@@ -288,7 +288,7 @@ function loadCsvText(text){
 // ==== FIXED fetchFullList ====
 function fetchFullList() {
   // Use CSV export link from Google Sheets (make sheet public)
-  const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg/edit?usp=sharing';
+  const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg/export?format=csv';
 
   fetch(SHEET_CSV_URL)
     .then(r => {
@@ -371,3 +371,4 @@ window.addEventListener('load',()=>{fetchFullList(); setTimeout(()=>map.invalida
 </script>
 </body>
 </html>
+
