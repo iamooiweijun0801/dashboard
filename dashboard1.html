@@ -580,6 +580,37 @@ document.getElementById('searchBtn').addEventListener('click', ()=> searchAndZoo
 document.getElementById('searchInput').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); searchAndZoom(e.target.value); }});
 
 window.addEventListener('load', ()=>{ fetchFullList(); setTimeout(()=>map.invalidateSize(),300); });
+// -------------------------
+// Auto-refresh CSV every 30 minutes
+// -------------------------
+let lastCsvText = null; // store previous CSV content
+const REFRESH_INTERVAL_MS = 0.5 * 60 * 1000; // 30 seconds
+
+async function smartFetchCsv() {
+  try {
+    const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg/export?format=csv&id=10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg&gid=0';
+    const response = await fetch(SHEET_CSV_URL);
+    if (!response.ok) throw new Error('Network response not ok');
+    const csvText = await response.text();
+
+    if (csvText !== lastCsvText) {
+      console.log('CSV changed, reloading map...');
+      lastCsvText = csvText;
+      loadCsvText(csvText); // calls your existing parser & render
+    } else {
+      console.log('CSV unchanged, no update needed.');
+    }
+  } catch (err) {
+    console.error('Error fetching CSV:', err);
+  }
+}
+
+// Initial load
+smartFetchCsv();
+
+// Auto-refresh every 30 minutes
+setInterval(smartFetchCsv, REFRESH_INTERVAL_MS);
+
 </script>
 </body>
 </html>
