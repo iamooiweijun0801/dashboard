@@ -278,7 +278,9 @@ function loadCsvText(text){
     const status = (norm['status'] ?? '') + '';
     const lat = parseFloat((norm['latitude'] ?? norm['lat'] ?? '').toString().replace(/,/g,'.'));
     const lon = parseFloat((norm['longitude'] ?? norm['lon'] ?? norm['lng'] ?? '').toString().replace(/,/g,'.'));
-    return {_rowIndex:i, site_code, enodeb_id, enodeb_name: enodeb_name || site_name || site_code, site_name, swap_batch, status, lat:Number.isFinite(lat)?lat:NaN, lon:Number.isFinite(lon)?lon:NaN};
+    const on_air_date = (norm['on-air_date'] ?? norm['on_air_date'] ?? norm['on air date'] ?? '') + '';
+
+    return {_rowIndex:i, site_code, enodeb_id, enodeb_name: enodeb_name || site_name || site_code, site_name, swap_batch, status,on_air_date, lat:Number.isFinite(lat)?lat:NaN, lon:Number.isFinite(lon)?lon:NaN};
   });
   render();
 }
@@ -286,7 +288,7 @@ function loadCsvText(text){
 // ==== FIXED fetchFullList ====
 function fetchFullList() {
   // Use CSV export link from Google Sheets (make sheet public)
-  const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg/export?format=csv&id=10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg&gid=0';
+  const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg/edit?usp=sharing';
 
   fetch(SHEET_CSV_URL)
     .then(r => {
@@ -312,7 +314,8 @@ function render(){
     const done = isDoneStatus(r.status);
     if(done) doneCount++; else pendingCount++;
     const icon = done?ICON_DONE:ICON_PENDING;
-    const popupHtml = `<div style="min-width:220px"><strong>${r.enodeb_name}</strong><br/><em>Site Name:</em> ${r.site_name}<br/><em>Site Code:</em> ${r.site_code}<br/><em>eNodeB ID:</em> ${r.enodeb_id}<br/><em>Swap Batch:</em> ${r.swap_batch}<br/><em>Status:</em> ${r.status}</div>`;
+    const popupHtml = `<div style="min-width:220px"><strong>${r.enodeb_name}</strong><br/><em>Site Name:</em> ${r.site_name}<br/><em>Site Code:</em> ${r.site_code}<br/><em>eNodeB ID:</em> ${r.enodeb_id}<br/><em>Swap Batch:</em> ${r.swap_batch}<br/><em>Status:</em> ${r.status}<br/>
+<em>On-Air Date:</em> ${r.on_air_date || '—'}</div>`;
     const m = L.marker([r.lat,r.lon],{icon});
     m.bindPopup(popupHtml,{autoClose:false, closeOnClick:false});
     m.on('mouseover',()=>{if(pinnedMarker && pinnedMarker!==m) pinnedMarker.closePopup(); pinnedMarker=null; m.openPopup(); document.getElementById('details').innerHTML = popupHtml;});
