@@ -6,167 +6,214 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-  :root{
-    --bg:#e0eaff;
-    --card:#ffffff80;
-    --accent:#2F80ED;
-    --accent-hover:#1C60B3;
-    --pending:#1F4E79;
-    --done:#66ff00;
-    --shadow:0 8px 30px rgba(0,0,0,0.12);
-    --radius:12px;
-  }
+:root {
+  --bg:#e0eaff;
+  --card:#ffffff80;
+  --accent:#2F80ED;
+  --accent-hover:#1C60B3;
+  --pending:#1F4E79;
+  --done:#66ff00;
+  --shadow:0 8px 30px rgba(0,0,0,0.12);
+  --radius:12px;
+}
 
-  html, body {
-    margin:0;
-    height:100%;
-    font-family: 'Inter', system-ui, Arial;
-    background: linear-gradient(to bottom right, #e0eaff, #ffffff);
-    color:#222;
-    font-size:14px;
-    line-height:1.5;
-  }
+/* --------------------
+   Base styles
+-------------------- */
+html {
+  font-size: clamp(12px, 1.2vw, 16px); /* responsive font */
+}
+body {
+  margin:0;
+  height:100%;
+  font-family: 'Inter', system-ui, Arial;
+  background: linear-gradient(to bottom right, #e0eaff, #ffffff);
+  color:#222;
+  line-height:1.5;
+}
 
+/* --------------------
+   Layout
+-------------------- */
+.app {
+  display:grid;
+  grid-template-columns:minmax(250px,30%) 1fr; /* left panel min 250px, max 30% */
+  gap:1.5vw;
+  height:100vh;
+  padding:1vw;
+  box-sizing:border-box;
+}
+
+.panel {
+  background:var(--card);
+  backdrop-filter: blur(12px);
+  border-radius:var(--radius);
+  padding:1em;
+  box-shadow:var(--shadow);
+  display:flex;
+  flex-direction:column;
+  overflow:auto;
+  border:1px solid rgba(255,255,255,0.3);
+}
+
+/* --------------------
+   Map
+-------------------- */
+#map {
+  height: 100%;
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  border:2px solid rgba(255,255,255,0.3);
+  min-height:50vh; /* ensures map visible on phones */
+}
+
+/* --------------------
+   Headings & labels
+-------------------- */
+h2 {
+  margin-bottom:0.75em;
+  font-weight:700;
+  font-size:clamp(1.2em,2vw,1.6em);
+  color:#1a1a1a;
+}
+
+label {
+  font-weight:600;
+  color:#333;
+}
+
+/* --------------------
+   Controls
+-------------------- */
+.controls {
+  display:flex;
+  flex-direction:column;
+  gap:0.75em;
+}
+
+.row {
+  display:flex;
+  gap:0.75em;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+select,input[type=text] {
+  padding:clamp(6px,0.5vw,10px) clamp(8px,1vw,12px);
+  border-radius:var(--radius);
+  border:1px solid #ccc;
+  transition:0.2s;
+  font-size:1em;
+}
+select:focus, input:focus{
+  border-color:var(--accent);
+  outline:none;
+  box-shadow:0 0 8px rgba(47,128,237,0.3);
+}
+
+.btn {
+  padding:clamp(8px,0.7vw,14px) clamp(12px,1.5vw,20px);
+  border-radius:var(--radius);
+  border:none;
+  font-weight:600;
+  cursor:pointer;
+  color:#fff;
+  background: linear-gradient(135deg,var(--accent),#1e5fc1);
+  transition:0.3s;
+  box-shadow:0 4px 12px rgba(0,0,0,0.2);
+  font-size:1em;
+}
+.btn:hover{
+  background:var(--accent-hover);
+  transform:translateY(-2px);
+  box-shadow:0 6px 16px rgba(0,0,0,0.25);
+}
+
+/* --------------------
+   Stats
+-------------------- */
+.stat {
+  background:rgba(255,255,255,0.85);
+  flex:1;
+  padding:0.75em;
+  border-radius:var(--radius);
+  box-shadow:0 4px 12px rgba(0,0,0,0.08);
+  text-align:center;
+  transition:0.2s;
+}
+.stat:hover{
+  box-shadow:0 6px 18px rgba(0,0,0,0.15);
+  transform:translateY(-2px);
+}
+.stat .small {
+  font-weight:500;
+  color:#555;
+  margin-bottom:0.25em;
+}
+.stat div[id] {
+  font-weight:700;
+  font-size:clamp(16px,1.2vw,22px);
+  margin-top:0.25em;
+}
+
+/* --------------------
+   Legend
+-------------------- */
+.legend .sw {
+  width:clamp(12px,1vw,18px);
+  height:clamp(12px,1vw,18px);
+  border-radius:50%;
+  display:inline-block;
+  margin-right:0.5em;
+  border:2px solid #fff;
+  box-shadow:0 0 4px rgba(0,0,0,0.25);
+}
+
+/* --------------------
+   Details panel
+-------------------- */
+#details {
+  font-size:clamp(12px,1vw,14px);
+  color:#222;
+  margin-top:0.5em;
+  padding:0.5em;
+  border-radius:var(--radius);
+  background:rgba(255,255,255,0.7);
+  box-shadow:0 4px 12px rgba(0,0,0,0.08);
+  min-height:64px;
+}
+
+/* --------------------
+   Search wrapper
+-------------------- */
+.search-wrap {
+  display:flex;
+  gap:0.5em;
+  flex-wrap:wrap;
+}
+
+/* --------------------
+   Responsive adjustments
+-------------------- */
+@media(max-width:950px){
   .app{
-    display:grid;
-    grid-template-columns:380px 1fr;
-    gap:16px;
-    height:100vh;
-    padding:16px;
-    box-sizing:border-box;
+    grid-template-columns:1fr;
+    grid-template-rows:minmax(300px,40vh) 1fr;
   }
-
-  .panel{
-    background:var(--card);
-    backdrop-filter: blur(12px);
-    border-radius:var(--radius);
-    padding:16px;
-    box-shadow:var(--shadow);
-    display:flex;
-    flex-direction:column;
-    overflow:auto;
-    border:1px solid rgba(255,255,255,0.3);
+  #map {
+    min-height:40vh;
   }
-
-  #map{
-    height:100%;
-    border-radius:var(--radius);
-    box-shadow:var(--shadow);
-    border:2px solid rgba(255,255,255,0.3);
+}
+@media(min-width:1500px){
+  .app{
+    grid-template-columns:minmax(300px,25%) 1fr;
   }
-
-  h2{
-    margin-bottom:12px;
-    font-weight:700;
-    font-size:1.4em;
-    color:#1a1a1a;
+  #map {
+    min-height:70vh;
   }
-
-  label{
-    font-weight:600;
-    color:#333;
-  }
-
-  .controls{
-    display:flex;
-    flex-direction:column;
-    gap:12px;
-  }
-
-  .row{
-    display:flex;
-    gap:12px;
-    align-items:center;
-  }
-
-  select,input[type=text]{
-    padding:8px 10px;
-    border-radius:var(--radius);
-    border:1px solid #ccc;
-    transition:0.2s;
-  }
-  select:focus, input:focus{
-    border-color:var(--accent);
-    outline:none;
-    box-shadow:0 0 8px rgba(47,128,237,0.3);
-  }
-
-  .btn{
-    padding:10px 16px;
-    border-radius:var(--radius);
-    border:none;
-    font-weight:600;
-    cursor:pointer;
-    color:#fff;
-    background: linear-gradient(135deg,var(--accent),#1e5fc1);
-    transition:0.3s;
-    box-shadow:0 4px 12px rgba(0,0,0,0.2);
-  }
-  .btn:hover{
-    background:var(--accent-hover);
-    transform:translateY(-2px);
-    box-shadow:0 6px 16px rgba(0,0,0,0.25);
-  }
-
-  .stat{
-    background:rgba(255,255,255,0.85);
-    flex:1;
-    padding:12px;
-    border-radius:var(--radius);
-    box-shadow:0 4px 12px rgba(0,0,0,0.08);
-    text-align:center;
-    transition:0.2s;
-  }
-  .stat:hover{
-    box-shadow:0 6px 18px rgba(0,0,0,0.15);
-    transform:translateY(-2px);
-  }
-
-  .stat .small{
-    font-weight:500;
-    color:#555;
-    margin-bottom:4px;
-  }
-
-  .stat div[id]{
-    font-weight:700;
-    font-size:20px;
-    margin-top:4px;
-  }
-
-  .legend .sw{
-    width:16px;
-    height:16px;
-    border-radius:50%;
-    display:inline-block;
-    margin-right:8px;
-    border:2px solid #fff;
-    box-shadow:0 0 4px rgba(0,0,0,0.25);
-  }
-
-  #details{
-    font-size:14px;
-    color:#222;
-    margin-top:8px;
-    padding:8px;
-    border-radius:var(--radius);
-    background:rgba(255,255,255,0.7);
-    box-shadow:0 4px 12px rgba(0,0,0,0.08);
-    min-height:64px;
-  }
-
-  .search-wrap{
-    display:flex;
-    gap:8px;
-  }
-
-  @media(max-width:950px){
-    .app{
-      grid-template-columns:1fr;
-      grid-template-rows:320px 1fr;
-    }
-  }
+}
 </style>
+
 </head>
 <body>
 <div class="app">
@@ -223,7 +270,7 @@
 
 <script>
 const map = L.map('map', { preferCanvas: true }).setView([3.0, 101.5], 6);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(map);
 const markersLayer = L.layerGroup().addTo(map);
 
 function dotIcon(color){ return L.divIcon({className:'', html:`<div style="width:10px;height:10px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.25);"></div>`, iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-10]}); }
@@ -469,7 +516,7 @@ function render(){
       pinnedMarker = m;
       m.openPopup();
       document.getElementById('details').innerHTML = popupHtml;
-      map.setView(m.getLatLng(), 16);
+      map.setView(m.getLatLng(), 14);
     });
 
     m.addTo(markersLayer);
@@ -566,7 +613,7 @@ function searchAndZoom(term){
   // 1) exact key in visibleMarkers
   if(visibleMarkers[term]){
     const m = visibleMarkers[term];
-    map.setView(m.getLatLng(), 16);
+    map.setView(m.getLatLng(), 14);
     document.getElementById('details').innerHTML = m.getPopup() ? m.getPopup().getContent() : '';
     m.openPopup();
     pinnedMarker = m;
@@ -576,7 +623,7 @@ function searchAndZoom(term){
   // 2) try exact matches in allRows (enodeb_id)
   const exact = allRows.find(r => (r.enodeb_id && r.enodeb_id.toString().trim() === term));
   if(exact && Number.isFinite(exact.lat) && Number.isFinite(exact.lon)){
-    map.setView([exact.lat, exact.lon], 16);
+    map.setView([exact.lat, exact.lon], 14);
     const key = (exact.enodeb_id || ('row' + exact._rowIndex)).toString();
     if(visibleMarkers[key]){
       const m = visibleMarkers[key];
@@ -605,13 +652,13 @@ function searchAndZoom(term){
       const key = (found.enodeb_id || ('row' + found._rowIndex)).toString();
       if(visibleMarkers[key]){
         const m = visibleMarkers[key];
-        map.setView(m.getLatLng(),16);
+        map.setView(m.getLatLng(),14);
         document.getElementById('details').innerHTML = m.getPopup() ? m.getPopup().getContent() : '';
         m.openPopup();
         pinnedMarker = m;
       } else {
         // show details and zoom map
-        map.setView([found.lat, found.lon], 16);
+        map.setView([found.lat, found.lon], 14);
         const popupHtml = `<div style="min-width:220px"><strong>${escapeHtml(found.enodeb_name)}</strong><br/>
           <em>Site Name:</em> ${escapeHtml(found.site_name)}<br/>
           <em>eNodeB ID:</em> ${escapeHtml(found.enodeb_id)}<br/>
