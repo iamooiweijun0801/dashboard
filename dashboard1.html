@@ -49,7 +49,7 @@
   }
 
   #map{
-    height:calc(100vh - 48px);
+    height:100%;
     border-radius:var(--radius);
     box-shadow:var(--shadow);
     border:2px solid rgba(255,255,255,0.3);
@@ -204,14 +204,14 @@
       <hr/>
 
       <div class="row search-wrap">
-        <input id="searchInput" type="text" placeholder="Search Site Code / eNodeB ID / Site name"/>
+        <input id="searchInput" type="text" placeholder="Search eNodeB ID / Site name"/>
         <button id="searchBtn" class="btn">Find</button>
       </div>
 
       <div id="details">Hover a marker or search to see details here.</div>
 
-      <div style="margin-top:auto" class="small"></div>
-
+    </div>
+  </div>
 
   <div class="panel" style="padding:0">
     <div id="map"></div>
@@ -222,33 +222,14 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-/* -------------------------
-   Map + UI (unchanged logic)
-   ------------------------- */
 const map = L.map('map', { preferCanvas: true }).setView([3.0, 101.5], 6);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 const markersLayer = L.layerGroup().addTo(map);
 
-function dotIcon(color){
-  return L.divIcon({
-    className:'',
-    html:`<div style="width:10px;height:10px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.25);"></div>`,
-    iconSize:[14,14],
-    iconAnchor:[7,7],
-    popupAnchor:[0,-10]
-  });
-}
+function dotIcon(color){ return L.divIcon({className:'', html:`<div style="width:10px;height:10px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.25);"></div>`, iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-10]}); }
+const ICON_PENDING = dotIcon('#1F4E79'); const ICON_DONE = dotIcon('#E74C3C');
+let allRows = [], visibleMarkers = {}, pinnedMarker = null;
 
-const ICON_PENDING = dotIcon('#1F4E79');
-const ICON_DONE    = dotIcon('#E74C3C');
-
-let allRows = [];
-let visibleMarkers = {};
-let pinnedMarker = null;
-
-/* -------------------------
-   small helpers
-   ------------------------- */
 function normalizeKey(k){ return (k||'').toString().trim().toLowerCase().replace(/\s+/g,'_'); }
 function isDoneStatus(s){
   if(!s) return false;
@@ -302,8 +283,8 @@ function fuzzyFindInRows(term, rows){
   const tNorm = normForSearch(term);
   if(!tNorm) return null;
 
-  // 1) exact match on site_code or enodeb_id or enodeb_name or site_name
-  let exact = rows.find(r => (r.site_code && r.site_code.toString().trim() === term) || (r.enodeb_id && r.enodeb_id.toString().trim() === term));
+  // 1) exact match on enodeb_id or enodeb_name or site_name
+  let exact = rows.find(r => (r.enodeb_id && r.enodeb_id.toString().trim() === term));
   if(exact) return { row: exact, score: 0, type: 'exact-id' };
 
   // 2) exact (case-insensitive) match for names
@@ -311,8 +292,7 @@ function fuzzyFindInRows(term, rows){
   if(exact) return { row: exact, score: 0, type: 'exact-name' };
 
   // 3) substring match (contains)
-  const substringMatches = rows.filter(r => (r.site_code && r.site_code.toString().toLowerCase().includes(term.toLowerCase()))
-    || (r.enodeb_id && r.enodeb_id.toString().toLowerCase().includes(term.toLowerCase()))
+  const substringMatches = rows.filter(r =>(r.enodeb_id && r.enodeb_id.toString().toLowerCase().includes(term.toLowerCase()))
     || (r.site_name && r.site_name.toString().toLowerCase().includes(term.toLowerCase()))
     || (r.enodeb_name && r.enodeb_name.toString().toLowerCase().includes(term.toLowerCase())));
   if(substringMatches.length === 1) return { row: substringMatches[0], score: 1, type: 'substring' };
@@ -328,7 +308,6 @@ function fuzzyFindInRows(term, rows){
     const candidates = [
       normForSearch(r.site_name || ''),
       normForSearch(r.enodeb_name || ''),
-      normForSearch(r.site_code || ''),
       normForSearch(r.enodeb_id || '')
     ];
     for(const c of candidates){
@@ -381,7 +360,6 @@ function loadCsvText(text){
     }
 
     // site fields (keep original values too)
-    const site_code = (norm['site_code'] ?? norm['site code'] ?? norm['site'] ?? '') + '';
     const enodeb_id = (norm['enodeb_id'] ?? norm['enodeb id'] ?? norm['enodeb'] ?? '') + '';
     const enodeb_name = (norm['enodeb_name'] ?? norm['enodeb name'] ?? '') + '';
     const site_name = (norm['site_name'] ?? norm['site name'] ?? '') + '';
@@ -414,9 +392,8 @@ function loadCsvText(text){
 
     return {
       _rowIndex: i,
-      site_code,
       enodeb_id,
-      enodeb_name: enodeb_name || site_name || site_code,
+      enodeb_name: enodeb_name || site_name,
       site_name,
       swap_batch,
       status,
@@ -469,7 +446,6 @@ function render(){
     const popupHtml = `<div style="min-width:240px">
       <strong>${escapeHtml(r.enodeb_name)}</strong><br/>
       <em>Site Name:</em> ${escapeHtml(r.site_name)}<br/>
-      <em>Site Code:</em> ${escapeHtml(r.site_code)}<br/>
       <em>eNodeB ID:</em> ${escapeHtml(r.enodeb_id)}<br/>
       <em>Swap Batch:</em> ${escapeHtml(r.swap_batch)}<br/>
       <em>Status:</em> ${escapeHtml(r.status)}<br/>
@@ -497,7 +473,7 @@ function render(){
     });
 
     m.addTo(markersLayer);
-    const key = (r.site_code || r.enodeb_id || ('row' + r._rowIndex)).toString();
+    const key = (r.enodeb_id || ('row' + r._rowIndex)).toString();
     visibleMarkers[key] = m;
     bounds.push([r.lat, r.lon]);
   });
@@ -524,10 +500,10 @@ function escapeHtml(s){
 }
 
 /* -------------------------
-   Search: supports code/id exact and fuzzy name search
+   Search: supports id exact and fuzzy name search
    ------------------------- */
 function searchAndZoom(term){
-  if(!term || !term.toString().trim()){ alert('Enter a Site Code, eNodeB ID, or Site name'); return; }
+  if(!term || !term.toString().trim()){ alert('Enter a eNodeB ID, or Site name'); return; }
   term = term.toString().trim();
 
   // 1) exact key in visibleMarkers
@@ -540,11 +516,11 @@ function searchAndZoom(term){
     return;
   }
 
-  // 2) try exact matches in allRows (site_code or enodeb_id)
-  const exact = allRows.find(r => (r.site_code && r.site_code.toString().trim() === term) || (r.enodeb_id && r.enodeb_id.toString().trim() === term));
+  // 2) try exact matches in allRows (enodeb_id)
+  const exact = allRows.find(r => (r.enodeb_id && r.enodeb_id.toString().trim() === term));
   if(exact && Number.isFinite(exact.lat) && Number.isFinite(exact.lon)){
     map.setView([exact.lat, exact.lon], 16);
-    const key = (exact.site_code || exact.enodeb_id || ('row' + exact._rowIndex)).toString();
+    const key = (exact.enodeb_id || ('row' + exact._rowIndex)).toString();
     if(visibleMarkers[key]){
       const m = visibleMarkers[key];
       document.getElementById('details').innerHTML = m.getPopup() ? m.getPopup().getContent() : '';
@@ -554,7 +530,6 @@ function searchAndZoom(term){
       // not visible in current filter — just show details in panel
       const popupHtml = `<div style="min-width:220px"><strong>${escapeHtml(exact.enodeb_name)}</strong><br/>
         <em>Site Name:</em> ${escapeHtml(exact.site_name)}<br/>
-        <em>Site Code:</em> ${escapeHtml(exact.site_code)}<br/>
         <em>eNodeB ID:</em> ${escapeHtml(exact.enodeb_id)}<br/>
         <em>Swap Batch:</em> ${escapeHtml(exact.swap_batch)}<br/>
         <em>Status:</em> ${escapeHtml(exact.status)}<br/>
@@ -564,13 +539,13 @@ function searchAndZoom(term){
     return;
   }
 
-  // 3) fuzzy / partial search across site_name / enodeb_name / site_code / enodeb_id
+  // 3) fuzzy / partial search across site_name / enodeb_name / enodeb_id
   const result = fuzzyFindInRows(term, allRows);
   if(result && result.row){
     const found = result.row;
     if(Number.isFinite(found.lat) && Number.isFinite(found.lon)){
       // if marker is visible, open; otherwise show details
-      const key = (found.site_code || found.enodeb_id || ('row' + found._rowIndex)).toString();
+      const key = (found.enodeb_id || ('row' + found._rowIndex)).toString();
       if(visibleMarkers[key]){
         const m = visibleMarkers[key];
         map.setView(m.getLatLng(),16);
@@ -582,7 +557,6 @@ function searchAndZoom(term){
         map.setView([found.lat, found.lon], 16);
         const popupHtml = `<div style="min-width:220px"><strong>${escapeHtml(found.enodeb_name)}</strong><br/>
           <em>Site Name:</em> ${escapeHtml(found.site_name)}<br/>
-          <em>Site Code:</em> ${escapeHtml(found.site_code)}<br/>
           <em>eNodeB ID:</em> ${escapeHtml(found.enodeb_id)}<br/>
           <em>Swap Batch:</em> ${escapeHtml(found.swap_batch)}<br/>
           <em>Status:</em> ${escapeHtml(found.status)}<br/>
@@ -594,7 +568,7 @@ function searchAndZoom(term){
     }
   }
 
-  alert('Site not found (try exact Site Code, eNodeB ID, or part of the Site Name).');
+  alert('Site not found (try exact eNodeB ID, or part of the Site Name).');
 }
 
 /* -------------------------
@@ -609,4 +583,3 @@ window.addEventListener('load', ()=>{ fetchFullList(); setTimeout(()=>map.invali
 </script>
 </body>
 </html>
-
