@@ -159,10 +159,7 @@
     display:flex;
     gap:8px;
   }
-.map-sniper-btn{position:absolute;bottom:20px;right:20px;z-index:9999;width:50px;height:50px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #444;box-shadow:0 2px 8px rgba(0,0,0,0.25);}
-.map-sniper-btn img{width:28px;height:28px;}
-.map-sniper-btn:hover{transform:translateY(-4px);box-shadow:0 6px 18px rgba(0,0,0,0.28);}
-hr{border:none;border-top:1px solid #eee;margin:12px 0;}
+
   @media(max-width:950px){
     .app{
       grid-template-columns:1fr;
@@ -210,14 +207,7 @@ hr{border:none;border-top:1px solid #eee;margin:12px 0;}
         <input id="searchInput" type="text" placeholder="Search eNodeB ID / Site name"/>
         <button id="searchBtn" class="btn">Find</button>
       </div>
-<div class="panel" style="padding:0;">
-    <div id="map">
-      <div id="sniperBtn" class="map-sniper-btn" title="Reset view to current filter bounds">
-        <img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" alt="sniper">
-      </div>
-    </div>
-  </div>
-</div>
+
       <div id="details">Hover a marker or search to see details here.</div>
 
     </div>
@@ -645,8 +635,7 @@ document.getElementById('viewSelect').addEventListener('change', render);
 document.getElementById('reloadBtn').addEventListener('click', fetchFullList);
 document.getElementById('searchBtn').addEventListener('click', ()=> searchAndZoom(document.getElementById('searchInput').value));
 document.getElementById('searchInput').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); searchAndZoom(e.target.value); }});
-document.getElementById('sniperBtn').addEventListener('click',()=>render());
-  
+
 window.addEventListener('load', ()=>{ fetchFullList(); setTimeout(()=>map.invalidateSize(),300); });
 // -------------------------
 // Auto-refresh CSV every 30 minutes
@@ -682,4 +671,3 @@ setInterval(smartFetchCsv, REFRESH_INTERVAL_MS);
 </script>
 </body>
 </html>
-
