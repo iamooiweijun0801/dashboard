@@ -150,7 +150,7 @@
 .map-sniper-btn img{width:28px;height:28px;}
 .map-sniper-btn:hover{transform:translateY(-4px);box-shadow:0 6px 18px rgba(0,0,0,0.28);}
 hr{border:none;border-top:1px solid #eee;margin:12px 0;}
-
+.color-picker-popup{ position:absolute; z-index:10000; background:#fff; border:1px solid #ccc; padding:8px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.2); display:flex; gap:8px; }
   @media(max-width:950px){
     .app{
       grid-template-columns:1fr;
@@ -220,6 +220,11 @@ hr{border:none;border-top:1px solid #eee;margin:12px 0;}
   </div>
 </div>
 
+<div id="colorPickerPopup" class="color-picker-popup" style="display:none;">
+  <label>Pick color: <input type="color" id="pickerInput"/></label>
+  <button id="applyColorBtn" class="btn" style="padding:4px 8px;font-size:12px;">Apply</button>
+</div>
+
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -236,16 +241,103 @@ function dotIcon(color){
 }
 
 let allRows = [], visibleMarkers = {}, pinnedMarker = null;
+let customLegendColors = null;
 
 function normalizeKey(k){ return (k||'').toString().trim().toLowerCase().replace(/\s+/g,'_'); }
 
 function getStatusColor(row){
-  const onair = row['on_air_date'], ft = row['ft_date'], ssv = row['ssv_date'];
-  if(onair && ft && ssv) return getComputedStyle(document.documentElement).getPropertyValue('--done').trim();
-  if(onair && ft && !ssv) return getComputedStyle(document.documentElement).getPropertyValue('--pending-ssv').trim();
-  if(onair && !ft) return getComputedStyle(document.documentElement).getPropertyValue('--pending-ft').trim();
-  if(!onair) return getComputedStyle(document.documentElement).getPropertyValue('--pending-onair').trim();
-  return getComputedStyle(document.documentElement).getPropertyValue('--pending-onair').trim();
+  const onair=row['on_air_date'], ft=row['ft_date'], ssv=row['ssv_date'];
+  const colors = customLegendColors || {
+    done: getComputedStyle(document.documentElement).getPropertyValue('--done').trim(),
+    pendingSsv: getComputedStyle(document.documentElement).getPropertyValue('--pending-ssv').trim(),
+    pendingFt: getComputedStyle(document.documentElement).getPropertyValue('--pending-ft').trim(),
+    pendingOnAir: getComputedStyle(document.documentElement).getPropertyValue('--pending-onair').trim()
+  };
+  if(onair && ft && ssv) return colors.done;
+  if(onair && ft && !ssv) return colors.pendingSsv;
+  if(onair && !ft) return colors.pendingFt;
+  if(!onair) return colors.pendingOnAir;
+  return colors.pendingOnAir;
+}
+
+function updateLegendUI(newLegend){
+  const legendRow = document.querySelector('.legend');
+  legendRow.innerHTML='';
+  newLegend.forEach(lg=>{
+    const span=document.createElement('span');
+    span.className='sw';
+    span.style.background=lg.color;
+    span.title=lg.label;
+    span.dataset.statusLabel=lg.label;
+
+    span.addEventListener('click',(e)=>{
+      showColorPicker(e.target);
+    });
+
+    legendRow.appendChild(span);
+    legendRow.appendChild(document.createTextNode(lg.label+' '));
+  });
+}
+
+function setLegendColors(newColors){
+  customLegendColors={
+    done:newColors.done,
+    pendingSsv:newColors.pendingSsv,
+    pendingFt:newColors.pendingFt,
+    pendingOnAir:newColors.pendingOnAir
+  };
+  updateLegendUI([
+    {color:newColors.done,label:'Done'},
+    {color:newColors.pendingSsv,label:'Pending SSV'},
+    {color:newColors.pendingFt,label:'Pending FT'},
+    {color:newColors.pendingOnAir,label:'Pending On-Air'}
+  ]);
+  render();
+}
+const colorPickerPopup = document.getElementById('colorPickerPopup');
+const pickerInput = document.getElementById('pickerInput');
+let currentLegendTarget=null;
+
+function showColorPicker(target){
+  currentLegendTarget = target;
+  const rect = target.getBoundingClientRect();
+  colorPickerPopup.style.top = rect.bottom + window.scrollY + 'px';
+  colorPickerPopup.style.left = rect.left + window.scrollX + 'px';
+  pickerInput.value = rgb2hex(target.style.background);
+  colorPickerPopup.style.display='flex';
+}
+
+document.getElementById('applyColorBtn').addEventListener('click',()=>{
+  if(!currentLegendTarget) return;
+  const newColor=pickerInput.value;
+  const label=currentLegendTarget.dataset.statusLabel;
+  const colorMap={
+    'Done':'done',
+    'Pending SSV':'pendingSsv',
+    'Pending FT':'pendingFt',
+    'Pending On-Air':'pendingOnAir'
+  };
+  const key=colorMap[label];
+  customLegendColors[key]=newColor;
+  render();
+  updateLegendUI([
+    {color:customLegendColors.done,label:'Done'},
+    {color:customLegendColors.pendingSsv,label:'Pending SSV'},
+    {color:customLegendColors.pendingFt,label:'Pending FT'},
+    {color:customLegendColors.pendingOnAir,label:'Pending On-Air'}
+  ]);
+  colorPickerPopup.style.display='none';
+});
+
+document.body.addEventListener('click',e=>{
+  if(!colorPickerPopup.contains(e.target) && !e.target.classList.contains('sw')){
+    colorPickerPopup.style.display='none';
+  }
+});
+
+function rgb2hex(rgb){
+  const result=/rgb\((\d+),\s*(\d+),\s*(\d+)\)/i.exec(rgb);
+  return result ? "#" + ((1 << 24) + (parseInt(result[1])<<16) + (parseInt(result[2])<<8) + parseInt(result[3])).toString(16).slice(1) : rgb;
 }
 
 function escapeHtml(s){
@@ -450,7 +542,12 @@ document.getElementById('searchBtn').addEventListener('click',()=>searchAndZoom(
 document.getElementById('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){ e.preventDefault(); searchAndZoom(e.target.value);}});
 document.getElementById('sniperBtn').addEventListener('click',()=>render());
 
-window.addEventListener('load',()=>{ fetchFullList(); setTimeout(()=>map.invalidateSize(),300); });
+window.addEventListener('load',()=>{ fetchFullList(); setTimeout(()=>map.invalidateSize(),300);setLegendColors({
+    done:'#00cc00',
+    pendingSsv:'#ffcc00',
+    pendingFt:'#ff3300',
+    pendingOnAir:'#3399ff'
+  }); });
 
 /* -------------------------
    CSV fetch
@@ -472,5 +569,6 @@ setInterval(fetchFullList,REFRESH_INTERVAL_MS);
 </script>
 </body>
 </html>
+
 
 
