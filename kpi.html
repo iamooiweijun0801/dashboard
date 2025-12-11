@@ -261,7 +261,7 @@
             <div class="style-button" onclick="applyChartStyle(1)">Smooth Line with Dots</div>
             <div class="style-button" onclick="applyChartStyle(2)">Smooth Line</div>
             <div class="style-button" onclick="applyChartStyle(3)">Thick Line</div>
-            <div class="style-button" onclick="applyChartStyle(4)">Thin Line</div>
+            <div class="style-button" onclick="applyChartStyle(4)">Thin Line with Dots</div>
             
             <div style="margin: 20px 0; border-top: 1px solid #eee; padding-top: 15px;">
                 <label><b>Technology Colors</b></label>
@@ -318,16 +318,16 @@
             { tech: "GSM", kpi: "Call drop rate(%)", initialChecked: true, color: "#2F80ED" },
             { tech: "GSM", kpi: "CS Traffic (erl)", initialChecked: true, color: "#2F80ED" },
             
-            { tech: "LTE", kpi: "LTE RRC Setup Success Rate(%)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "RRC Setup Success Rate(%)", initialChecked: true, color: "#27AE60" },
             { tech: "LTE", kpi: "E-RAB Call Drop Rate(%)", initialChecked: true, color: "#27AE60" },
-            { tech: "LTE", kpi: "LTE DL -USER Average Throughput (Mbit/s) ", initialChecked: true, color: "#27AE60" },
-            { tech: "LTE", kpi: "LTE UL -USER Average Throughput (Mbit/s)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "DL -USER Average Throughput (Mbit/s)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "UL -USER Average Throughput (Mbit/s)", initialChecked: true, color: "#27AE60" },
             { tech: "LTE", kpi: "DL Data Total Volume (Gbyte)", initialChecked: true, color: "#27AE60" },
             { tech: "LTE", kpi: "UL Data Total Volume (Gbyte)", initialChecked: true, color: "#27AE60" },
                        
             { tech: "NR", kpi: "SgNB Addition Success Rate (CU)(%)", initialChecked: true, color: "#D24726" },
-            { tech: "NR", kpi: "NR DL Traffic Volume (GB)", initialChecked: true, color: "#D24726" },
-            { tech: "NR", kpi: "NR DL User Throughput(Mbps)", initialChecked: true, color: "#D24726" },
+            { tech: "NR", kpi: "DL Traffic Volume (GB)", initialChecked: true, color: "#D24726" },
+            { tech: "NR", kpi: "DL User Throughput(Mbps)", initialChecked: true, color: "#D24726" },
       
         ];
 
@@ -366,8 +366,8 @@
                 backgroundColor: "rgba(47, 128, 237, 0.1)" 
             },
             { 
-                name: "Smooth Line with Dots", 
-                borderWidth: 2, 
+                name: "Line with Dots", 
+                borderWidth: 3, 
                 pointRadius: 5, 
                 borderDash: [], 
                 tension: 0.4, 
@@ -390,9 +390,9 @@
                 fill: false 
             },
             { 
-                name: "Thin Line", 
-                borderWidth: 1, 
-                pointRadius: 0, 
+                name: "Thin Line with dots", 
+                borderWidth: 2, 
+                pointRadius: 4, 
                 borderDash: [], 
                 tension: 0, 
                 fill: false 
@@ -528,7 +528,7 @@
                     
                     // Simple aggregation
                     const kpiLower = kpi.toLowerCase();
-                    if (kpiLower.includes('%') || kpiLower.includes('rate') || kpiLower.includes('avg') || kpiLower.includes('average')) {
+                    if (kpiLower.includes('%') || kpiLower.includes('rate') || kpiLower.includes('avg') || kpiLower.includes('average')|| kpiLower.includes('max')) {
                         return values.reduce((a, b) => a + b, 0) / values.length;
                     } else {
                         return values.reduce((a, b) => a + b, 0);
@@ -558,8 +558,11 @@
                     }
                     return niceFraction * Math.pow(10, exponent);
                 }
-                
+      
                 function computeYAxis(minVal, maxVal) {
+                    if (minVal >= 97 && maxVal <= 100) {
+                    return { niceMin: 96, niceMax: 100, tickSpacing: 1 };
+                     }
                     let minV = minVal * 0.95; 
                     let maxV = maxVal * 1.05;
                     if (maxVal < 10) minV = 0;
