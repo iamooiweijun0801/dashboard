@@ -5,88 +5,236 @@
     <title>KPI Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* --- BASE STYLES (Kept for visual appeal) --- */
-        body { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; padding:0; background:#f4f7f6; overflow-x:hidden; }
-        header { text-align:center; padding:15px 0; font-size:28px; font-weight:700; color:#333; background:white; box-shadow:0 2px 4px rgba(0,0,0,0.05); margin-bottom:15px; }
-        /* --- CONTROLS --- */
-        .controls { display:flex; justify-content:center; gap:10px; margin-bottom:20px; flex-wrap:wrap; align-items:center; }
-        button.action-btn { padding:8px 16px; cursor:pointer; border:none; background:#2F80ED; color:white; border-radius:6px; font-weight:600; transition:0.2s; }
-        button.action-btn:hover { background:#1f5ab5; }
-        button.ppt-btn { background:#D24726; } /* PowerPoint Orange */
-        button.ppt-btn:hover { background:#a8381e; }
+        /* --- BASE STYLES --- */
+        body { 
+            font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin:0; 
+            padding:0; 
+            background:#f4f7f6; 
+            overflow-x:hidden; 
+        }
+        header { 
+            text-align:center; 
+            padding:15px 0; 
+            font-size:28px; 
+            font-weight:700; 
+            color:#333; 
+            background:white; 
+            box-shadow:0 2px 4px rgba(0,0,0,0.05); 
+            margin-bottom:15px; 
+        }
         
         /* --- DRAWER TOGGLE BUTTONS --- */
-        .drawer-toggle-buttons { position: fixed; top: 20px; right: 0; display: flex; flex-direction: column; gap: 8px; z-index: 900; }
-        .chartStyleDrawerToggle, .kpiDrawerToggle { width: 36px; height: 36px; background: #8E44AD; color: white; border-radius: 6px 0 0 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: 0.2s; }
-        .kpiDrawerToggle { background: #2F80ED; margin-top: 8px; }
-        .chartStyleDrawerToggle:hover, .kpiDrawerToggle:hover { opacity: 0.9; }
+        .drawer-toggle-buttons { 
+            position: fixed; 
+            top: 20px; 
+            right: 0; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 8px; 
+            z-index: 900; 
+        }
+        .chartStyleDrawerToggle, .kpiDrawerToggle { 
+            width: 36px; 
+            height: 36px; 
+            background: #8E44AD; 
+            color: white; 
+            border-radius: 6px 0 0 6px; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 20px; 
+            transition: 0.2s; 
+        }
+        .kpiDrawerToggle { 
+            background: #2F80ED; 
+            margin-top: 8px; 
+        }
+        .chartStyleDrawerToggle:hover, .kpiDrawerToggle:hover { 
+            opacity: 0.9; 
+        }
         
         /* --- GRID LAYOUT (3 Graphs per row) --- */
-        .chart-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:20px; padding:0 20px 40px 20px; max-width: 1800px; margin: 0 auto; }
-        @media (max-width: 1400px) { .chart-grid { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 768px) { .chart-grid { grid-template-columns: 1fr; } }
+        .chart-grid { 
+            display:grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap:20px; 
+            padding:0 20px 40px 20px; 
+            max-width: 1800px; 
+            margin: 0 auto; 
+        }
+        @media (max-width: 1400px) { 
+            .chart-grid { 
+                grid-template-columns: repeat(2, 1fr); 
+            } 
+        }
+        @media (max-width: 768px) { 
+            .chart-grid { 
+                grid-template-columns: 1fr; 
+            } 
+        }
         
         /* --- CARDS & CHARTS --- */
-        .chart-card { background:white; border-radius:8px; padding:15px; box-shadow:0 2px 8px rgba(0,0,0,0.08); display:flex; flex-direction:column; }
-        .chart-container { position: relative; height: 280px; width: 100%; }
+        .chart-card { 
+            background:white; 
+            border-radius:8px; 
+            padding:15px; 
+            box-shadow:0 2px 8px rgba(0,0,0,0.08); 
+            display:flex; 
+            flex-direction:column; 
+        }
+        .chart-container { 
+            position: relative; 
+            height: 280px; 
+            width: 100%; 
+        }
         
         /* --- DRAWERS --- */
         .chartStyleDrawer, .kpiDrawer { 
-            position: fixed; top: 0; right: 0; width: 320px; height: 100%; 
-            background: white; box-shadow: -2px 0 10px rgba(0,0,0,0.1); 
-            z-index: 1000; transform: translateX(100%); transition: 0.3s; 
-            padding: 20px; display: flex; flex-direction: column; 
+            position: fixed; 
+            top: 0; 
+            right: 0; 
+            width: 320px; 
+            height: 100%; 
+            background: white; 
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1); 
+            z-index: 1000; 
+            transform: translateX(100%); 
+            transition: 0.3s; 
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column; 
         }
-        .chartStyleDrawer.open, .kpiDrawer.open { transform: translateX(0); }
-        .drawer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
-        .kpi-options-body, .style-options-body { flex-grow: 1; overflow-y: auto; padding-right: 5px; padding-bottom: 40px; }
-        .drawer-controls { display: flex; gap: 5px; align-items: center; }
-        .drawer-controls .action-btn { padding: 6px 10px; font-size: 13px; }
+        .chartStyleDrawer.open, .kpiDrawer.open { 
+            transform: translateX(0); 
+        }
+        .drawer-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 15px; 
+            padding-bottom: 10px; 
+            border-bottom: 1px solid #eee; 
+        }
+        .kpi-options-body, .style-options-body { 
+            flex-grow: 1; 
+            overflow-y: auto; 
+            padding-right: 5px; 
+            padding-bottom: 40px; 
+        }
+        .drawer-controls { 
+            display: flex; 
+            gap: 5px; 
+            align-items: center; 
+        }
+        .drawer-controls .action-btn { 
+            padding: 6px 10px; 
+            font-size: 13px; 
+        }
 
-        .kpi-group-title { font-weight: bold; color: #2F80ED; margin-top: 15px; margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 3px; }
-        .kpi-option { display: block; margin-bottom: 5px; cursor: pointer; user-select: none; }
-        .kpi-option input[type="checkbox"] { margin-right: 8px; }
+        /* --- KPI OPTIONS STYLING --- */
+        .kpi-group-title { 
+            font-weight: bold; 
+            color: #2F80ED; 
+            margin-top: 15px; 
+            margin-bottom: 5px; 
+            border-bottom: 1px solid #eee; 
+            padding-bottom: 3px; 
+        }
+        .kpi-option { 
+            display: block; 
+            margin-bottom: 5px; 
+            cursor: pointer; 
+            user-select: none; 
+        }
+        .kpi-option input[type="checkbox"] { 
+            margin-right: 8px; 
+        }
         
-        /* --- Chart Style Buttons (Simplified) --- */
-        .style-button { padding: 10px 12px; margin: 6px 0; background: #f5f5f5; border-radius: 6px; cursor: pointer; font-weight: 500; border: 1px solid #ddd; transition: 0.2s; }
-        .style-button:hover { background: #e9e9e9; }
-        .style-button.active { background: #8E44AD; color: white; border-color: #8E44AD; }
+        /* --- Chart Style Buttons --- */
+        .style-button { 
+            padding: 10px 12px; 
+            margin: 6px 0; 
+            background: #f5f5f5; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: 500; 
+            border: 1px solid #ddd; 
+            transition: 0.2s; 
+        }
+        .style-button:hover { 
+            background: #e9e9e9; 
+        }
+        .style-button.active { 
+            background: #8E44AD; 
+            color: white; 
+            border-color: #8E44AD; 
+        }
         
-        /* --- MODAL/PREVIEW (Simplified for length) --- */
-        /* ... (You can copy the modal styles from your original code if you want the full PPT export feature) ... */
-
-        /* Minimal Modal Styles to keep the JS functional */
-        .modal { display: none; } 
-    </style>
+        /* --- TECH COLOR BUTTONS --- */
+        .tech-color-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 15px;
+        }
+        .tech-color-btn {
+            padding: 8px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            color: white;
+            text-align: center;
+        }
+        .tech-color-btn.gsm { background: #2F80ED; }
+        .tech-color-btn.lte { background: #27AE60; }
+        .tech-color-btn.nr { background: #D24726; }
+        </style>
 </head>
 <body onload="initDashboard()">
     <header>KPI Dashboard</header>
 
-    <div class="controls">
-        <button onclick="fetchData()" class="action-btn">Refresh Data</button>
-        <button onclick="alert('PPT Export Feature requires the full CSS and JS from the original file.')" class="action-btn ppt-btn">Export PPT</button> 
+    <div class="chart-grid" id="mainChartContainer">
+        <!-- Charts will be loaded here -->
     </div>
 
-    <div class="chart-grid" id="mainChartContainer">
-        </div>
-
+    <!-- Drawer Toggle Buttons -->
     <div class="drawer-toggle-buttons">
         <div class="chartStyleDrawerToggle" onclick="toggleChartStyleDrawer()">🎨</div>
         <div class="kpiDrawerToggle" onclick="toggleDrawer()">⚙</div>
     </div>
 
+    <!-- Chart Style Drawer -->
     <div id="chartStyleDrawer" class="chartStyleDrawer">
-        <div class="drawer-header"> <h3>Chart Styles</h3> <button onclick="toggleChartStyleDrawer()" style="border:none; background:none; font-size:22px; cursor:pointer;">✕</button> </div>
+        <div class="drawer-header"> 
+            <h3>Chart Styles</h3> 
+            <button onclick="toggleChartStyleDrawer()" style="border:none; background:none; font-size:22px; cursor:pointer;">✕</button> 
+        </div>
         <div class="style-options-body">
-            <div class="style-button" onclick="applyChartStyle(0)">Filled</div>
-            <div class="style-button" onclick="applyChartStyle(1)">Minimalist</div>
-            <div class="style-button" onclick="applyChartStyle(3)">Smooth</div>
+            <div class="style-button" onclick="applyChartStyle(0)">Filled Area</div>
+            <div class="style-button" onclick="applyChartStyle(1)">Smooth Line with Dots</div>
+            <div class="style-button" onclick="applyChartStyle(2)">Smooth Line</div>
+            <div class="style-button" onclick="applyChartStyle(3)">Thick Line</div>
+            <div class="style-button" onclick="applyChartStyle(4)">Thin Line</div>
+            
+            <div style="margin: 20px 0; border-top: 1px solid #eee; padding-top: 15px;">
+                <label><b>Technology Colors</b></label>
+                <div class="tech-color-buttons">
+                    <button class="tech-color-btn gsm" onclick="changeTechColor('GSM')">GSM Color</button>
+                    <button class="tech-color-btn lte" onclick="changeTechColor('LTE')">LTE Color</button>
+                    <button class="tech-color-btn nr" onclick="changeTechColor('NR')">NR Color</button>
+                    </div>
+            </div>
+            
             <hr style="margin:15px 0;">
-            <label><b>Custom Color:</b></label> 
+            <label><b>Custom Color (All Charts):</b></label> 
             <input type="color" id="customChartColor" onchange="applyCustomColor()" style="width:100%; height:40px; margin-top:6px;">
         </div>
     </div>
 
+    <!-- KPI Settings Drawer -->
     <div id="kpiDrawer" class="kpiDrawer">
         <div class="drawer-header"> 
             <h3 id="drawerHeaderTitle">KPI Settings</h3> 
@@ -95,17 +243,10 @@
         <div class="drawer-controls">
             <button class="action-btn" onclick="selectVisibleKpis()" style="background:#5cb85c;">Select All</button>
             <button class="action-btn" onclick="clearVisibleKpis()" style="background:#f0ad4e;">Clear All</button>
-            <button class="action-btn" onclick="applyKpis()">Apply</button>
+            <button class="action-btn" onclick="applyKpis()" style="background:#2F80ED;">Apply</button>
         </div>
         <div class="kpi-options-body" id="kpiOptionsList">
-            </div>
-    </div>
-
-    <div id="previewModal" class="modal"> 
-        <div class="modal-content">
-            <div class="modal-header">PPT Export Preview</div>
-            <div class="modal-body">...</div>
-            <div class="modal-footer"><button onclick="alert('Requires full script.')">Download</button></div>
+            <!-- KPI options will be loaded here -->
         </div>
     </div>
 
@@ -115,68 +256,135 @@
         let allCharts = {};
         let selectedKpis = [];
 
-        // --- KPI Definitions (YOUR KEY CHANGE) ---
-        // 1. Define all KPIs grouped by technology
-        // 2. Add an 'initialChecked: false' property for KPIs you want unchecked by default
+        // --- KPI Definitions ---
         const kpiDefinitions = [
             { tech: "GSM", kpi: "Call setup success rate(%)", initialChecked: true, color: "#2F80ED" },
             { tech: "GSM", kpi: "Call drop rate(%)", initialChecked: true, color: "#2F80ED" },
-            { tech: "GSM", kpi: "CS Traffic (erl)", initialChecked: true, color: "#2F80ED" }, // UNCHECKED BY DEFAULT
+            { tech: "GSM", kpi: "CS Traffic (erl)", initialChecked: false, color: "#2F80ED" },
             
-            { tech: "LTE", kpi: "DL PRB Utilization (%)", initialChecked: true, color: "#27AE60" },
-            { tech: "LTE", kpi: "UL PRB Utilization (%)", initialChecked: true, color: "#27AE60" },
-            { tech: "LTE", kpi: "LTE DL -USER Average Throughput (Mbit/s)", initialChecked: true, color: "#27AE60" }, // UNCHECKED BY DEFAULT
-            { tech: "LTE", kpi: "LTE UL -USER Average Throughput (Mbit/s)", initialChecked: true, color: "#27AE60" },
-            { tech: "LTE", kpi: "DL Data Total Volume (Gbyte)", initialChecked: true, color: "#27AE60" }, // UNCHECKED BY DEFAULT
-            { tech: "LTE", kpi: "UL Data Total Volume (Gbyte)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "RRC Setup Success Rate(%)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "ERAB Setup Success Rate(%)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "Average DL Throughput(Mbps)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "Average UL Throughput(Mbps)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "DL Data Total Volume (Gbyte)", initialChecked: false, color: "#27AE60" },
+            { tech: "LTE", kpi: "UL Data Total Volume (Gbyte)", initialChecked: false, color: "#27AE60" },
+                       
+            { tech: "NR", kpi: "NR RRC Setup Success Rate(%)", initialChecked: true, color: "#D24726" },
+            { tech: "NR", kpi: "NR DL Traffic Volume (GB)", initialChecked: true, color: "#D24726" },
+            { tech: "NR", kpi: "NR DL Throughput(Mbps)", initialChecked: true, color: "#D24726" },
             
-            { tech: "NR", kpi: "SgNB Addition Success Rate (CU)(%)", initialChecked: false, color: "#D24726" },
-            { tech: "NR", kpi: "NR DL Traffic Volume (GB)", initialChecked: false, color: "#D24726" },
-            { tech: "NR", kpi: "NR DL User Throughput", initialChecked: false, color: "#D24726" },
-             ];
+        ];
 
-        // --- Sheet URLs (PLACEHOLDERS - REPLACE WITH YOUR ACTUAL URLs) ---
+        // --- Sheet URLs ---
         const sheetUrls = {
             GSM: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=1977848975&single=true&output=csv",
             LTE: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=893314169&single=true&output=csv",
-            NR: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=1372365834&single=true&output=csv",
-            };
+            NR: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=1372365834&single=true&output=csv"
+             };
         
-        let activeChartStyle = null; // For styling
-        let activeCustomColor = null; // For styling
+        let activeChartStyle = null;
+        let activeCustomColor = null;
+        let techColors = {
+            GSM: "#2F80ED",
+            LTE: "#27AE60",
+            NR: "#D24726",
+            };
 
+        // --- Chart Styles (5 styles as requested) ---
         const chartStyles = [
-             // Kept a few styles from the original
-            { name: "Filled", borderWidth: 3, pointRadius: 0, borderDash: [], tension: 0.2, borderColor: null, fill: true, backgroundColor: "rgba(47, 128, 237, 0.1)" },
-            { name: "Minimalist", borderWidth: 1, pointRadius: 0, borderDash: [], tension: 0, borderColor: null, fill: false },
-            { name: "Smooth", borderWidth: 2, pointRadius: 0, borderDash: [], tension: 0.4, borderColor: null, fill: false },
-            { name: "Random Colors", borderWidth: 3, pointRadius: 5, borderDash: [], tension: 0.25, borderColor: null, fill: false, randomColor: true }
+            { 
+                name: "Filled Area", 
+                borderWidth: 2, 
+                pointRadius: 0, 
+                borderDash: [], 
+                tension: 0.2, 
+                borderColor: null, 
+                fill: true, 
+                backgroundColor: "rgba(47, 128, 237, 0.1)" 
+            },
+            { 
+                name: "Smooth Line with Dots", 
+                borderWidth: 2, 
+                pointRadius: 5, 
+                borderDash: [], 
+                tension: 0.4, 
+                borderColor: null, 
+                fill: false 
+            },
+            { 
+                name: "Smooth Line", 
+                borderWidth: 2, 
+                pointRadius: 0, 
+                borderDash: [], 
+                tension: 0.4, 
+                borderColor: null, 
+                fill: false 
+            },
+            { 
+                name: "Thick Line", 
+                borderWidth: 4, 
+                pointRadius: 0, 
+                borderDash: [], 
+                tension: 0.3, 
+                borderColor: null, 
+                fill: false 
+            },
+            { 
+                name: "Thin Line", 
+                borderWidth: 1, 
+                pointRadius: 0, 
+                borderDash: [], 
+                tension: 0, 
+                borderColor: null, 
+                fill: false 
+            }
         ];
+
+        // --- ACTION BUTTON STYLING ---
+        const actionBtnStyle = `
+            .action-btn { 
+                padding: 8px 16px; 
+                cursor: pointer; 
+                border: none; 
+                background: #2F80ED; 
+                color: white; 
+                border-radius: 6px; 
+                font-weight: 600; 
+                transition: 0.2s; 
+            }
+            .action-btn:hover { 
+                background: #1f5ab5; 
+            }
+        `;
+        
+        // Add style for action buttons
+        const style = document.createElement('style');
+        style.textContent = actionBtnStyle;
+        document.head.appendChild(style);
 
         // --- INITIALIZATION ---
         function initDashboard() {
             // Set initial selected KPIs based on the definitions
             selectedKpis = kpiDefinitions.filter(k => k.initialChecked).map(k => k.tech + " - " + k.kpi);
             // Apply a default chart style
-            applyChartStyle(2); // Apply 'Smooth' style on load
+            applyChartStyle(0); // Apply 'Filled Area' style on load
             fetchData();
         }
 
-
-        // --- DATA FETCHING & MAPPING (Revised to fetch multiple sheets) ---
+        // --- DATA FETCHING ---
         async function fetchData(){
-            document.getElementById("mainChartContainer").innerHTML = "<h2>Loading data...</h2>";
+            document.getElementById("mainChartContainer").innerHTML = "<h2 style='text-align:center;padding:40px;color:#666;'>Loading data...</h2>";
             allData = [];
             let timeline = [];
             
             try {
                 for (const tech in sheetUrls) {
-                    const url = sheetUrls[tech] + "&t=" + Date.now(); // Add timestamp to prevent cache
+                    const url = sheetUrls[tech] + "&t=" + Date.now();
                     const res = await fetch(url);
                     const text = await res.text();
                     const rows = text.trim().split('\n').map(r => r.split(','));
                     
-                    if (rows.length < 2) continue; // Skip empty sheets
+                    if (rows.length < 2) continue;
                     
                     const headers = rows.shift().map(h => h.trim());
                     const dateHeader = headers.find(h => h.toLowerCase().includes('date'));
@@ -188,7 +396,7 @@
                             obj[h] = val === "" ? null : (isNaN(val) ? val : parseFloat(val));
                         });
                         if (obj[dateHeader]) {
-                            obj.Tech = tech; // Add technology tag
+                            obj.Tech = tech;
                             allData.push(obj);
                             if (!timeline.includes(obj[dateHeader])) {
                                 timeline.push(obj[dateHeader]);
@@ -197,11 +405,10 @@
                     });
                 }
 
-                // Sort the timeline for consistent charting
+                // Sort the timeline
                 timeline.sort((a,b)=>{
                     const [da,ma,ya]=a.split('/').map(Number);
                     const [db,mb,yb]=b.split('/').map(Number);
-                    // Assuming Date format is D/M/Y
                     return new Date(ya,ma-1,da)-new Date(yb,mb-1,db);
                 });
                 
@@ -209,18 +416,18 @@
 
             } catch(e) {
                 console.error("Data loading error:", e);
-                document.getElementById("mainChartContainer").innerHTML = "<h2>Failed to load all data. Check console for details.</h2>";
+                document.getElementById("mainChartContainer").innerHTML = "<h2 style='text-align:center;padding:40px;color:#D24726;'>Failed to load data. Check console for details.</h2>";
             }
         }
 
-        // --- CHART RENDERING (Revised for multi-tech) ---
+        // --- CHART RENDERING ---
         function renderCharts(timeline = []) {
             const container = document.getElementById("mainChartContainer");
             container.innerHTML = "";
             allCharts = {};
             
             if (timeline.length === 0 || allData.length === 0) {
-                container.innerHTML = "<h2>No data available.</h2>";
+                container.innerHTML = "<h2 style='text-align:center;padding:40px;color:#666;'>No data available.</h2>";
                 return;
             }
 
@@ -249,7 +456,7 @@
                 card.appendChild(wrapper);
                 container.appendChild(card);
 
-                // --- Data Processing for a single KPI across the timeline ---
+                // Data Processing
                 const dataPoints = timeline.map(date => {
                     const values = allData
                         .filter(d => d.Tech === tech && d[dateHeaderName] === date)
@@ -260,12 +467,12 @@
                     
                     if (values.length === 0) return null;
                     
-                    // Simple aggregation (Average for rates/percentages, Sum for volumes/traffic)
+                    // Simple aggregation
                     const kpiLower = kpi.toLowerCase();
-                    if (kpiLower.includes('%') || kpiLower.includes('rate') || kpiLower.includes('avg')) {
-                        return values.reduce((a, b) => a + b, 0) / values.length; // Average
+                    if (kpiLower.includes('%') || kpiLower.includes('rate') || kpiLower.includes('avg') || kpiLower.includes('average')) {
+                        return values.reduce((a, b) => a + b, 0) / values.length;
                     } else {
-                        return values.reduce((a, b) => a + b, 0); // Sum
+                        return values.reduce((a, b) => a + b, 0);
                     }
                 });
 
@@ -274,20 +481,28 @@
                 let minVal = Math.min(...validValues);
                 let maxVal = Math.max(...validValues);
 
-                // Y-Axis Helper Functions (Kept from original for smart scaling)
+                // Y-Axis Helper Functions
                 function niceNumber(value, round) {
                     const exponent = Math.floor(Math.log10(value));
                     const fraction = value / Math.pow(10, exponent);
                     let niceFraction;
                     if (round) {
-                        if (fraction < 1.5) niceFraction = 1; else if (fraction < 3) niceFraction = 2; else if (fraction < 7) niceFraction = 5; else niceFraction = 10;
+                        if (fraction < 1.5) niceFraction = 1; 
+                        else if (fraction < 3) niceFraction = 2; 
+                        else if (fraction < 7) niceFraction = 5; 
+                        else niceFraction = 10;
                     } else {
-                        if (fraction <= 1) niceFraction = 1; else if (fraction <= 2) niceFraction = 2; else if (fraction <= 5) niceFraction = 5; else niceFraction = 10;
+                        if (fraction <= 1) niceFraction = 1; 
+                        else if (fraction <= 2) niceFraction = 2; 
+                        else if (fraction <= 5) niceFraction = 5; 
+                        else niceFraction = 10;
                     }
                     return niceFraction * Math.pow(10, exponent);
                 }
+                
                 function computeYAxis(minVal, maxVal) {
-                    let minV = minVal * 0.95; let maxV = maxVal * 1.05;
+                    let minV = minVal * 0.95; 
+                    let maxV = maxVal * 1.05;
                     if (maxVal < 10) minV = 0;
                     if (maxVal > 90 && maxVal <= 100) maxV = 100;
                     let range = maxV - minV;
@@ -300,13 +515,15 @@
                 
                 const { niceMin, niceMax, tickSpacing } = computeYAxis(minVal, maxVal);
 
-                // --- Chart Color ---
-                let chartColor = kpiDef.color; // Use the pre-defined color
-                if (activeCustomColor) chartColor = activeCustomColor;
-                else if (activeChartStyle && activeChartStyle.randomColor) chartColor = getRandomColor();
-                else if (activeChartStyle && activeChartStyle.borderColor) chartColor = activeChartStyle.borderColor;
+                // Chart Color - Use technology-specific color
+                let chartColor = techColors[tech];
+                if (activeCustomColor) {
+                    chartColor = activeCustomColor;
+                } else if (activeChartStyle && activeChartStyle.borderColor) {
+                    chartColor = activeChartStyle.borderColor;
+                }
 
-                // --- Chart Config ---
+                // Chart Config
                 const chartConfig = {
                     type: 'line',
                     data: {
@@ -315,41 +532,66 @@
                             label: fullKpiName,
                             data: dataPoints,
                             borderColor: chartColor,
-                            backgroundColor: activeChartStyle && activeChartStyle.fill ? activeChartStyle.backgroundColor.replace('0.1', '0.2') : 'transparent',
-                            borderWidth: 2, pointRadius: 3, tension: 0.1, spanGaps: true
+                            backgroundColor: activeChartStyle && activeChartStyle.fill ? 
+                                chartColor.replace(')', ', 0.1)').replace('rgb', 'rgba') : 'transparent',
+                            borderWidth: 2, 
+                            pointRadius: 3, 
+                            tension: 0.1, 
+                            spanGaps: true
                         }]
                     },
                     options: {
-                        responsive: true, maintainAspectRatio: false,
+                        responsive: true, 
+                        maintainAspectRatio: false,
                         plugins: { 
-                            legend: { display: false },
+                            legend: { 
+                                display: false 
+                            },
                             title: { 
                                 display: true, 
-                                text: `${fullKpiName}`, 
-                                font: { size: 14, weight: 'bold' }, 
+                                text: `${kpi} (${tech})`, 
+                                font: { 
+                                    size: 14, 
+                                    weight: 'bold' 
+                                }, 
                                 color: '#333'
                             }
                         },
                         scales: {
-                            x: { ticks: { font: { size: 8 } }, grid: { display: false } },
+                            x: { 
+                                ticks: { 
+                                    font: { size: 8 } 
+                                }, 
+                                grid: { 
+                                    display: false 
+                                } 
+                            },
                             y: { 
-                                grid: { color: '#eee' }, 
-                                min: niceMin, max: niceMax, 
-                                ticks: { stepSize: tickSpacing }, 
+                                grid: { 
+                                    color: '#eee' 
+                                }, 
+                                min: niceMin, 
+                                max: niceMax, 
+                                ticks: { 
+                                    stepSize: tickSpacing 
+                                }, 
                                 beginAtZero: maxVal < 10 
                             }
                         }
                     }
                 };
 
-                // Apply active chart style if set
+                // Apply active chart style
                 if (activeChartStyle) {
                     const style = activeChartStyle;
                     chartConfig.data.datasets[0].borderWidth = style.borderWidth;
                     chartConfig.data.datasets[0].pointRadius = style.pointRadius;
                     chartConfig.data.datasets[0].borderDash = style.borderDash;
                     chartConfig.data.datasets[0].tension = style.tension;
-                    if (style.stepped) chartConfig.data.datasets[0].stepped = style.stepped;
+                    chartConfig.data.datasets[0].fill = style.fill;
+                    if (style.fill && style.backgroundColor) {
+                        chartConfig.data.datasets[0].backgroundColor = style.backgroundColor;
+                    }
                 }
 
                 // Create chart
@@ -382,7 +624,6 @@
                 d.className = "kpi-option";
                 d.innerHTML = `<input type='checkbox' value='${fullKpiName}' class='kpi-chk' ${checked}> ${kpiDef.kpi}`;
                 d.onclick = (e) => {
-                     // Check or uncheck when clicking anywhere on the label
                     const chk = d.querySelector("input");
                     if (e.target.tagName !== "INPUT") {
                         chk.checked = !chk.checked;
@@ -396,27 +637,30 @@
             const list = document.getElementById("kpiOptionsList");
             selectedKpis = Array.from(list.querySelectorAll(".kpi-chk:checked")).map(c => c.value);
             document.getElementById("kpiDrawer").classList.remove("open");
+            
             // Re-render charts with new selection
             const dateHeaderName = Object.keys(allData[0] || {}).find(h => h.toLowerCase().includes('date'));
-            const timeline = [...new Set(allData.map(d=>d[dateHeaderName]))].sort((a,b)=>{ 
-                const [da,ma,ya]=a.split('/').map(Number);
-                const [db,mb,yb]=b.split('/').map(Number);
-                return new Date(ya,ma-1,da)-new Date(yb,mb-1,db);
-            });
-            renderCharts(timeline);
+            if (dateHeaderName) {
+                const timeline = [...new Set(allData.map(d => d[dateHeaderName]))].sort((a,b) => { 
+                    const [da,ma,ya] = a.split('/').map(Number);
+                    const [db,mb,yb] = b.split('/').map(Number);
+                    return new Date(ya,ma-1,da) - new Date(yb,mb-1,db);
+                });
+                renderCharts(timeline);
+            }
         }
 
         function selectVisibleKpis() {
             selectedKpis = kpiDefinitions.map(k => k.tech + " - " + k.kpi);
-            populateKpiOptions(); // Update checkboxes
+            populateKpiOptions();
         }
         
         function clearVisibleKpis() {
             selectedKpis = [];
-            populateKpiOptions(); // Update checkboxes
+            populateKpiOptions();
         }
 
-        // --- CHART STYLING & UTILITIES (Kept from original) ---
+        // --- CHART STYLING FUNCTIONS ---
         function toggleChartStyleDrawer(){
             const d = document.getElementById("chartStyleDrawer");
             d.classList.toggle("open");
@@ -425,34 +669,84 @@
         function applyChartStyle(styleIndex){
             activeChartStyle = chartStyles[styleIndex];
             document.querySelectorAll('.style-button').forEach((btn, idx) => {
-                if (idx === styleIndex) { btn.classList.add('active'); } else { btn.classList.remove('active'); }
+                if (idx === styleIndex) { 
+                    btn.classList.add('active'); 
+                } else { 
+                    btn.classList.remove('active'); 
+                }
             });
+            
+            // Update technology color buttons with current colors
+            updateTechColorButtons();
             
             // Re-render to apply style
             const dateHeaderName = Object.keys(allData[0] || {}).find(h => h.toLowerCase().includes('date'));
-            const timeline = [...new Set(allData.map(d=>d[dateHeaderName]))].sort((a,b)=>{ 
-                const [da,ma,ya]=a.split('/').map(Number);
-                const [db,mb,yb]=b.split('/').map(Number);
-                return new Date(ya,ma-1,da)-new Date(yb,mb-1,db);
-            });
-            if (allData.length > 0) renderCharts(timeline);
+            if (dateHeaderName && allData.length > 0) {
+                const timeline = [...new Set(allData.map(d => d[dateHeaderName]))].sort((a,b) => { 
+                    const [da,ma,ya] = a.split('/').map(Number);
+                    const [db,mb,yb] = b.split('/').map(Number);
+                    return new Date(ya,ma-1,da) - new Date(yb,mb-1,db);
+                });
+                renderCharts(timeline);
+            }
+        }
+
+        function updateTechColorButtons() {
+            // This function updates the tech color buttons with current colors
+            const gsmBtn = document.querySelector('.tech-color-btn.gsm');
+            const lteBtn = document.querySelector('.tech-color-btn.lte');
+            const nrBtn = document.querySelector('.tech-color-btn.nr');
+                       
+            if (gsmBtn) gsmBtn.style.background = techColors.GSM;
+            if (lteBtn) lteBtn.style.background = techColors.LTE;
+            if (nrBtn) nrBtn.style.background = techColors.NR;
+             }
+
+        function changeTechColor(tech) {
+            const currentColor = techColors[tech];
+            const newColor = prompt(`Enter new color for ${tech} (hex format):`, currentColor);
+            
+            if (newColor && /^#[0-9A-F]{6}$/i.test(newColor)) {
+                techColors[tech] = newColor;
+                
+                // Update the KPI definitions with new color
+                kpiDefinitions.forEach(kpi => {
+                    if (kpi.tech === tech) {
+                        kpi.color = newColor;
+                    }
+                });
+                
+                // Re-render charts
+                const dateHeaderName = Object.keys(allData[0] || {}).find(h => h.toLowerCase().includes('date'));
+                if (dateHeaderName && allData.length > 0) {
+                    const timeline = [...new Set(allData.map(d => d[dateHeaderName]))].sort((a,b) => { 
+                        const [da,ma,ya] = a.split('/').map(Number);
+                        const [db,mb,yb] = b.split('/').map(Number);
+                        return new Date(ya,ma-1,da) - new Date(yb,mb-1,db);
+                    });
+                    renderCharts(timeline);
+                }
+                
+                // Update color button
+                updateTechColorButtons();
+            } else if (newColor && newColor !== "") {
+                alert("Please enter a valid hex color (e.g., #FF5733)");
+            }
         }
 
         function applyCustomColor(){
             activeCustomColor = document.getElementById("customChartColor").value;
+            
             // Re-render to apply color
-             const dateHeaderName = Object.keys(allData[0] || {}).find(h => h.toLowerCase().includes('date'));
-            const timeline = [...new Set(allData.map(d=>d[dateHeaderName]))].sort((a,b)=>{ 
-                const [da,ma,ya]=a.split('/').map(Number);
-                const [db,mb,yb]=b.split('/').map(Number);
-                return new Date(ya,ma-1,da)-new Date(yb,mb-1,db);
-            });
-            if (allData.length > 0) renderCharts(timeline);
-        }
-        
-        function getRandomColor() {
-            const colors = ['#2F80ED', '#27AE60', '#D24726', '#8E44AD', '#F39C12', '#2980B9'];
-            return colors[Math.floor(Math.random() * colors.length)];
+            const dateHeaderName = Object.keys(allData[0] || {}).find(h => h.toLowerCase().includes('date'));
+            if (dateHeaderName && allData.length > 0) {
+                const timeline = [...new Set(allData.map(d => d[dateHeaderName]))].sort((a,b) => { 
+                    const [da,ma,ya] = a.split('/').map(Number);
+                    const [db,mb,yb] = b.split('/').map(Number);
+                    return new Date(ya,ma-1,da) - new Date(yb,mb-1,db);
+                });
+                renderCharts(timeline);
+            }
         }
     </script>
 </body>
