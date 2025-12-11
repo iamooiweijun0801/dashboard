@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Interactive Sites Map — Top50 & 278</title>
+<title>Interactive Sites Map — Dynamic Filter</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
@@ -179,9 +179,8 @@ hr{border:none;border-top:1px solid #eee;margin:12px 0;}
       <div class="row">
         <label for="viewSelect">View</label>
         <select id="viewSelect">
-          <option value="top50">Top 50</option>
-          <option value="batch278">278 sites</option>
-          <option value="all">All rows</option>
+          <option value="all">All Sites</option>
+          <!-- Options will be dynamically populated -->
         </select>
       </div>
 
@@ -235,6 +234,8 @@ const markersLayer = L.layerGroup().addTo(map);
 function dotIcon(color){ return L.divIcon({className:'', html:`<div style="width:10px;height:10px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.25);"></div>`, iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-10]}); }
 const ICON_PENDING = dotIcon('#1F4E79'); const ICON_DONE = dotIcon('#66ff00');
 let allRows = [], visibleMarkers = {}, pinnedMarker = null;
+let uniqueBatches = new Set();
+let batchMap = new Map(); // Store mapping between normalized value and actual batch name
 
 function normalizeKey(k){ return (k||'').toString().trim().toLowerCase().replace(/\s+/g,'_'); }
 function isDoneStatus(s){
@@ -349,6 +350,37 @@ function animateValue(id, start, end, total) {
 }
 
 /* -------------------------
+   Update filter dropdown with unique batches
+   ------------------------- */
+function updateFilterDropdown() {
+  const select = document.getElementById('viewSelect');
+  const currentValue = select.value;
+  
+  // Clear existing options except "All Sites"
+  select.innerHTML = '<option value="all">All Sites</option>';
+  
+  // Add unique batches as options
+  Array.from(uniqueBatches)
+    .filter(batch => batch && batch.trim() !== '')
+    .sort()
+    .forEach(batch => {
+      const option = document.createElement('option');
+      option.value = batch.toLowerCase().replace(/\s+/g, '_');
+      option.textContent = batch;
+      select.appendChild(option);
+      batchMap.set(option.value, batch);
+    });
+  
+  // Restore previous selection if it still exists
+  if (currentValue) {
+    const optionExists = Array.from(select.options).some(opt => opt.value === currentValue);
+    if (optionExists) {
+      select.value = currentValue;
+    }
+  }
+}
+
+/* -------------------------
    CSV parsing (adds on_air_date)
    ------------------------- */
 function loadCsvText(text){
@@ -358,7 +390,11 @@ function loadCsvText(text){
     return;
   }
 
-  allRows = parsed.data.map((r,i)=>{
+  allRows = [];
+  uniqueBatches = new Set();
+  batchMap = new Map();
+
+  parsed.data.forEach((r,i)=>{
     const norm = {};
     // normalized keys -> original values
     for(const key in r){
@@ -375,16 +411,11 @@ function loadCsvText(text){
     const lon = parseFloat((norm['longitude'] ?? norm['lon'] ?? norm['lng'] ?? '').toString().replace(/,/g,'.'));
 
     // Attempt to find on-air date value robustly:
-    // First check common normalised keys; then search the original row headers if needed.
     let on_air_date = '';
-    // try common normalized keys
     if('on-air_date' in norm) on_air_date = norm['on-air_date'];
     else if('on_air_date' in norm) on_air_date = norm['on_air_date'];
     else if('on_air' in norm) on_air_date = norm['on_air'];
     else {
-      // fallback: find key that resembles "on air date"
-      // use the originally parsed row keys from parsed.meta.fields
-      // parsed.data row `r` still contains original header names; test them
       for(const originalKey in r){
         if(!originalKey) continue;
         const compact = originalKey.toString().toLowerCase().replace(/[^a-z0-9]/g,'');
@@ -396,7 +427,7 @@ function loadCsvText(text){
     }
     on_air_date = (on_air_date ?? '') + '';
 
-    return {
+    const row = {
       _rowIndex: i,
       enodeb_id,
       enodeb_name: enodeb_name || site_name,
@@ -405,10 +436,22 @@ function loadCsvText(text){
       status,
       on_air_date,
       lat: Number.isFinite(lat) ? lat : NaN,
-      lon: Number.isFinite(lon) ? lon : NaN
+      lon: Number.isFinite(lon) ? lon : NaN,
+      // Add normalized batch for easier filtering
+      normalized_batch: (swap_batch || '').toLowerCase().replace(/\s+/g, '_')
     };
+
+    allRows.push(row);
+    
+    // Add batch to unique batches set
+    if (swap_batch && swap_batch.trim() !== '') {
+      uniqueBatches.add(swap_batch.trim());
+    }
   });
 
+  // Update filter dropdown with new batches
+  updateFilterDropdown();
+  
   render();
 }
 
@@ -417,7 +460,6 @@ function loadCsvText(text){
    - make sure sheet is 'Anyone with link can view' and use the CSV export link
    ------------------------- */
 function fetchFullList() {
-  // REPLACE with your sheet's CSV export URL or keep current if correct
   const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg/export?format=csv&id=10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg&gid=0';
 
   fetch(SHEET_CSV_URL)
@@ -436,9 +478,13 @@ function render(){
   markersLayer.clearLayers();
   visibleMarkers = {};
   const view = document.getElementById('viewSelect').value;
+  
   let rows = allRows.slice();
-  if(view==='top50') rows = allRows.filter(r => (r.swap_batch || '').toString().toLowerCase().includes('top 50'));
-  else if(view==='batch278') rows = allRows.filter(r => (r.swap_batch || '').toString().toLowerCase().includes('278 sites'));
+  
+  // If not "all", filter by normalized_batch
+  if(view !== 'all' && view !== '') {
+    rows = allRows.filter(r => r.normalized_batch === view);
+  }
 
   let doneCount = 0, pendingCount = 0;
   const bounds = [];
@@ -495,6 +541,7 @@ function render(){
     if(b.isValid()) map.fitBounds(b.pad(0.2));
   }
 }
+
 /* -------------------------
    Legend color picker for markers
    ------------------------- */
@@ -505,7 +552,7 @@ const statusColors = {
 
 // click legend dot to pick a color
 document.querySelectorAll('.legend .sw').forEach((el, idx) => {
-  const status = idx === 0 ? 'done' : 'pending'; // first dot = done, second = pending
+  const status = idx === 0 ? 'done' : 'pending';
   el.addEventListener('click', async () => {
     const newColor = await pickColor(statusColors[status]);
     if (!newColor) return;
@@ -643,10 +690,11 @@ document.getElementById('searchInput').addEventListener('keydown', e => { if(e.k
 document.getElementById('sniperBtn').addEventListener('click',()=>render());
   
 window.addEventListener('load', ()=>{ fetchFullList(); setTimeout(()=>map.invalidateSize(),300); });
+
 // -------------------------
 // Auto-refresh CSV every 30 seconds
 // -------------------------
-let lastCsvText = null; // store previous CSV content
+let lastCsvText = null;
 const REFRESH_INTERVAL_MS = 0.5 * 60 * 1000; // 30 seconds
 
 async function smartFetchCsv() {
@@ -659,7 +707,7 @@ async function smartFetchCsv() {
     if (csvText !== lastCsvText) {
       console.log('CSV changed, reloading map...');
       lastCsvText = csvText;
-      loadCsvText(csvText); // calls your existing parser & render
+      loadCsvText(csvText);
     } else {
       console.log('CSV unchanged, no update needed.');
     }
@@ -677,4 +725,3 @@ setInterval(smartFetchCsv, REFRESH_INTERVAL_MS);
 </script>
 </body>
 </html>
-
