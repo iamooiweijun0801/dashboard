@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>KPI Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
     <style>
         /* --- BASE STYLES --- */
         body { 
@@ -23,14 +22,6 @@
             background:white; 
             box-shadow:0 2px 4px rgba(0,0,0,0.05); 
             margin-bottom:15px; 
-        }
-        
-        /* --- CONTROLS --- */
-        .controls {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 20px;
         }
         
         /* --- DRAWER TOGGLE BUTTONS --- */
@@ -244,154 +235,10 @@
             justify-content: center;
             margin-top: 15px;
         }
-        
-        /* --- PPT EXPORT MODAL --- */
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 2001;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(3px);
-        }
-        .modal-content {
-            background: white;
-            width: 95%;
-            max-width: 1400px;
-            height: 90vh;
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-        }
-        .modal-header {
-            padding: 15px 20px;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: bold;
-            font-size: 18px;
-        }
-        .modal-body {
-            flex: 1;
-            display: flex;
-            padding: 0;
-            overflow: hidden;
-        }
-        #previewBody {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            background: #f5f5f5;
-        }
-        .preview-slide {
-            background: white;
-            border: 1px solid #ddd;
-            margin-bottom: 20px;
-            padding: 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            aspect-ratio: 16/9;
-            position: relative;
-        }
-        .preview-slide-title {
-            position: absolute;
-            top: 10px;
-            left: 20px;
-            font-size: 16px;
-            font-weight: bold;
-            color: #D24726;
-        }
-        .preview-grid {
-            display: grid;
-            height: 100%;
-            align-items: center;
-            padding-top: 30px;
-        }
-        .preview-img-box {
-            text-align: center;
-            padding: 5px;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        .preview-img-box img {
-            max-width: 100%;
-            max-height: calc(100% - 20px);
-            object-fit: contain;
-            border: 1px solid #eee;
-        }
-        #previewSettingsPanel {
-            width: 250px;
-            background: #fff;
-            border-left: 1px solid #eee;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            flex-shrink: 0;
-        }
-        .settings-group {
-            margin-bottom: 20px;
-        }
-        .settings-group h4 {
-            margin-top: 0;
-            margin-bottom: 10px;
-            font-size: 14px;
-            color: #555;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
-        }
-        .graph-options {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-        }
-        .graph-options button {
-            padding: 6px 10px;
-            font-size: 13px;
-            background: #f0f0f0;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .graph-options button.active {
-            background: #2F80ED;
-            color: white;
-            border-color: #2F80ED;
-        }
-        .tech-export-options {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        .tech-export-option {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .tech-export-option input {
-            margin: 0;
-        }
-        .modal-footer {
-            padding: 15px 20px;
-            border-top: 1px solid #eee;
-            text-align: right;
-            flex-shrink: 0;
-        }
     </style>
 </head>
 <body onload="initDashboard()">
     <header>KPI Dashboard</header>
-
-    <div class="controls">
-        <button class="action-btn" onclick="openPPTExport()">📊 Export PPT</button>
-    </div>
 
     <div class="chart-grid" id="mainChartContainer">
         <!-- Charts will be loaded here -->
@@ -411,10 +258,10 @@
         </div>
         <div class="style-options-body">
             <div class="style-button" onclick="applyChartStyle(0)">Filled Area</div>
-            <div class="style-button" onclick="applyChartStyle(1)">Line with Dots</div>
+            <div class="style-button" onclick="applyChartStyle(1)">Smooth Line with Dots</div>
             <div class="style-button" onclick="applyChartStyle(2)">Smooth Line</div>
             <div class="style-button" onclick="applyChartStyle(3)">Thick Line</div>
-            <div class="style-button" onclick="applyChartStyle(4)">Thin Line with dots</div>
+            <div class="style-button" onclick="applyChartStyle(4)">Thin Line with Dots</div>
             
             <div style="margin: 20px 0; border-top: 1px solid #eee; padding-top: 15px;">
                 <label><b>Technology Colors</b></label>
@@ -457,56 +304,6 @@
         </div>
     </div>
 
-    <!-- PPT Export Modal -->
-    <div id="pptModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span>PPT Export Preview</span>
-                <button onclick="closePPTExport()" style="border:none; background:none; font-size:20px; cursor:pointer;">✕</button>
-            </div>
-            <div class="modal-body">
-                <div id="previewBody">
-                    <!-- Preview slides will be loaded here -->
-                </div>
-                <div id="previewSettingsPanel">
-                    <h3>Export Settings</h3>
-                    
-                    <div class="settings-group">
-                        <h4>Layout</h4>
-                        <div class="graph-options">
-                            <button onclick="updatePPTPreview(1)" data-count="1">1 Graph</button>
-                            <button onclick="updatePPTPreview(2)" data-count="2">2 Graphs</button>
-                            <button onclick="updatePPTPreview(3)" data-count="3">3 Graphs</button>
-                            <button onclick="updatePPTPreview(4)" data-count="4">4 Graphs</button>
-                            <button onclick="updatePPTPreview(6)" data-count="6">6 Graphs</button>
-                            <button onclick="updatePPTPreview(9)" data-count="9">9 Graphs</button>
-                        </div>
-                    </div>
-                    
-                    <div class="settings-group">
-                        <h4>Select Technologies</h4>
-                        <div class="tech-export-options" id="techExportOptions">
-                            <!-- Technology checkboxes will be added here -->
-                        </div>
-                    </div>
-                    
-                    <div class="settings-group">
-                        <h4>Export Options</h4>
-                        <div style="font-size: 12px; color: #666; margin-top: 10px;">
-                            <p>• Maintains chart colors</p>
-                            <p>• Preserves chart titles</p>
-                            <p>• Optimized for PowerPoint</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="action-btn" onclick="closePPTExport()" style="background:#888;">Cancel</button>
-                <button class="action-btn ppt-btn" onclick="downloadPPT()" style="background:#D24726;">Download PPT</button>
-            </div>
-        </div>
-    </div>
-
     <script>
         // --- CONFIG & STATE ---
         let allData = [];
@@ -514,12 +311,6 @@
         let selectedKpis = [];
         let selectedTechForColor = '';
         let selectedColor = '';
-        let pptLayout = 2; // Default: 2 graphs per slide
-        let selectedTechForExport = {
-            GSM: true,
-            LTE: true,
-            NR: true
-        };
 
         // --- KPI Definitions ---
         const kpiDefinitions = [
@@ -527,17 +318,17 @@
             { tech: "GSM", kpi: "Call drop rate(%)", initialChecked: true, color: "#2F80ED" },
             { tech: "GSM", kpi: "CS Traffic (erl)", initialChecked: true, color: "#2F80ED" },
             
-            { tech: "LTE", kpi: "Call Setup Success Rate(%)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "RRC Setup Success Rate(%)", initialChecked: true, color: "#27AE60" },
             { tech: "LTE", kpi: "E-RAB Call Drop Rate(%)", initialChecked: true, color: "#27AE60" },
             { tech: "LTE", kpi: "DL -USER Average Throughput (Mbit/s)", initialChecked: true, color: "#27AE60" },
             { tech: "LTE", kpi: "UL -USER Average Throughput (Mbit/s)", initialChecked: true, color: "#27AE60" },
             { tech: "LTE", kpi: "DL Data Total Volume (Gbyte)", initialChecked: true, color: "#27AE60" },
             { tech: "LTE", kpi: "UL Data Total Volume (Gbyte)", initialChecked: true, color: "#27AE60" },
-            { tech: "LTE", kpi: "DL PRB Utilization (%)", initialChecked: true, color: "#27AE60" }
                        
             { tech: "NR", kpi: "SgNB Addition Success Rate (CU)(%)", initialChecked: true, color: "#D24726" },
             { tech: "NR", kpi: "DL Traffic Volume (GB)", initialChecked: true, color: "#D24726" },
             { tech: "NR", kpi: "DL User Throughput(Mbps)", initialChecked: true, color: "#D24726" },
+      
         ];
 
         // --- Sheet URLs ---
@@ -623,12 +414,6 @@
             .action-btn:hover { 
                 background: #1f5ab5; 
             }
-            .ppt-btn {
-                background: #D24726 !important;
-            }
-            .ppt-btn:hover {
-                background: #a8381e !important;
-            }
         `;
         
         // Add style for action buttons
@@ -640,7 +425,7 @@
         function initDashboard() {
             // Set initial selected KPIs based on the definitions
             selectedKpis = kpiDefinitions.filter(k => k.initialChecked).map(k => k.tech + " - " + k.kpi);
-            // Apply default chart style: Line with Dots
+            // Apply default chart style: Smooth Line with Dots
             applyChartStyle(1);
             fetchData();
         }
@@ -1045,305 +830,6 @@
                 
                 closeColorPicker();
             }
-        }
-
-        // --- PPT EXPORT FUNCTIONS ---
-        function openPPTExport() {
-            const charts = document.querySelectorAll("canvas");
-            if (charts.length === 0) {
-                alert("No charts to export. Please select some KPIs first.");
-                return;
-            }
-            
-            // Populate technology selection options
-            const techOptions = document.getElementById('techExportOptions');
-            techOptions.innerHTML = '';
-            
-            for (const tech in selectedTechForExport) {
-                const div = document.createElement('div');
-                div.className = 'tech-export-option';
-                div.innerHTML = `
-                    <input type="checkbox" id="export-${tech}" ${selectedTechForExport[tech] ? 'checked' : ''} 
-                           onchange="updateTechExportSelection('${tech}', this.checked)">
-                    <label for="export-${tech}">${tech}</label>
-                `;
-                techOptions.appendChild(div);
-            }
-            
-            // Update layout buttons
-            document.querySelectorAll('.graph-options button').forEach(btn => {
-                if (parseInt(btn.dataset.count) === pptLayout) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            });
-            
-            // Generate preview
-            updatePPTPreview(pptLayout);
-            
-            // Show modal
-            document.getElementById('pptModal').style.display = 'flex';
-        }
-
-        function closePPTExport() {
-            document.getElementById('pptModal').style.display = 'none';
-        }
-
-        function updateTechExportSelection(tech, isSelected) {
-            selectedTechForExport[tech] = isSelected;
-            updatePPTPreview(pptLayout);
-        }
-
-        function updatePPTPreview(layoutCount) {
-            pptLayout = layoutCount;
-            
-            // Update active layout button
-            document.querySelectorAll('.graph-options button').forEach(btn => {
-                if (parseInt(btn.dataset.count) === layoutCount) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            });
-            
-            // Filter charts based on selected technologies
-            const filteredCharts = [];
-            const chartElements = document.querySelectorAll("canvas");
-            
-            chartElements.forEach((canvas, index) => {
-                const chart = Chart.getChart(canvas.id);
-                if (chart) {
-                    const title = chart.options.plugins.title.text;
-                    const tech = title.split(' - ')[0]; // Extract tech from title
-                    
-                    if (selectedTechForExport[tech]) {
-                        filteredCharts.push({
-                            canvas: canvas,
-                            chart: chart,
-                            title: title,
-                            tech: tech
-                        });
-                    }
-                }
-            });
-            
-            if (filteredCharts.length === 0) {
-                document.getElementById('previewBody').innerHTML = 
-                    '<div style="text-align:center;padding:40px;color:#666;">No charts selected for export. Please select at least one technology.</div>';
-                return;
-            }
-            
-            // Calculate grid layout
-            const layout = getLayoutConfig(layoutCount);
-            const gridTemplateCols = `repeat(${layout.cols}, 1fr)`;
-            
-            // Generate preview
-            const previewBody = document.getElementById('previewBody');
-            previewBody.innerHTML = '';
-            
-            for (let i = 0; i < filteredCharts.length; i += layoutCount) {
-                const slideDiv = document.createElement('div');
-                slideDiv.className = 'preview-slide';
-                
-                const slideTitle = document.createElement('div');
-                slideTitle.className = 'preview-slide-title';
-                slideTitle.textContent = `Slide ${Math.floor(i/layoutCount) + 1}`;
-                slideDiv.appendChild(slideTitle);
-                
-                const grid = document.createElement('div');
-                grid.className = 'preview-grid';
-                grid.style.display = 'grid';
-                grid.style.gridTemplateColumns = gridTemplateCols;
-                grid.style.gap = '10px';
-                grid.style.height = '100%';
-                grid.style.paddingTop = '30px';
-                grid.style.alignContent = 'start';
-                
-                for (let j = 0; j < layoutCount; j++) {
-                    if (i + j < filteredCharts.length) {
-                        const chartData = filteredCharts[i + j];
-                        const box = createPreviewBox(chartData.canvas, chartData.title);
-                        grid.appendChild(box);
-                    }
-                }
-                
-                slideDiv.appendChild(grid);
-                previewBody.appendChild(slideDiv);
-            }
-        }
-
-        function getLayoutConfig(count) {
-            let rows, cols;
-            switch(parseInt(count)) {
-                case 1: rows = 1; cols = 1; break;
-                case 2: rows = 1; cols = 2; break;
-                case 3: rows = 2; cols = 2; break; // Actually 2x2 with one empty
-                case 4: rows = 2; cols = 2; break;
-                case 6: rows = 2; cols = 3; break;
-                case 9: rows = 3; cols = 3; break;
-                default: rows = 2; cols = 2;
-            }
-            
-            return { rows, cols };
-        }
-
-        function createPreviewBox(canvas, title) {
-            const box = document.createElement('div');
-            box.className = 'preview-img-box';
-            
-            // Create a copy of the canvas for preview
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = canvas.width;
-            tempCanvas.height = canvas.height;
-            const tempCtx = tempCanvas.getContext('2d');
-            
-            // Draw the chart
-            tempCtx.drawImage(canvas, 0, 0);
-            const imgData = tempCanvas.toDataURL("image/png");
-            
-            const img = document.createElement('img');
-            img.src = imgData;
-            img.style.maxHeight = '100%';
-            img.style.maxWidth = '100%';
-            img.style.objectFit = 'contain';
-            
-            const titleLabel = document.createElement('div');
-            titleLabel.textContent = title;
-            titleLabel.style.fontSize = '12px';
-            titleLabel.style.color = '#666';
-            titleLabel.style.marginTop = '5px';
-            titleLabel.style.textAlign = 'center';
-            
-            box.appendChild(img);
-            box.appendChild(titleLabel);
-            
-            return box;
-        }
-
-        async function downloadPPT() {
-            const pptx = new PptxGenJS();
-            pptx.layout = 'LAYOUT_16x9';
-            
-            // Add title slide
-            const titleSlide = pptx.addSlide();
-            titleSlide.addText('KPI Dashboard Report', {
-                x: 0.5, y: 1, w: 9, h: 1,
-                fontSize: 36, bold: true, color: '2F80ED'
-            });
-            
-            const date = new Date().toLocaleDateString();
-            titleSlide.addText(`Generated: ${date}`, {
-                x: 0.5, y: 2, w: 9, h: 0.5,
-                fontSize: 16, color: '666666'
-            });
-            
-            // Get filtered charts
-            const filteredCharts = [];
-            const chartElements = document.querySelectorAll("canvas");
-            
-            chartElements.forEach((canvas, index) => {
-                const chart = Chart.getChart(canvas.id);
-                if (chart) {
-                    const title = chart.options.plugins.title.text;
-                    const tech = title.split(' - ')[0];
-                    
-                    if (selectedTechForExport[tech]) {
-                        filteredCharts.push({
-                            canvas: canvas,
-                            chart: chart,
-                            title: title,
-                            tech: tech
-                        });
-                    }
-                }
-            });
-            
-            if (filteredCharts.length === 0) {
-                alert("No charts selected for export.");
-                return;
-            }
-            
-            // Calculate layout
-            const layout = getLayoutConfig(pptLayout);
-            const slideWidth = 10.0;
-            const slideHeight = 5.625;
-            const marginX = 0.2;
-            const marginTop = 0.9;
-            const marginBottom = 0.2;
-            const gap = 0.15;
-            
-            const usableW = slideWidth - (marginX * 2);
-            const usableH = slideHeight - marginTop - marginBottom;
-            const chartW = (usableW - ((layout.cols - 1) * gap)) / layout.cols;
-            const chartH = (usableH - ((layout.rows - 1) * gap)) / layout.rows;
-            
-            // Add chart slides
-            for (let i = 0; i < filteredCharts.length; i += pptLayout) {
-                const slide = pptx.addSlide();
-                
-                for (let j = 0; j < pptLayout; j++) {
-                    if (i + j < filteredCharts.length) {
-                        const chartData = filteredCharts[i + j];
-                        const colIndex = j % layout.cols;
-                        const rowIndex = Math.floor(j / layout.cols);
-                        
-                        const xPos = marginX + (colIndex * (chartW + gap));
-                        const yPos = marginTop + (rowIndex * (chartH + gap));
-                        
-                        // Add chart image
-                        slide.addImage({
-                            data: chartData.canvas.toDataURL("image/png"),
-                            x: xPos,
-                            y: yPos,
-                            w: chartW,
-                            h: chartH
-                        });
-                        
-                        // Add chart title
-                        slide.addText(chartData.title, {
-                            x: xPos,
-                            y: yPos - 0.3,
-                            w: chartW,
-                            h: 0.3,
-                            fontSize: 8,
-                            bold: true,
-                            color: '333333'
-                        });
-                    }
-                }
-            }
-            
-            // Add summary slide
-            const summarySlide = pptx.addSlide();
-            summarySlide.addText('Summary', {
-                x: 0.5, y: 0.5, w: 9, h: 0.5,
-                fontSize: 28, bold: true, color: '2F80ED'
-            });
-            
-            let summaryText = `Total Charts: ${filteredCharts.length}\n`;
-            summaryText += `Layout: ${pptLayout} per slide\n`;
-            summaryText += `Total Slides: ${Math.ceil(filteredCharts.length / pptLayout) + 2}\n\n`;
-            
-            // Group by technology
-            const techCount = {};
-            filteredCharts.forEach(chart => {
-                techCount[chart.tech] = (techCount[chart.tech] || 0) + 1;
-            });
-            
-            for (const tech in techCount) {
-                summaryText += `${tech}: ${techCount[tech]} charts\n`;
-            }
-            
-            summarySlide.addText(summaryText, {
-                x: 0.5, y: 1.5, w: 9, h: 3,
-                fontSize: 14, color: '333333'
-            });
-            
-            // Download
-            const timestamp = new Date().getTime();
-            pptx.writeFile({ fileName: `KPI_Report_${timestamp}.pptx` });
-            closePPTExport();
         }
     </script>
 </body>
