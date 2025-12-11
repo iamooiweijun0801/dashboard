@@ -201,41 +201,6 @@
         .tech-color-btn.lte { background: #27AE60; }
         .tech-color-btn.nr { background: #D24726; }
 
-        /* --- ANIMATION CONTROLS --- */
-        .animation-controls {
-            margin: 20px 0;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border: 1px solid #eee;
-        }
-        .animation-controls h4 {
-            margin-top: 0;
-            margin-bottom: 10px;
-            color: #333;
-        }
-        .animation-toggle {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        .animation-toggle label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-        }
-        .animation-speed {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        .animation-speed input {
-            flex: 1;
-        }
-
         /* --- COLOR PICKER MODAL --- */
         .color-picker-modal {
             position: fixed;
@@ -426,7 +391,6 @@
 
     <div class="controls">
         <button class="action-btn" onclick="openPPTExport()">📊 Export PPT</button>
-        <button class="action-btn" onclick="toggleChartAnimation()" id="animationToggleBtn">▶ Start Animation</button>
     </div>
 
     <div class="chart-grid" id="mainChartContainer">
@@ -451,21 +415,6 @@
             <div class="style-button" onclick="applyChartStyle(2)">Smooth Line</div>
             <div class="style-button" onclick="applyChartStyle(3)">Thick Line</div>
             <div class="style-button" onclick="applyChartStyle(4)">Thin Line with dots</div>
-            
-            <div class="animation-controls">
-                <h4>Animation Controls</h4>
-                <div class="animation-toggle">
-                    <label>
-                        <input type="checkbox" id="animationEnabled" onchange="toggleChartAnimation()">
-                        Enable Chart Animation
-                    </label>
-                </div>
-                <div class="animation-speed">
-                    <span>Speed:</span>
-                    <input type="range" id="animationSpeed" min="500" max="5000" value="2000" step="100" onchange="updateAnimationSpeed(this.value)">
-                    <span id="speedValue">2.0s</span>
-                </div>
-            </div>
             
             <div style="margin: 20px 0; border-top: 1px solid #eee; padding-top: 15px;">
                 <label><b>Technology Colors</b></label>
@@ -530,7 +479,6 @@
                             <button onclick="updatePPTPreview(3)" data-count="3">3 Graphs</button>
                             <button onclick="updatePPTPreview(4)" data-count="4">4 Graphs</button>
                             <button onclick="updatePPTPreview(6)" data-count="6">6 Graphs</button>
-                            <button onclick="updatePPTPreview(7)" data-count="7">7 Graphs</button>
                             <button onclick="updatePPTPreview(9)" data-count="9">9 Graphs</button>
                         </div>
                     </div>
@@ -566,17 +514,12 @@
         let selectedKpis = [];
         let selectedTechForColor = '';
         let selectedColor = '';
-        let pptLayout = 9;
+        let pptLayout = 9; // Default: 3 graphs per slide
         let selectedTechForExport = {
             GSM: true,
             LTE: true,
             NR: true
         };
-
-        // --- NEW STATE VARIABLES ---
-        let chartAnimationActive = false;
-        let chartAnimationSpeed = 2000;
-        let animationInterval;
 
         // --- KPI Definitions ---
         const kpiDefinitions = [
@@ -693,65 +636,9 @@
 
         // --- INITIALIZATION ---
         function initDashboard() {
-            // Load saved settings from localStorage
-            loadSavedSettings();
-            
             selectedKpis = kpiDefinitions.filter(k => k.initialChecked).map(k => k.tech + " - " + k.kpi);
             applyChartStyle(1);
             fetchData();
-        }
-
-        // --- LOCAL STORAGE FUNCTIONS ---
-        function saveSettings() {
-            const settings = {
-                chartStyle: activeChartStyle ? chartStyles.findIndex(s => s.name === activeChartStyle.name) : 1,
-                techColors: techColors,
-                selectedKpis: selectedKpis,
-                animationEnabled: chartAnimationActive,
-                animationSpeed: chartAnimationSpeed
-            };
-            localStorage.setItem('kpiDashboardSettings', JSON.stringify(settings));
-        }
-
-        function loadSavedSettings() {
-            const saved = localStorage.getItem('kpiDashboardSettings');
-            if (saved) {
-                try {
-                    const settings = JSON.parse(saved);
-                    
-                    // Load chart style
-                    if (settings.chartStyle !== undefined) {
-                        applyChartStyle(settings.chartStyle, false);
-                    }
-                    
-                    // Load tech colors
-                    if (settings.techColors) {
-                        techColors = settings.techColors;
-                    }
-                    
-                    // Load selected KPIs
-                    if (settings.selectedKpis) {
-                        selectedKpis = settings.selectedKpis;
-                    }
-                    
-                    // Load animation settings
-                    if (settings.animationEnabled !== undefined) {
-                        chartAnimationActive = settings.animationEnabled;
-                        document.getElementById('animationEnabled').checked = chartAnimationActive;
-                        document.getElementById('animationToggleBtn').textContent = 
-                            chartAnimationActive ? '⏸ Stop Animation' : '▶ Start Animation';
-                    }
-                    
-                    if (settings.animationSpeed !== undefined) {
-                        chartAnimationSpeed = settings.animationSpeed;
-                        document.getElementById('animationSpeed').value = chartAnimationSpeed;
-                        document.getElementById('speedValue').textContent = (chartAnimationSpeed / 1000).toFixed(1) + 's';
-                    }
-                    
-                } catch (e) {
-                    console.error('Error loading saved settings:', e);
-                }
-            }
         }
 
         // --- DATA FETCHING ---
@@ -840,319 +727,181 @@
                 return;
             }
 
-            // Smart layout calculation for 7 graphs
-            if (chartsToRender.length === 7) {
-                container.style.gridTemplateColumns = 'repeat(3, 1fr)';
-                
-                // Create first row with 3 charts
-                for (let i = 0; i < 3; i++) {
-                    if (i < chartsToRender.length) {
-                        createChartCard(chartsToRender[i], i, timeline, timelineLabels, dateHeaderName);
-                    }
-                }
-                
-                // Create second row with 3 charts
-                for (let i = 3; i < 6; i++) {
-                    if (i < chartsToRender.length) {
-                        createChartCard(chartsToRender[i], i, timeline, timelineLabels, dateHeaderName);
-                    }
-                }
-                
-                // Create third row with 1 chart (centered)
-                if (chartsToRender.length > 6) {
-                    const card = document.createElement("div");
-                    card.className = "chart-card";
-                    card.style.gridColumn = "2"; // Center in middle column
+            chartsToRender.forEach((kpiDef, idx) => {
+                const fullKpiName = kpiDef.tech + " - " + kpiDef.kpi;
+                const tech = kpiDef.tech;
+                const kpi = kpiDef.kpi;
+
+                const card = document.createElement("div");
+                card.className = "chart-card";
+                const wrapper = document.createElement("div");
+                wrapper.className = "chart-container";
+                const canvas = document.createElement("canvas");
+                canvas.id = `chart_${idx}`;
+                wrapper.appendChild(canvas);
+                card.appendChild(wrapper);
+                container.appendChild(card);
+
+                // Data Processing
+                const dataPoints = timeline.map(date => {
+                    const values = allData
+                        .filter(d => d.Tech === tech && d[dateHeaderName] === date)
+                        .map(d => d[kpi])
+                        .filter(v => v !== null && v !== "")
+                        .map(Number)
+                        .filter(v => !isNaN(v));
                     
-                    const wrapper = document.createElement("div");
-                    wrapper.className = "chart-container";
-                    const canvas = document.createElement("canvas");
-                    canvas.id = `chart_6`;
-                    wrapper.appendChild(canvas);
-                    card.appendChild(wrapper);
-                    container.appendChild(card);
+                    if (values.length === 0) return null;
                     
-                    createChartInstance(chartsToRender[6], 6, timeline, timelineLabels, dateHeaderName, canvas);
-                }
-            } else {
-                // Normal grid layout for other counts
-                chartsToRender.forEach((kpiDef, idx) => {
-                    createChartCard(kpiDef, idx, timeline, timelineLabels, dateHeaderName);
+                    const kpiLower = kpi.toLowerCase();
+                    if (kpiLower.includes('%') || kpiLower.includes('rate') || kpiLower.includes('avg') || kpiLower.includes('average')|| kpiLower.includes('max')) {
+                        return values.reduce((a, b) => a + b, 0) / values.length;
+                    } else {
+                        return values.reduce((a, b) => a + b, 0);
+                    }
                 });
-            }
 
-            // Start animation if enabled
-            if (chartAnimationActive) {
-                startChartAnimation();
-            }
-        }
+                const validValues = dataPoints.filter(v => v !== null);
+                if (validValues.length === 0) {
+                    const noDataMsg = document.createElement("div");
+                    noDataMsg.style.textAlign = "center";
+                    noDataMsg.style.padding = "20px";
+                    noDataMsg.style.color = "#666";
+                    noDataMsg.textContent = "No data available for this KPI";
+                    card.appendChild(noDataMsg);
+                    return;
+                }
 
-        function createChartCard(kpiDef, idx, timeline, timelineLabels, dateHeaderName) {
-            const container = document.getElementById("mainChartContainer");
-            const card = document.createElement("div");
-            card.className = "chart-card";
-            const wrapper = document.createElement("div");
-            wrapper.className = "chart-container";
-            const canvas = document.createElement("canvas");
-            canvas.id = `chart_${idx}`;
-            wrapper.appendChild(canvas);
-            card.appendChild(wrapper);
-            container.appendChild(card);
-            
-            createChartInstance(kpiDef, idx, timeline, timelineLabels, dateHeaderName, canvas);
-        }
+                let minVal = Math.min(...validValues);
+                let maxVal = Math.max(...validValues);
 
-        function createChartInstance(kpiDef, idx, timeline, timelineLabels, dateHeaderName, canvas) {
-            const fullKpiName = kpiDef.tech + " - " + kpiDef.kpi;
-            const tech = kpiDef.tech;
-            const kpi = kpiDef.kpi;
-
-            // Data Processing
-            const dataPoints = timeline.map(date => {
-                const values = allData
-                    .filter(d => d.Tech === tech && d[dateHeaderName] === date)
-                    .map(d => d[kpi])
-                    .filter(v => v !== null && v !== "")
-                    .map(Number)
-                    .filter(v => !isNaN(v));
+                // Y-Axis Helper Functions
+                function niceNumber(value, round) {
+                    if (value === 0) return 0;
+                    const exponent = Math.floor(Math.log10(value));
+                    const fraction = value / Math.pow(10, exponent);
+                    let niceFraction;
+                    if (round) {
+                        if (fraction < 1.5) niceFraction = 1; 
+                        else if (fraction < 3) niceFraction = 2; 
+                        else if (fraction < 7) niceFraction = 5; 
+                        else niceFraction = 10;
+                    } else {
+                        if (fraction <= 1) niceFraction = 1; 
+                        else if (fraction <= 2) niceFraction = 2; 
+                        else if (fraction <= 5) niceFraction = 5; 
+                        else niceFraction = 10;
+                    }
+                    return niceFraction * Math.pow(10, exponent);
+                }
+      
+                function computeYAxis(minVal, maxVal) {
+                    if (minVal >= 98 && maxVal <= 100) {
+                        return { niceMin: 98, niceMax: 100, tickSpacing: 0.5 };
+                    }
+                    let minV = minVal * 0.95; 
+                    let maxV = maxVal * 1.05;
+                    if (maxVal < 10) minV = 0;
+                    if (maxVal > 90 && maxVal <= 100) maxV = 100;
+                    let range = maxV - minV;
+                    if (range === 0) range = Math.abs(maxV) * 0.1 || 1;
+                    const tickSpacing = niceNumber(range / 5, true);
+                    const niceMin = Math.floor(minV / tickSpacing) * tickSpacing;
+                    const niceMax = Math.ceil(maxV / tickSpacing) * tickSpacing;
+                    return { niceMin, niceMax, tickSpacing };
+                }
                 
-                if (values.length === 0) return null;
-                
-                const kpiLower = kpi.toLowerCase();
-                if (kpiLower.includes('%') || kpiLower.includes('rate') || kpiLower.includes('avg') || kpiLower.includes('average')|| kpiLower.includes('max')) {
-                    return values.reduce((a, b) => a + b, 0) / values.length;
-                } else {
-                    return values.reduce((a, b) => a + b, 0);
-                }
-            });
+                const { niceMin, niceMax, tickSpacing } = computeYAxis(minVal, maxVal);
+                let chartColor = techColors[tech];
 
-            const validValues = dataPoints.filter(v => v !== null);
-            if (validValues.length === 0) {
-                const noDataMsg = document.createElement("div");
-                noDataMsg.style.textAlign = "center";
-                noDataMsg.style.padding = "20px";
-                noDataMsg.style.color = "#666";
-                noDataMsg.textContent = "No data available for this KPI";
-                canvas.parentElement.parentElement.appendChild(noDataMsg);
-                return;
-            }
-
-            let minVal = Math.min(...validValues);
-            let maxVal = Math.max(...validValues);
-
-            // Y-Axis Helper Functions
-            function niceNumber(value, round) {
-                if (value === 0) return 0;
-                const exponent = Math.floor(Math.log10(value));
-                const fraction = value / Math.pow(10, exponent);
-                let niceFraction;
-                if (round) {
-                    if (fraction < 1.5) niceFraction = 1; 
-                    else if (fraction < 3) niceFraction = 2; 
-                    else if (fraction < 7) niceFraction = 5; 
-                    else niceFraction = 10;
-                } else {
-                    if (fraction <= 1) niceFraction = 1; 
-                    else if (fraction <= 2) niceFraction = 2; 
-                    else if (fraction <= 5) niceFraction = 5; 
-                    else niceFraction = 10;
-                }
-                return niceFraction * Math.pow(10, exponent);
-            }
-
-            function computeYAxis(minVal, maxVal) {
-                if (minVal >= 98 && maxVal <= 100) {
-                    return { niceMin: 98, niceMax: 100, tickSpacing: 0.5 };
-                }
-                let minV = minVal * 0.95; 
-                let maxV = maxVal * 1.05;
-                if (maxVal < 10) minV = 0;
-                if (maxVal > 90 && maxVal <= 100) maxV = 100;
-                let range = maxV - minV;
-                if (range === 0) range = Math.abs(maxV) * 0.1 || 1;
-                const tickSpacing = niceNumber(range / 5, true);
-                const niceMin = Math.floor(minV / tickSpacing) * tickSpacing;
-                const niceMax = Math.ceil(maxV / tickSpacing) * tickSpacing;
-                return { niceMin, niceMax, tickSpacing };
-            }
-            
-            const { niceMin, niceMax, tickSpacing } = computeYAxis(minVal, maxVal);
-            let chartColor = techColors[tech];
-
-            // Chart Config with Animation
-            const chartConfig = {
-                type: 'line',
-                data: {
-                    labels: timelineLabels,
-                    datasets: [{ 
-                        label: kpi,
-                        data: dataPoints,
-                        borderColor: chartColor,
-                        backgroundColor: activeChartStyle && activeChartStyle.fill ? 
-                            chartColor.replace(')', ', 0.1)').replace('rgb', 'rgba') : 'transparent',
-                        borderWidth: activeChartStyle ? activeChartStyle.borderWidth : 2, 
-                        pointRadius: activeChartStyle ? activeChartStyle.pointRadius : 5, 
-                        pointBackgroundColor: chartColor,
-                        pointBorderColor: chartColor,
-                        pointBorderWidth: 1,
-                        tension: activeChartStyle ? activeChartStyle.tension : 0.4, 
-                        spanGaps: true
-                    }]
-                },
-                options: {
-                    responsive: true, 
-                    maintainAspectRatio: false,
-                    plugins: { 
-                        legend: { 
-                            display: false 
-                        },
-                        title: { 
-                            display: true, 
-                            text: `${tech} - ${kpi}`,
-                            font: { 
-                                size: 14, 
-                                weight: 'bold' 
-                            }, 
-                            color: '#333'
-                        }
+                // Chart Config
+                const chartConfig = {
+                    type: 'line',
+                    data: {
+                        labels: timelineLabels,
+                        datasets: [{ 
+                            label: kpi,
+                            data: dataPoints,
+                            borderColor: chartColor,
+                            backgroundColor: activeChartStyle && activeChartStyle.fill ? 
+                                chartColor.replace(')', ', 0.1)').replace('rgb', 'rgba') : 'transparent',
+                            borderWidth: activeChartStyle ? activeChartStyle.borderWidth : 2, 
+                            pointRadius: activeChartStyle ? activeChartStyle.pointRadius : 5, 
+                            pointBackgroundColor: chartColor,
+                            pointBorderColor: chartColor,
+                            pointBorderWidth: 1,
+                            tension: activeChartStyle ? activeChartStyle.tension : 0.4, 
+                            spanGaps: true
+                        }]
                     },
-                    scales: {
-                        x: { 
-                            ticks: { 
-                                font: { size: 8 } 
-                            }, 
-                            grid: { 
+                    options: {
+                        responsive: true, 
+                        maintainAspectRatio: false,
+                        plugins: { 
+                            legend: { 
                                 display: false 
-                            } 
+                            },
+                            title: { 
+                                display: true, 
+                                text: `${tech} - ${kpi}`,
+                                font: { 
+                                    size: 14, 
+                                    weight: 'bold' 
+                                }, 
+                                color: '#333'
+                            }
                         },
-                        y: { 
-                            grid: { 
-                                color: '#eee' 
-                            }, 
-                            min: niceMin, 
-                            max: niceMax, 
-                            ticks: { 
-                                stepSize: tickSpacing 
-                            }, 
-                            beginAtZero: maxVal < 10 
-                        }
-                    },
-                    // Animation configuration
-                    animation: {
-                        duration: chartAnimationActive ? chartAnimationSpeed : 0,
-                        easing: 'easeInOutQuart',
-                        onComplete: function(animation) {
-                            if (chartAnimationActive) {
-                                // Reset for next animation cycle
-                                this.data.datasets.forEach(dataset => {
-                                    dataset._meta = {};
-                                });
+                        scales: {
+                            x: { 
+                                ticks: { 
+                                    font: { size: 8 } 
+                                }, 
+                                grid: { 
+                                    display: false 
+                                } 
+                            },
+                            y: { 
+                                grid: { 
+                                    color: '#eee' 
+                                }, 
+                                min: niceMin, 
+                                max: niceMax, 
+                                ticks: { 
+                                    stepSize: tickSpacing 
+                                }, 
+                                beginAtZero: maxVal < 10 
                             }
                         }
                     }
-                }
-            };
+                };
 
-            if (activeChartStyle) {
-                const style = activeChartStyle;
-                chartConfig.data.datasets[0].borderWidth = style.borderWidth;
-                chartConfig.data.datasets[0].pointRadius = style.pointRadius;
-                chartConfig.data.datasets[0].borderDash = style.borderDash;
-                chartConfig.data.datasets[0].tension = style.tension;
-                chartConfig.data.datasets[0].fill = style.fill;
-                if (style.fill && style.backgroundColor) {
-                    chartConfig.data.datasets[0].backgroundColor = style.backgroundColor.replace('47, 128, 237', 
-                        chartColor.substring(1).match(/.{2}/g).map(x => parseInt(x, 16)).join(', '));
+                if (activeChartStyle) {
+                    const style = activeChartStyle;
+                    chartConfig.data.datasets[0].borderWidth = style.borderWidth;
+                    chartConfig.data.datasets[0].pointRadius = style.pointRadius;
+                    chartConfig.data.datasets[0].borderDash = style.borderDash;
+                    chartConfig.data.datasets[0].tension = style.tension;
+                    chartConfig.data.datasets[0].fill = style.fill;
+                    if (style.fill && style.backgroundColor) {
+                        chartConfig.data.datasets[0].backgroundColor = style.backgroundColor.replace('47, 128, 237', 
+                            chartColor.substring(1).match(/.{2}/g).map(x => parseInt(x, 16)).join(', '));
+                    }
                 }
-            }
 
-            try {
-                allCharts[fullKpiName] = new Chart(canvas.getContext("2d"), chartConfig);
-            } catch (e) {
-                console.error(`Error creating chart for ${fullKpiName}:`, e);
-                const errorMsg = document.createElement("div");
-                errorMsg.style.textAlign = "center";
-                errorMsg.style.padding = "20px";
-                errorMsg.style.color = "#D24726";
-                errorMsg.textContent = "Error creating chart";
-                canvas.parentElement.parentElement.appendChild(errorMsg);
-            }
+                try {
+                    allCharts[fullKpiName] = new Chart(canvas.getContext("2d"), chartConfig);
+                } catch (e) {
+                    console.error(`Error creating chart for ${fullKpiName}:`, e);
+                    const errorMsg = document.createElement("div");
+                    errorMsg.style.textAlign = "center";
+                    errorMsg.style.padding = "20px";
+                    errorMsg.style.color = "#D24726";
+                    errorMsg.textContent = "Error creating chart";
+                    card.appendChild(errorMsg);
+                }
+            });
         }
         
-        // --- ANIMATION FUNCTIONS ---
-        function toggleChartAnimation() {
-            chartAnimationActive = !chartAnimationActive;
-            
-            const checkbox = document.getElementById('animationEnabled');
-            const button = document.getElementById('animationToggleBtn');
-            
-            checkbox.checked = chartAnimationActive;
-            button.textContent = chartAnimationActive ? '⏸ Stop Animation' : '▶ Start Animation';
-            
-            if (chartAnimationActive) {
-                startChartAnimation();
-            } else {
-                stopChartAnimation();
-            }
-            
-            saveSettings();
-        }
-
-        function startChartAnimation() {
-            // Clear any existing interval
-            if (animationInterval) {
-                clearInterval(animationInterval);
-            }
-            
-            // Animate all charts
-            Object.values(allCharts).forEach(chart => {
-                if (chart) {
-                    chart.options.animation.duration = chartAnimationSpeed;
-                    chart.update('none');
-                }
-            });
-            
-            // Set up continuous animation
-            animationInterval = setInterval(() => {
-                Object.values(allCharts).forEach(chart => {
-                    if (chart) {
-                        chart.data.datasets.forEach(dataset => {
-                            // Reset animation
-                            dataset._meta = {};
-                        });
-                        chart.update('none');
-                    }
-                });
-            }, chartAnimationSpeed + 500);
-        }
-
-        function stopChartAnimation() {
-            if (animationInterval) {
-                clearInterval(animationInterval);
-                animationInterval = null;
-            }
-            
-            // Reset charts to static state
-            Object.values(allCharts).forEach(chart => {
-                if (chart) {
-                    chart.options.animation.duration = 0;
-                    chart.update();
-                }
-            });
-        }
-
-        function updateAnimationSpeed(speed) {
-            chartAnimationSpeed = parseInt(speed);
-            document.getElementById('speedValue').textContent = (chartAnimationSpeed / 1000).toFixed(1) + 's';
-            
-            if (chartAnimationActive) {
-                stopChartAnimation();
-                startChartAnimation();
-            }
-            
-            saveSettings();
-        }
-
         // --- KPI DRAWER FUNCTIONS ---
         function toggleDrawer(){
             const d = document.getElementById("kpiDrawer");
@@ -1192,11 +941,6 @@
             selectedKpis = Array.from(list.querySelectorAll(".kpi-chk:checked")).map(c => c.value);
             document.getElementById("kpiDrawer").classList.remove("open");
             
-            // Stop animation before rendering new charts
-            if (chartAnimationActive) {
-                stopChartAnimation();
-            }
-            
             const dateHeaderName = Object.keys(allData[0] || {}).find(h => h.toLowerCase().includes('date'));
             if (dateHeaderName && allData.length > 0) {
                 const timeline = [...new Set(allData.map(d => d[dateHeaderName]))].sort((a,b) => { 
@@ -1206,8 +950,6 @@
                 });
                 renderCharts(timeline);
             }
-            
-            saveSettings();
         }
 
         function selectVisibleKpis() {
@@ -1226,7 +968,7 @@
             d.classList.toggle("open");
         }
 
-        function applyChartStyle(styleIndex, save = true){
+        function applyChartStyle(styleIndex){
             activeChartStyle = chartStyles[styleIndex];
             document.querySelectorAll('.style-button').forEach((btn, idx) => {
                 if (idx === styleIndex) { 
@@ -1238,11 +980,6 @@
             
             updateTechColorButtons();
             
-            // Stop animation before updating charts
-            if (chartAnimationActive) {
-                stopChartAnimation();
-            }
-            
             const dateHeaderName = Object.keys(allData[0] || {}).find(h => h.toLowerCase().includes('date'));
             if (dateHeaderName && allData.length > 0) {
                 const timeline = [...new Set(allData.map(d => d[dateHeaderName]))].sort((a,b) => { 
@@ -1251,10 +988,6 @@
                     return new Date(ya,ma-1,da) - new Date(yb,mb-1,db);
                 });
                 renderCharts(timeline);
-            }
-            
-            if (save) {
-                saveSettings();
             }
         }
 
@@ -1317,11 +1050,6 @@
                 
                 updateTechColorButtons();
                 
-                // Stop animation before updating charts
-                if (chartAnimationActive) {
-                    stopChartAnimation();
-                }
-                
                 const dateHeaderName = Object.keys(allData[0] || {}).find(h => h.toLowerCase().includes('date'));
                 if (dateHeaderName && allData.length > 0) {
                     const timeline = [...new Set(allData.map(d => d[dateHeaderName]))].sort((a,b) => { 
@@ -1333,11 +1061,10 @@
                 }
                 
                 closeColorPicker();
-                saveSettings();
             }
         }
 
-        // --- PPT EXPORT FUNCTIONS ---
+        // --- PPT EXPORT FUNCTIONS --- FIXED: Simple mixed technology layout
         function openPPTExport() {
             const charts = document.querySelectorAll("canvas");
             if (charts.length === 0) {
@@ -1423,6 +1150,8 @@
             
             // Calculate grid layout based on selected layout
             const layout = getLayoutConfig(layoutCount);
+            const gridTemplateCols = `repeat(${layout.cols}, 1fr)`;
+            const gridTemplateRows = `repeat(${layout.rows}, 1fr)`;
             
             for (let i = 0; i < allChartsForExport.length; i += layoutCount) {
                 const slideDiv = document.createElement('div');
@@ -1436,69 +1165,28 @@
                 const grid = document.createElement('div');
                 grid.className = 'preview-grid';
                 grid.style.display = 'grid';
-                grid.style.gridTemplateColumns = `repeat(${layout.cols}, 1fr)`;
-                grid.style.gridTemplateRows = `repeat(${layout.rows}, 1fr)`;
+                grid.style.gridTemplateColumns = gridTemplateCols;
+                grid.style.gridTemplateRows = gridTemplateRows;
                 grid.style.gap = '10px';
                 grid.style.height = '100%';
                 grid.style.paddingTop = '30px';
                 grid.style.alignContent = 'start';
                 
-                // Special handling for 7 charts layout
-                if (layoutCount === 7 && allChartsForExport.length - i >= 7) {
-                    // First row: 3 charts
-                    for (let j = 0; j < 3; j++) {
-                        const chartData = allChartsForExport[i + j];
-                        if (chartData) {
-                            const box = createPreviewBox(chartData.canvas, chartData.title);
-                            grid.appendChild(box);
-                        }
-                    }
-                    
-                    // Second row: 3 charts
-                    for (let j = 3; j < 6; j++) {
-                        const chartData = allChartsForExport[i + j];
-                        if (chartData) {
-                            const box = createPreviewBox(chartData.canvas, chartData.title);
-                            box.style.gridColumn = j === 3 ? '1' : (j === 4 ? '2' : '3');
-                            grid.appendChild(box);
-                        }
-                    }
-                    
-                    // Third row: 1 chart centered
-                    if (allChartsForExport[i + 6]) {
-                        const chartData = allChartsForExport[i + 6];
+                // Fill the grid
+                for (let j = 0; j < layoutCount; j++) {
+                    const cellIndex = i + j;
+                    if (cellIndex < allChartsForExport.length) {
+                        const chartData = allChartsForExport[cellIndex];
                         const box = createPreviewBox(chartData.canvas, chartData.title);
-                        box.style.gridColumn = '2';
-                        box.style.gridRow = '3';
                         grid.appendChild(box);
-                    }
-                } else {
-                    // Normal layout for other counts
-                    for (let j = 0; j < layoutCount; j++) {
-                        const chartIndex = i + j;
-                        if (chartIndex < allChartsForExport.length) {
-                            const chartData = allChartsForExport[chartIndex];
-                            const box = createPreviewBox(chartData.canvas, chartData.title);
-                            
-                            // Special handling for 1 and 2 charts to make them larger
-                            if (layoutCount === 1) {
-                                box.style.gridColumn = '1 / -1';
-                                box.style.gridRow = '1 / -1';
-                            } else if (layoutCount === 2) {
-                                box.style.gridColumn = j === 0 ? '1' : '2';
-                                box.style.gridRow = '1 / -1';
-                            }
-                            
-                            grid.appendChild(box);
-                        } else {
-                            // Empty cell
-                            const emptyBox = document.createElement('div');
-                            emptyBox.className = 'preview-img-box';
-                            emptyBox.style.border = '1px dashed #eee';
-                            emptyBox.style.background = '#f9f9f9';
-                            emptyBox.innerHTML = '<div style="color:#999;font-size:12px;"></div>';
-                            grid.appendChild(emptyBox);
-                        }
+                    } else {
+                        // Empty cell for 1-0-0 layout
+                        const emptyBox = document.createElement('div');
+                        emptyBox.className = 'preview-img-box';
+                        emptyBox.style.border = '1px dashed #eee';
+                        emptyBox.style.background = '#f9f9f9';
+                        emptyBox.innerHTML = '<div style="color:#999;font-size:12px;"></div>';
+                        grid.appendChild(emptyBox);
                     }
                 }
                 
@@ -1515,7 +1203,6 @@
                 case 3: rows = 2; cols = 2; break;
                 case 4: rows = 2; cols = 2; break;
                 case 6: rows = 2; cols = 3; break;
-                case 7: rows = 3; cols = 3; break; // Special 1-0-0 layout
                 case 9: rows = 3; cols = 3; break;
                 default: rows = 3; cols = 3;
             }
@@ -1608,115 +1295,48 @@
             const marginBottom = 0.5;
             const gap = 0.2;
             
+            const usableW = slideWidth - (marginX * 2);
+            const usableH = slideHeight - marginTop - marginBottom;
+            const chartW = (usableW - ((layout.cols - 1) * gap)) / layout.cols;
+            const chartH = (usableH - ((layout.rows - 1) * gap)) / layout.rows;
+            
             // Add chart slides
             for (let i = 0; i < allChartsForExport.length; i += pptLayout) {
                 const slide = pptx.addSlide();
                 
-                // Special handling for 7 charts per slide
-                if (pptLayout === 7 && allChartsForExport.length - i >= 7) {
-                    const chartW = 2.5;
-                    const chartH = 1.8;
-                    
-                    // Row 1: 3 charts
-                    for (let j = 0; j < 3; j++) {
-                        if (i + j < allChartsForExport.length) {
-                            const chartData = allChartsForExport[i + j];
+                for (let j = 0; j < pptLayout; j++) {
+                    const chartIndex = i + j;
+                    if (chartIndex < allChartsForExport.length) {
+                        const chartData = allChartsForExport[chartIndex];
+                        const rowIndex = Math.floor(j / layout.cols);
+                        const colIndex = j % layout.cols;
+                        
+                        const xPos = marginX + (colIndex * (chartW + gap));
+                        const yPos = marginTop + (rowIndex * (chartH + gap));
+                        
+                        try {
                             slide.addImage({
                                 data: chartData.canvas.toDataURL("image/png"),
-                                x: marginX + j * (chartW + gap),
-                                y: marginTop,
+                                x: xPos,
+                                y: yPos,
                                 w: chartW,
                                 h: chartH
                             });
-                        }
-                    }
-                    
-                    // Row 2: 3 charts
-                    for (let j = 3; j < 6; j++) {
-                        if (i + j < allChartsForExport.length) {
-                            const chartData = allChartsForExport[i + j];
-                            slide.addImage({
-                                data: chartData.canvas.toDataURL("image/png"),
-                                x: marginX + (j - 3) * (chartW + gap),
-                                y: marginTop + chartH + gap,
+                            
+                            // Add chart title
+                            const shortTitle = chartData.title.length > 40 ? 
+                                chartData.title.substring(0, 40) + '...' : chartData.title;
+                            slide.addText(shortTitle, {
+                                x: xPos,
+                                y: yPos - 0.25,
                                 w: chartW,
-                                h: chartH
+                                h: 0.25,
+                                fontSize: 7,
+                                bold: true,
+                                color: '333333'
                             });
-                        }
-                    }
-                    
-                    // Row 3: 1 chart centered
-                    if (i + 6 < allChartsForExport.length) {
-                        const chartData = allChartsForExport[i + 6];
-                        slide.addImage({
-                            data: chartData.canvas.toDataURL("image/png"),
-                            x: marginX + chartW + gap/2,
-                            y: marginTop + (chartH + gap) * 2,
-                            w: chartW,
-                            h: chartH
-                        });
-                    }
-                } else {
-                    // Normal layout for other counts
-                    const usableW = slideWidth - (marginX * 2);
-                    const usableH = slideHeight - marginTop - marginBottom;
-                    let chartW = (usableW - ((layout.cols - 1) * gap)) / layout.cols;
-                    let chartH = (usableH - ((layout.rows - 1) * gap)) / layout.rows;
-                    
-                    // Make charts larger for 1 and 2 layouts
-                    if (pptLayout === 1) {
-                        chartW = usableW * 0.8;
-                        chartH = usableH * 0.8;
-                    } else if (pptLayout === 2) {
-                        chartW = usableW * 0.45;
-                        chartH = usableH * 0.9;
-                    }
-                    
-                    for (let j = 0; j < pptLayout; j++) {
-                        const chartIndex = i + j;
-                        if (chartIndex < allChartsForExport.length) {
-                            const chartData = allChartsForExport[chartIndex];
-                            const rowIndex = Math.floor(j / layout.cols);
-                            const colIndex = j % layout.cols;
-                            
-                            let xPos, yPos;
-                            
-                            // Center charts for 1 and 2 layouts
-                            if (pptLayout === 1) {
-                                xPos = (slideWidth - chartW) / 2;
-                                yPos = (slideHeight - chartH) / 2;
-                            } else if (pptLayout === 2) {
-                                xPos = marginX + (colIndex * (usableW / 2 + gap/2));
-                                yPos = marginTop;
-                            } else {
-                                xPos = marginX + (colIndex * (chartW + gap));
-                                yPos = marginTop + (rowIndex * (chartH + gap));
-                            }
-                            
-                            try {
-                                slide.addImage({
-                                    data: chartData.canvas.toDataURL("image/png"),
-                                    x: xPos,
-                                    y: yPos,
-                                    w: chartW,
-                                    h: chartH
-                                });
-                                
-                                // Add chart title
-                                const shortTitle = chartData.title.length > 40 ? 
-                                    chartData.title.substring(0, 40) + '...' : chartData.title;
-                                slide.addText(shortTitle, {
-                                    x: xPos,
-                                    y: yPos - 0.25,
-                                    w: chartW,
-                                    h: 0.25,
-                                    fontSize: 7,
-                                    bold: true,
-                                    color: '333333'
-                                });
-                            } catch (e) {
-                                console.error(`Error adding chart to PPT:`, e);
-                            }
+                        } catch (e) {
+                            console.error(`Error adding chart to PPT:`, e);
                         }
                     }
                 }
