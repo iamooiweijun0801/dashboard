@@ -120,30 +120,37 @@
         // 2. Add an 'initialChecked: false' property for KPIs you want unchecked by default
         const kpiDefinitions = [
             { tech: "GSM", kpi: "Call setup success rate(%)", initialChecked: true, color: "#2F80ED" },
+            { tech: "GSM", kpi: "SDCCH Congestion Rate(%)", initialChecked: true, color: "#2F80ED" },
             { tech: "GSM", kpi: "TCH Congestion Rate(%)", initialChecked: true, color: "#2F80ED" },
             { tech: "GSM", kpi: "Call drop rate(%)", initialChecked: true, color: "#2F80ED" },
-            { tech: "GSM", kpi: "CS Traffic (erl)", initialChecked: false, color: "#2F80ED" }, // UNCHECKED BY DEFAULT
+            { tech: "GSM", kpi: "Handover Success Rate(%)", initialChecked: true, color: "#2F80ED" },
+            { tech: "GSM", kpi: "CS Traffic (erl)", initialChecked: true, color: "#2F80ED" }, // UNCHECKED BY DEFAULT
             
-            { tech: "LTE", kpi: "E-RAB Setup Success Rate(%)", initialChecked: true, color: "#27AE60" },
-            { tech: "LTE", kpi: "E-RAB Drop Rate(%)", initialChecked: true, color: "#27AE60" },
-            { tech: "LTE", kpi: "RRC Connection Setup Success Rate(%)", initialChecked: false, color: "#27AE60" }, // UNCHECKED BY DEFAULT
-            { tech: "LTE", kpi: "DL User Throughput (Mbps)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "DL PRB Utilization (%)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "UL PRB Utilization (%)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "Inter-eNBX2HO Success Rate(%)", initialChecked: true, color: "#27AE60" }, // UNCHECKED BY DEFAULT
+            { tech: "LTE", kpi: "Inter-eNBS1HO Success Rate(%)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "LTE DL -USER Average Throughput (Mbit/s)", initialChecked: true, color: "#27AE60" }, // UNCHECKED BY DEFAULT
+            { tech: "LTE", kpi: "LTE UL -USER Average Throughput (Mbit/s)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "DL Data Total Volume (Gbyte)", initialChecked: true, color: "#27AE60" }, // UNCHECKED BY DEFAULT
+            { tech: "LTE", kpi: "UL Data Total Volume (Gbyte)", initialChecked: true, color: "#27AE60" },
             
-            { tech: "NR", kpi: "PDCCH Success Rate(%)", initialChecked: true, color: "#D24726" },
-            { tech: "NR", kpi: "Initial Access Success Rate(%)", initialChecked: true, color: "#D24726" },
-            { tech: "NR", kpi: "NR Cell Availability(%)", initialChecked: true, color: "#D24726" },
+            { tech: "NR", kpi: "SgNB Addition Success Rate (CU)(%)", initialChecked: false, color: "#D24726" },
+            { tech: "NR", kpi: "SCG PSCell Change Success Rate(%)", initialChecked: false, color: "#D24726" },
+            { tech: "NR", kpi: "SgNB TriSgNB Abnormal Release Rate(%)", initialChecked: false, color: "#D24726" },
+            { tech: "NR", kpi: "Inter-SgNB Pscell Change Success Rate(%)", initialChecked: false, color: "#D24726" },
+            { tech: "NR", kpi: "NSA Average User Number", initialChecked: false, color: "#D24726" },
             
-            { tech: "NSA", kpi: "SCG Establishment Success Rate(%)", initialChecked: true, color: "#8E44AD" },
-            { tech: "NSA", kpi: "SCG Drop Rate(%)", initialChecked: false, color: "#8E44AD" }, // UNCHECKED BY DEFAULT
-            { tech: "NSA", kpi: "NSA Total Traffic (GB)", initialChecked: true, color: "#8E44AD" }
+            { tech: "NSA", kpi: "User Downlink Split Average Throughput (NSA DC)", initialChecked: false, color: "#8E44AD" },
+            { tech: "NSA", kpi: "User Uplink Split Average Throughput (NSA DC)", initialChecked: false, color: "#8E44AD" }, // UNCHECKED BY DEFAULT
         ];
 
         // --- Sheet URLs (PLACEHOLDERS - REPLACE WITH YOUR ACTUAL URLs) ---
         const sheetUrls = {
-            GSM: "https://docs.google.com/spreadsheets/d/e/YOUR-GSM-SHEET-ID/pub?gid=YOUR-GSM-GID&single=true&output=csv",
-            LTE: "https://docs.google.com/spreadsheets/d/e/YOUR-LTE-SHEET-ID/pub?gid=YOUR-LTE-GID&single=true&output=csv",
-            NR: "https://docs.google.com/spreadsheets/d/e/YOUR-NR-SHEET-ID/pub?gid=YOUR-NR-GID&single=true&output=csv",
-            NSA: "https://docs.google.com/spreadsheets/d/e/YOUR-NSA-SHEET-ID/pub?gid=YOUR-NSA-GID&single=true&output=csv"
+            GSM: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=1977848975&single=true&output=csv",
+            LTE: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=893314169&single=true&output=csv",
+            NR: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=1372365834&single=true&output=csv",
+            NSA: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=1503870746&single=true&output=csv"
         };
         
         let activeChartStyle = null; // For styling
