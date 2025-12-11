@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Multi-Tech KPI Dashboard (GSM, LTE, NR, NSA)</title>
+    <title>KPI Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         /* --- BASE STYLES (Kept for visual appeal) --- */
@@ -60,7 +60,7 @@
     </style>
 </head>
 <body onload="initDashboard()">
-    <header>Multi-Technology KPI Dashboard (GSM, LTE, NR, NSA)</header>
+    <header>KPI Dashboard</header>
 
     <div class="controls">
         <button onclick="fetchData()" class="action-btn">Refresh Data</button>
@@ -120,38 +120,27 @@
         // 2. Add an 'initialChecked: false' property for KPIs you want unchecked by default
         const kpiDefinitions = [
             { tech: "GSM", kpi: "Call setup success rate(%)", initialChecked: true, color: "#2F80ED" },
-            { tech: "GSM", kpi: "SDCCH Congestion Rate(%)", initialChecked: true, color: "#2F80ED" },
-            { tech: "GSM", kpi: "TCH Congestion Rate(%)", initialChecked: true, color: "#2F80ED" },
             { tech: "GSM", kpi: "Call drop rate(%)", initialChecked: true, color: "#2F80ED" },
-            { tech: "GSM", kpi: "Handover Success Rate(%)", initialChecked: true, color: "#2F80ED" },
             { tech: "GSM", kpi: "CS Traffic (erl)", initialChecked: true, color: "#2F80ED" }, // UNCHECKED BY DEFAULT
             
             { tech: "LTE", kpi: "DL PRB Utilization (%)", initialChecked: true, color: "#27AE60" },
             { tech: "LTE", kpi: "UL PRB Utilization (%)", initialChecked: true, color: "#27AE60" },
-            { tech: "LTE", kpi: "Inter-eNBX2HO Success Rate(%)", initialChecked: true, color: "#27AE60" }, // UNCHECKED BY DEFAULT
-            { tech: "LTE", kpi: "Inter-eNBS1HO Success Rate(%)", initialChecked: true, color: "#27AE60" },
             { tech: "LTE", kpi: "LTE DL -USER Average Throughput (Mbit/s)", initialChecked: true, color: "#27AE60" }, // UNCHECKED BY DEFAULT
             { tech: "LTE", kpi: "LTE UL -USER Average Throughput (Mbit/s)", initialChecked: true, color: "#27AE60" },
             { tech: "LTE", kpi: "DL Data Total Volume (Gbyte)", initialChecked: true, color: "#27AE60" }, // UNCHECKED BY DEFAULT
             { tech: "LTE", kpi: "UL Data Total Volume (Gbyte)", initialChecked: true, color: "#27AE60" },
             
             { tech: "NR", kpi: "SgNB Addition Success Rate (CU)(%)", initialChecked: false, color: "#D24726" },
-            { tech: "NR", kpi: "SCG PSCell Change Success Rate(%)", initialChecked: false, color: "#D24726" },
-            { tech: "NR", kpi: "SgNB TriSgNB Abnormal Release Rate(%)", initialChecked: false, color: "#D24726" },
-            { tech: "NR", kpi: "Inter-SgNB Pscell Change Success Rate(%)", initialChecked: false, color: "#D24726" },
-            { tech: "NR", kpi: "NSA Average User Number", initialChecked: false, color: "#D24726" },
-            
-            { tech: "NSA", kpi: "User Downlink Split Average Throughput (NSA DC)", initialChecked: false, color: "#8E44AD" },
-            { tech: "NSA", kpi: "User Uplink Split Average Throughput (NSA DC)", initialChecked: false, color: "#8E44AD" }, // UNCHECKED BY DEFAULT
-        ];
+            { tech: "NR", kpi: "NR DL Traffic Volume (GB)", initialChecked: false, color: "#D24726" },
+            { tech: "NR", kpi: "NR DL User Throughput", initialChecked: false, color: "#D24726" },
+             ];
 
         // --- Sheet URLs (PLACEHOLDERS - REPLACE WITH YOUR ACTUAL URLs) ---
         const sheetUrls = {
             GSM: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=1977848975&single=true&output=csv",
             LTE: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=893314169&single=true&output=csv",
             NR: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=1372365834&single=true&output=csv",
-            NSA: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=1503870746&single=true&output=csv"
-        };
+            };
         
         let activeChartStyle = null; // For styling
         let activeCustomColor = null; // For styling
@@ -336,7 +325,7 @@
                             legend: { display: false },
                             title: { 
                                 display: true, 
-                                text: `${fullKpiName} (Group Average)`, 
+                                text: `${fullKpiName}`, 
                                 font: { size: 14, weight: 'bold' }, 
                                 color: '#333'
                             }
