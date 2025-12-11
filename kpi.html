@@ -90,26 +90,6 @@
             width: 100%;
         }
         
-        .kpi-toggle {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            user-select: none;
-        }
-        
-        .kpi-checkbox {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-        }
-        
-        .kpi-name {
-            font-size: 14px;
-            color: #555;
-        }
-        
         .controls {
             display: flex;
             justify-content: center;
@@ -131,6 +111,14 @@
             background: #1f5ab5;
         }
         
+        .settings-btn {
+            background: #8E44AD;
+        }
+        
+        .settings-btn:hover {
+            background: #6c3483;
+        }
+        
         .loading {
             text-align: center;
             padding: 20px;
@@ -145,6 +133,169 @@
             border-radius: 6px;
             margin: 10px 0;
         }
+        
+        /* KPI Settings Drawer */
+        .drawer-toggle-button {
+            position: fixed;
+            top: 80px;
+            right: 0;
+            width: 40px;
+            height: 40px;
+            background: #8E44AD;
+            color: white;
+            border-radius: 6px 0 0 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1000;
+            font-size: 20px;
+            transition: all 0.3s;
+        }
+        
+        .drawer-toggle-button:hover {
+            width: 45px;
+            background: #6c3483;
+        }
+        
+        .kpi-drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 350px;
+            height: 100%;
+            background: white;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+            z-index: 1001;
+            transform: translateX(100%);
+            transition: transform 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .kpi-drawer.open {
+            transform: translateX(0);
+        }
+        
+        .drawer-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .drawer-header h3 {
+            margin: 0;
+            color: #333;
+        }
+        
+        .close-drawer {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #777;
+        }
+        
+        .drawer-controls {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .drawer-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .tech-kpi-group {
+            margin-bottom: 25px;
+        }
+        
+        .tech-kpi-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .tech-kpi-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2F80ED;
+        }
+        
+        .tech-select-all {
+            font-size: 12px;
+            color: #777;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .tech-select-all:hover {
+            color: #2F80ED;
+            text-decoration: underline;
+        }
+        
+        .kpi-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #f5f5f5;
+            cursor: pointer;
+        }
+        
+        .kpi-option:last-child {
+            border-bottom: none;
+        }
+        
+        .kpi-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .kpi-label {
+            font-size: 14px;
+            color: #555;
+            flex: 1;
+            cursor: pointer;
+        }
+        
+        .apply-btn {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+            text-align: center;
+        }
+        
+        /* Collapse/Expand buttons */
+        .collapse-expand-buttons {
+            display: flex;
+            gap: 5px;
+            margin-left: auto;
+        }
+        
+        .collapse-expand-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .collapse-expand-btn:hover {
+            background: #e0e0e0;
+        }
     </style>
 </head>
 <body>
@@ -156,6 +307,9 @@
         <button class="action-btn" onclick="expandAllSections()">Expand All</button>
     </div>
     
+    <!-- KPI Settings Drawer Toggle Button -->
+    <div class="drawer-toggle-button" onclick="toggleKPIDrawer()">⚙</div>
+    
     <!-- GSM Section -->
     <div class="tech-section" id="gsm-section">
         <div class="tech-header" onclick="toggleSection('gsm')">
@@ -163,14 +317,6 @@
             <div class="toggle-icon" id="gsm-toggle">▼</div>
         </div>
         <div class="tech-content" id="gsm-content">
-            <div class="kpi-selection">
-                <div class="kpi-toggle">
-                    <input type="checkbox" class="kpi-checkbox" id="gsm-all" checked onchange="toggleAllKPIs('gsm', this.checked)">
-                    <span class="kpi-name">Select All GSM KPIs</span>
-                </div>
-                <!-- GSM KPI checkboxes will be added here by JavaScript -->
-                <div id="gsm-kpi-list"></div>
-            </div>
             <div class="chart-grid" id="gsm-charts"></div>
         </div>
     </div>
@@ -182,13 +328,6 @@
             <div class="toggle-icon" id="lte-toggle">▼</div>
         </div>
         <div class="tech-content" id="lte-content">
-            <div class="kpi-selection">
-                <div class="kpi-toggle">
-                    <input type="checkbox" class="kpi-checkbox" id="lte-all" checked onchange="toggleAllKPIs('lte', this.checked)">
-                    <span class="kpi-name">Select All LTE KPIs</span>
-                </div>
-                <div id="lte-kpi-list"></div>
-            </div>
             <div class="chart-grid" id="lte-charts"></div>
         </div>
     </div>
@@ -200,13 +339,6 @@
             <div class="toggle-icon" id="nr-toggle">▼</div>
         </div>
         <div class="tech-content" id="nr-content">
-            <div class="kpi-selection">
-                <div class="kpi-toggle">
-                    <input type="checkbox" class="kpi-checkbox" id="nr-all" checked onchange="toggleAllKPIs('nr', this.checked)">
-                    <span class="kpi-name">Select All NR KPIs</span>
-                </div>
-                <div id="nr-kpi-list"></div>
-            </div>
             <div class="chart-grid" id="nr-charts"></div>
         </div>
     </div>
@@ -218,14 +350,32 @@
             <div class="toggle-icon" id="nsa-toggle">▼</div>
         </div>
         <div class="tech-content" id="nsa-content">
-            <div class="kpi-selection">
-                <div class="kpi-toggle">
-                    <input type="checkbox" class="kpi-checkbox" id="nsa-all" checked onchange="toggleAllKPIs('nsa', this.checked)">
-                    <span class="kpi-name">Select All NSA KPIs</span>
-                </div>
-                <div id="nsa-kpi-list"></div>
-            </div>
             <div class="chart-grid" id="nsa-charts"></div>
+        </div>
+    </div>
+    
+    <!-- KPI Settings Drawer -->
+    <div class="kpi-drawer" id="kpiDrawer">
+        <div class="drawer-header">
+            <h3>KPI Settings</h3>
+            <button class="close-drawer" onclick="toggleKPIDrawer()">✕</button>
+        </div>
+        
+        <div class="drawer-controls">
+            <button class="action-btn" onclick="selectAllKPIs()" style="background: #27AE60;">Select All</button>
+            <button class="action-btn" onclick="clearAllKPIs()" style="background: #D24726;">Clear All</button>
+            <div class="collapse-expand-buttons">
+                <button class="collapse-expand-btn" onclick="collapseAllInDrawer()">Collapse All</button>
+                <button class="collapse-expand-btn" onclick="expandAllInDrawer()">Expand All</button>
+            </div>
+        </div>
+        
+        <div class="drawer-body" id="kpiDrawerBody">
+            <!-- KPI options will be loaded here -->
+        </div>
+        
+        <div class="apply-btn">
+            <button class="action-btn" onclick="applyKPISettings()">Apply Settings</button>
         </div>
     </div>
 
@@ -234,17 +384,17 @@
         const techConfig = {
             gsm: {
                 name: "GSM",
-                sheetUrl: "https://docs.google.com/spreadsheets/d/e/YOUR_GSM_SHEET_ID/pub?output=csv",
+                sheetUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=1977848975&single=true&output=csv",
                 kpis: [
                     "Call setup success rate(%)",
                     "SDCCH Congestion Rate(%)",
                     "TCH Congestion Rate(%)",
                     "Call drop rate(%)",
                     "Handover Success Rate(%)",
-                    "Cell Availability(%)"
-                ],
-                defaultUnchecked: ["SDCCH Congestion Rate(%)", "TCH Congestion Rate(%)"], // These will be unchecked by default
-                color: "#2F80ED" // Blue
+                    "CS Traffic (erl)"
+                ]
+                color: "#2F80ED",
+                collapsedInDrawer: false
             },
             lte: {
                 name: "LTE",
@@ -259,7 +409,8 @@
                     "Handover Success Rate(%)"
                 ],
                 defaultUnchecked: ["DL PRB Utilization(%)", "UL PRB Utilization(%)"],
-                color: "#27AE60" // Green
+                color: "#27AE60",
+                collapsedInDrawer: false
             },
             nr: {
                 name: "NR",
@@ -273,7 +424,8 @@
                     "NR Handover Success Rate(%)"
                 ],
                 defaultUnchecked: ["NR Handover Success Rate(%)"],
-                color: "#8E44AD" // Purple
+                color: "#8E44AD",
+                collapsedInDrawer: false
             },
             nsa: {
                 name: "NSA",
@@ -286,7 +438,8 @@
                     "NSA Session Drop Rate(%)"
                 ],
                 defaultUnchecked: ["NSA Session Drop Rate(%)"],
-                color: "#D24726" // Orange
+                color: "#D24726",
+                collapsedInDrawer: false
             }
         };
 
@@ -304,61 +457,71 @@
             nr: [],
             nsa: []
         };
-
-        // Initialize when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeKPISelection();
-            fetchAllData();
-        });
-
-        // Initialize KPI selection checkboxes
-        function initializeKPISelection() {
+        
+        // Initialize selected KPIs based on defaults
+        function initializeSelectedKPIs() {
             for (const tech in techConfig) {
                 const config = techConfig[tech];
-                const container = document.getElementById(`${tech}-kpi-list`);
-                
-                config.kpis.forEach(kpi => {
-                    const isDefaultUnchecked = config.defaultUnchecked.includes(kpi);
-                    const checkboxId = `${tech}-${kpi.replace(/[^a-zA-Z0-9]/g, '-')}`;
-                    
-                    const div = document.createElement('div');
-                    div.className = 'kpi-toggle';
-                    div.innerHTML = `
-                        <input type="checkbox" class="kpi-checkbox" id="${checkboxId}" 
-                               ${!isDefaultUnchecked ? 'checked' : ''}
-                               onchange="updateSelectedKPIs('${tech}', '${kpi}', this.checked)">
-                        <span class="kpi-name">${kpi}</span>
-                    `;
-                    container.appendChild(div);
-                    
-                    // Update selected KPIs state
-                    if (!isDefaultUnchecked) {
-                        selectedKPIs[tech].push(kpi);
-                    }
-                });
+                // Start with all KPIs checked except the default unchecked ones
+                selectedKPIs[tech] = config.kpis.filter(kpi => !config.defaultUnchecked.includes(kpi));
             }
         }
 
-        // Toggle all KPIs for a technology
-        function toggleAllKPIs(tech, checked) {
-            const config = techConfig[tech];
-            selectedKPIs[tech] = checked ? [...config.kpis] : [];
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSelectedKPIs();
+            populateKPIDrawer();
+            fetchAllData();
+        });
+
+        // Populate the KPI drawer with options
+        function populateKPIDrawer() {
+            const drawerBody = document.getElementById('kpiDrawerBody');
+            drawerBody.innerHTML = '';
             
-            // Update checkboxes
-            config.kpis.forEach(kpi => {
-                const checkboxId = `${tech}-${kpi.replace(/[^a-zA-Z0-9]/g, '-')}`;
-                const checkbox = document.getElementById(checkboxId);
-                if (checkbox) {
-                    checkbox.checked = checked;
-                }
-            });
-            
-            // Refresh charts for this technology
-            renderCharts(tech);
+            for (const tech in techConfig) {
+                const config = techConfig[tech];
+                
+                // Create tech group container
+                const techGroup = document.createElement('div');
+                techGroup.className = 'tech-kpi-group';
+                techGroup.id = `drawer-${tech}-group`;
+                
+                // Create header with select all option
+                const header = document.createElement('div');
+                header.className = 'tech-kpi-header';
+                header.innerHTML = `
+                    <div class="tech-kpi-title">${config.name} KPIs</div>
+                    <div class="tech-select-all" onclick="selectAllTechKPIs('${tech}')">Select All</div>
+                `;
+                techGroup.appendChild(header);
+                
+                // Create container for KPI options
+                const optionsContainer = document.createElement('div');
+                optionsContainer.id = `drawer-${tech}-options`;
+                optionsContainer.style.display = config.collapsedInDrawer ? 'none' : 'block';
+                
+                // Add each KPI as a checkbox
+                config.kpis.forEach(kpi => {
+                    const isSelected = selectedKPIs[tech].includes(kpi);
+                    const option = document.createElement('div');
+                    option.className = 'kpi-option';
+                    option.innerHTML = `
+                        <input type="checkbox" class="kpi-checkbox" id="drawer-${tech}-${kpi.replace(/[^a-zA-Z0-9]/g, '-')}" 
+                               ${isSelected ? 'checked' : ''}
+                               onchange="updateKPIInDrawer('${tech}', '${kpi}', this.checked)">
+                        <label class="kpi-label" for="drawer-${tech}-${kpi.replace(/[^a-zA-Z0-9]/g, '-')}">${kpi}</label>
+                    `;
+                    optionsContainer.appendChild(option);
+                });
+                
+                techGroup.appendChild(optionsContainer);
+                drawerBody.appendChild(techGroup);
+            }
         }
 
-        // Update selected KPIs when checkbox is toggled
-        function updateSelectedKPIs(tech, kpi, isChecked) {
+        // Update KPI selection in drawer
+        function updateKPIInDrawer(tech, kpi, isChecked) {
             if (isChecked) {
                 if (!selectedKPIs[tech].includes(kpi)) {
                     selectedKPIs[tech].push(kpi);
@@ -369,15 +532,84 @@
                     selectedKPIs[tech].splice(index, 1);
                 }
             }
+        }
+
+        // Select all KPIs for a specific technology
+        function selectAllTechKPIs(tech) {
+            selectedKPIs[tech] = [...techConfig[tech].kpis];
             
-            // Update "Select All" checkbox
-            const allCheckbox = document.getElementById(`${tech}-all`);
-            if (allCheckbox) {
-                allCheckbox.checked = selectedKPIs[tech].length === techConfig[tech].kpis.length;
+            // Update checkboxes in drawer
+            techConfig[tech].kpis.forEach(kpi => {
+                const checkbox = document.getElementById(`drawer-${tech}-${kpi.replace(/[^a-zA-Z0-9]/g, '-')}`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                }
+            });
+        }
+
+        // Select all KPIs across all technologies
+        function selectAllKPIs() {
+            for (const tech in techConfig) {
+                selectedKPIs[tech] = [...techConfig[tech].kpis];
+                techConfig[tech].kpis.forEach(kpi => {
+                    const checkbox = document.getElementById(`drawer-${tech}-${kpi.replace(/[^a-zA-Z0-9]/g, '-')}`);
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                });
             }
+        }
+
+        // Clear all KPIs across all technologies
+        function clearAllKPIs() {
+            for (const tech in techConfig) {
+                selectedKPIs[tech] = [];
+                techConfig[tech].kpis.forEach(kpi => {
+                    const checkbox = document.getElementById(`drawer-${tech}-${kpi.replace(/[^a-zA-Z0-9]/g, '-')}`);
+                    if (checkbox) {
+                        checkbox.checked = false;
+                    }
+                });
+            }
+        }
+
+        // Apply KPI settings and refresh charts
+        function applyKPISettings() {
+            // Close the drawer
+            toggleKPIDrawer();
             
-            // Refresh charts for this technology
-            renderCharts(tech);
+            // Refresh all charts with new KPI selections
+            for (const tech in techConfig) {
+                renderCharts(tech);
+            }
+        }
+
+        // Toggle KPI drawer open/close
+        function toggleKPIDrawer() {
+            const drawer = document.getElementById('kpiDrawer');
+            drawer.classList.toggle('open');
+        }
+
+        // Collapse all tech groups in drawer
+        function collapseAllInDrawer() {
+            for (const tech in techConfig) {
+                const optionsContainer = document.getElementById(`drawer-${tech}-options`);
+                if (optionsContainer) {
+                    optionsContainer.style.display = 'none';
+                }
+                techConfig[tech].collapsedInDrawer = true;
+            }
+        }
+
+        // Expand all tech groups in drawer
+        function expandAllInDrawer() {
+            for (const tech in techConfig) {
+                const optionsContainer = document.getElementById(`drawer-${tech}-options`);
+                if (optionsContainer) {
+                    optionsContainer.style.display = 'block';
+                }
+                techConfig[tech].collapsedInDrawer = false;
+            }
         }
 
         // Fetch data from all sheets
