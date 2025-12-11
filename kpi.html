@@ -191,7 +191,51 @@
         .tech-color-btn.gsm { background: #2F80ED; }
         .tech-color-btn.lte { background: #27AE60; }
         .tech-color-btn.nr { background: #D24726; }
-        </style>
+
+        /* --- COLOR PICKER MODAL --- */
+        .color-picker-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        .color-picker-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            text-align: center;
+        }
+        .color-picker-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .color-option {
+            width: 50px;
+            height: 50px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 0 auto;
+            border: 2px solid transparent;
+        }
+        .color-option.selected {
+            border: 2px solid #333;
+        }
+        .color-picker-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+    </style>
 </head>
 <body onload="initDashboard()">
     <header>KPI Dashboard</header>
@@ -222,15 +266,11 @@
             <div style="margin: 20px 0; border-top: 1px solid #eee; padding-top: 15px;">
                 <label><b>Technology Colors</b></label>
                 <div class="tech-color-buttons">
-                    <button class="tech-color-btn gsm" onclick="changeTechColor('GSM')">GSM Color</button>
-                    <button class="tech-color-btn lte" onclick="changeTechColor('LTE')">LTE Color</button>
-                    <button class="tech-color-btn nr" onclick="changeTechColor('NR')">NR Color</button>
-                    </div>
+                    <button class="tech-color-btn gsm" onclick="openColorPicker('GSM')">GSM Color</button>
+                    <button class="tech-color-btn lte" onclick="openColorPicker('LTE')">LTE Color</button>
+                    <button class="tech-color-btn nr" onclick="openColorPicker('NR')">NR Color</button>
+                </div>
             </div>
-            
-            <hr style="margin:15px 0;">
-            <label><b>Custom Color (All Charts):</b></label> 
-            <input type="color" id="customChartColor" onchange="applyCustomColor()" style="width:100%; height:40px; margin-top:6px;">
         </div>
     </div>
 
@@ -250,29 +290,45 @@
         </div>
     </div>
 
+    <!-- Color Picker Modal -->
+    <div id="colorPickerModal" class="color-picker-modal">
+        <div class="color-picker-content">
+            <h3 id="colorPickerTitle">Select Color for GSM</h3>
+            <div class="color-picker-grid" id="colorPickerGrid">
+                <!-- Color options will be added here -->
+            </div>
+            <div class="color-picker-actions">
+                <button class="action-btn" onclick="closeColorPicker()" style="background:#888;">Cancel</button>
+                <button class="action-btn" onclick="applySelectedColor()" style="background:#27AE60;">Apply</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // --- CONFIG & STATE ---
         let allData = [];
         let allCharts = {};
         let selectedKpis = [];
+        let selectedTechForColor = '';
+        let selectedColor = '';
 
         // --- KPI Definitions ---
         const kpiDefinitions = [
             { tech: "GSM", kpi: "Call setup success rate(%)", initialChecked: true, color: "#2F80ED" },
             { tech: "GSM", kpi: "Call drop rate(%)", initialChecked: true, color: "#2F80ED" },
-            { tech: "GSM", kpi: "CS Traffic (erl)", initialChecked: false, color: "#2F80ED" },
+            { tech: "GSM", kpi: "CS Traffic (erl)", initialChecked: true, color: "#2F80ED" },
             
-            { tech: "LTE", kpi: "RRC Setup Success Rate(%)", initialChecked: true, color: "#27AE60" },
-            { tech: "LTE", kpi: "ERAB Setup Success Rate(%)", initialChecked: true, color: "#27AE60" },
-            { tech: "LTE", kpi: "Average DL Throughput(Mbps)", initialChecked: true, color: "#27AE60" },
-            { tech: "LTE", kpi: "Average UL Throughput(Mbps)", initialChecked: true, color: "#27AE60" },
-            { tech: "LTE", kpi: "DL Data Total Volume (Gbyte)", initialChecked: false, color: "#27AE60" },
-            { tech: "LTE", kpi: "UL Data Total Volume (Gbyte)", initialChecked: false, color: "#27AE60" },
+            { tech: "LTE", kpi: "LTE RRC Setup Success Rate(%)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "E-RAB Call Drop Rate(%)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "LTE DL -USER Average Throughput (Mbit/s) ", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "LTE UL -USER Average Throughput (Mbit/s)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "DL Data Total Volume (Gbyte)", initialChecked: true, color: "#27AE60" },
+            { tech: "LTE", kpi: "UL Data Total Volume (Gbyte)", initialChecked: true, color: "#27AE60" },
                        
-            { tech: "NR", kpi: "NR RRC Setup Success Rate(%)", initialChecked: true, color: "#D24726" },
+            { tech: "NR", kpi: "SgNB Addition Success Rate (CU)(%)", initialChecked: true, color: "#D24726" },
             { tech: "NR", kpi: "NR DL Traffic Volume (GB)", initialChecked: true, color: "#D24726" },
-            { tech: "NR", kpi: "NR DL Throughput(Mbps)", initialChecked: true, color: "#D24726" },
-            
+            { tech: "NR", kpi: "NR DL User Throughput(Mbps)", initialChecked: true, color: "#D24726" },
+      
         ];
 
         // --- Sheet URLs ---
@@ -280,15 +336,23 @@
             GSM: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=1977848975&single=true&output=csv",
             LTE: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=893314169&single=true&output=csv",
             NR: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=1372365834&single=true&output=csv"
-             };
+        };
         
         let activeChartStyle = null;
-        let activeCustomColor = null;
         let techColors = {
             GSM: "#2F80ED",
             LTE: "#27AE60",
-            NR: "#D24726",
-            };
+            NR: "#D24726"
+        };
+
+        // --- Color Palette Options ---
+        const colorPalette = [
+            "#2F80ED", "#27AE60", "#D24726", "#8E44AD", // Default tech colors
+            "#3498DB", "#2ECC71", "#E74C3C", "#9B59B6", // Alternatives
+            "#1ABC9C", "#F39C12", "#34495E", "#95A5A6", // More options
+            "#2980B9", "#16A085", "#C0392B", "#8E44AD", // Additional
+            "#2C3E50", "#27AE60", "#E67E22", "#D35400"  // More
+        ];
 
         // --- Chart Styles (5 styles as requested) ---
         const chartStyles = [
@@ -298,7 +362,6 @@
                 pointRadius: 0, 
                 borderDash: [], 
                 tension: 0.2, 
-                borderColor: null, 
                 fill: true, 
                 backgroundColor: "rgba(47, 128, 237, 0.1)" 
             },
@@ -308,7 +371,6 @@
                 pointRadius: 5, 
                 borderDash: [], 
                 tension: 0.4, 
-                borderColor: null, 
                 fill: false 
             },
             { 
@@ -317,7 +379,6 @@
                 pointRadius: 0, 
                 borderDash: [], 
                 tension: 0.4, 
-                borderColor: null, 
                 fill: false 
             },
             { 
@@ -326,7 +387,6 @@
                 pointRadius: 0, 
                 borderDash: [], 
                 tension: 0.3, 
-                borderColor: null, 
                 fill: false 
             },
             { 
@@ -335,7 +395,6 @@
                 pointRadius: 0, 
                 borderDash: [], 
                 tension: 0, 
-                borderColor: null, 
                 fill: false 
             }
         ];
@@ -366,8 +425,8 @@
         function initDashboard() {
             // Set initial selected KPIs based on the definitions
             selectedKpis = kpiDefinitions.filter(k => k.initialChecked).map(k => k.tech + " - " + k.kpi);
-            // Apply a default chart style
-            applyChartStyle(0); // Apply 'Filled Area' style on load
+            // Apply default chart style: Smooth Line with Dots
+            applyChartStyle(1);
             fetchData();
         }
 
@@ -517,11 +576,6 @@
 
                 // Chart Color - Use technology-specific color
                 let chartColor = techColors[tech];
-                if (activeCustomColor) {
-                    chartColor = activeCustomColor;
-                } else if (activeChartStyle && activeChartStyle.borderColor) {
-                    chartColor = activeChartStyle.borderColor;
-                }
 
                 // Chart Config
                 const chartConfig = {
@@ -529,14 +583,17 @@
                     data: {
                         labels: timelineLabels,
                         datasets: [{ 
-                            label: fullKpiName,
+                            label: kpi, // Just show KPI name
                             data: dataPoints,
                             borderColor: chartColor,
                             backgroundColor: activeChartStyle && activeChartStyle.fill ? 
                                 chartColor.replace(')', ', 0.1)').replace('rgb', 'rgba') : 'transparent',
-                            borderWidth: 2, 
-                            pointRadius: 3, 
-                            tension: 0.1, 
+                            borderWidth: activeChartStyle ? activeChartStyle.borderWidth : 2, 
+                            pointRadius: activeChartStyle ? activeChartStyle.pointRadius : 5, 
+                            pointBackgroundColor: chartColor,
+                            pointBorderColor: chartColor,
+                            pointBorderWidth: 1,
+                            tension: activeChartStyle ? activeChartStyle.tension : 0.4, 
                             spanGaps: true
                         }]
                     },
@@ -549,7 +606,7 @@
                             },
                             title: { 
                                 display: true, 
-                                text: `${kpi} (${tech})`, 
+                                text: `${tech} - ${kpi}`, // Format: Tech - KPI
                                 font: { 
                                     size: 14, 
                                     weight: 'bold' 
@@ -590,7 +647,8 @@
                     chartConfig.data.datasets[0].tension = style.tension;
                     chartConfig.data.datasets[0].fill = style.fill;
                     if (style.fill && style.backgroundColor) {
-                        chartConfig.data.datasets[0].backgroundColor = style.backgroundColor;
+                        chartConfig.data.datasets[0].backgroundColor = style.backgroundColor.replace('47, 128, 237', 
+                            chartColor.substring(1).match(/.{2}/g).map(x => parseInt(x, 16)).join(', '));
                     }
                 }
 
@@ -692,29 +750,69 @@
         }
 
         function updateTechColorButtons() {
-            // This function updates the tech color buttons with current colors
+            // Update the tech color buttons with current colors
             const gsmBtn = document.querySelector('.tech-color-btn.gsm');
             const lteBtn = document.querySelector('.tech-color-btn.lte');
             const nrBtn = document.querySelector('.tech-color-btn.nr');
-                       
+            
             if (gsmBtn) gsmBtn.style.background = techColors.GSM;
             if (lteBtn) lteBtn.style.background = techColors.LTE;
             if (nrBtn) nrBtn.style.background = techColors.NR;
-             }
+        }
 
-        function changeTechColor(tech) {
-            const currentColor = techColors[tech];
-            const newColor = prompt(`Enter new color for ${tech} (hex format):`, currentColor);
+        // --- COLOR PICKER FUNCTIONS ---
+        function openColorPicker(tech) {
+            selectedTechForColor = tech;
+            selectedColor = techColors[tech];
+            document.getElementById('colorPickerTitle').textContent = `Select Color for ${tech}`;
             
-            if (newColor && /^#[0-9A-F]{6}$/i.test(newColor)) {
-                techColors[tech] = newColor;
+            // Populate color grid
+            const colorGrid = document.getElementById('colorPickerGrid');
+            colorGrid.innerHTML = '';
+            
+            colorPalette.forEach(color => {
+                const colorOption = document.createElement('div');
+                colorOption.className = 'color-option';
+                colorOption.style.backgroundColor = color;
+                colorOption.dataset.color = color;
+                
+                if (color === selectedColor) {
+                    colorOption.classList.add('selected');
+                }
+                
+                colorOption.onclick = () => {
+                    // Remove selected class from all options
+                    document.querySelectorAll('.color-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    // Add selected class to clicked option
+                    colorOption.classList.add('selected');
+                    selectedColor = color;
+                };
+                
+                colorGrid.appendChild(colorOption);
+            });
+            
+            document.getElementById('colorPickerModal').style.display = 'flex';
+        }
+
+        function closeColorPicker() {
+            document.getElementById('colorPickerModal').style.display = 'none';
+        }
+
+        function applySelectedColor() {
+            if (selectedTechForColor && selectedColor) {
+                techColors[selectedTechForColor] = selectedColor;
                 
                 // Update the KPI definitions with new color
                 kpiDefinitions.forEach(kpi => {
-                    if (kpi.tech === tech) {
-                        kpi.color = newColor;
+                    if (kpi.tech === selectedTechForColor) {
+                        kpi.color = selectedColor;
                     }
                 });
+                
+                // Update the color button
+                updateTechColorButtons();
                 
                 // Re-render charts
                 const dateHeaderName = Object.keys(allData[0] || {}).find(h => h.toLowerCase().includes('date'));
@@ -727,25 +825,7 @@
                     renderCharts(timeline);
                 }
                 
-                // Update color button
-                updateTechColorButtons();
-            } else if (newColor && newColor !== "") {
-                alert("Please enter a valid hex color (e.g., #FF5733)");
-            }
-        }
-
-        function applyCustomColor(){
-            activeCustomColor = document.getElementById("customChartColor").value;
-            
-            // Re-render to apply color
-            const dateHeaderName = Object.keys(allData[0] || {}).find(h => h.toLowerCase().includes('date'));
-            if (dateHeaderName && allData.length > 0) {
-                const timeline = [...new Set(allData.map(d => d[dateHeaderName]))].sort((a,b) => { 
-                    const [da,ma,ya] = a.split('/').map(Number);
-                    const [db,mb,yb] = b.split('/').map(Number);
-                    return new Date(ya,ma-1,da) - new Date(yb,mb-1,db);
-                });
-                renderCharts(timeline);
+                closeColorPicker();
             }
         }
     </script>
