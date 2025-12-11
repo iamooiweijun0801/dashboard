@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Multi-Tech KPI Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f4f7f6;
+        }
+        
+        header {
+            text-align: center;
+            font-size: 28px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .tech-section {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .tech-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        
+        .tech-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2F80ED;
+        }
+        
+        .toggle-icon {
+            font-size: 24px;
+            transition: transform 0.3s;
+        }
+        
+        .tech-content {
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        
+        .tech-content.collapsed {
+            max-height: 0 !important;
+        }
+        
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        
+        @media (max-width: 1200px) {
+            .chart-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .chart-card {
+            background: white;
+            border-radius: 6px;
+            padding: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            border: 1px solid #eee;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 220px;
+            width: 100%;
+        }
+        
+        .kpi-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .kpi-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .kpi-name {
+            font-size: 14px;
+            color: #555;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .action-btn {
+            padding: 8px 16px;
+            background: #2F80ED;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        
+        .action-btn:hover {
+            background: #1f5ab5;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .error {
+            text-align: center;
+            padding: 20px;
+            color: #D24726;
+            background: #ffeaea;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <header>Multi-Technology KPI Dashboard</header>
+    
+    <div class="controls">
+        <button class="action-btn" onclick="fetchAllData()">Refresh All Data</button>
+        <button class="action-btn" onclick="collapseAllSections()">Collapse All</button>
+        <button class="action-btn" onclick="expandAllSections()">Expand All</button>
+    </div>
+    
+    <!-- GSM Section -->
+    <div class="tech-section" id="gsm-section">
+        <div class="tech-header" onclick="toggleSection('gsm')">
+            <div class="tech-title">GSM KPIs</div>
+            <div class="toggle-icon" id="gsm-toggle">▼</div>
+        </div>
+        <div class="tech-content" id="gsm-content">
+            <div class="kpi-selection">
+                <div class="kpi-toggle">
+                    <input type="checkbox" class="kpi-checkbox" id="gsm-all" checked onchange="toggleAllKPIs('gsm', this.checked)">
+                    <span class="kpi-name">Select All GSM KPIs</span>
+                </div>
+                <!-- GSM KPI checkboxes will be added here by JavaScript -->
+                <div id="gsm-kpi-list"></div>
+            </div>
+            <div class="chart-grid" id="gsm-charts"></div>
+        </div>
+    </div>
+    
+    <!-- LTE Section -->
+    <div class="tech-section" id="lte-section">
+        <div class="tech-header" onclick="toggleSection('lte')">
+            <div class="tech-title">LTE KPIs</div>
+            <div class="toggle-icon" id="lte-toggle">▼</div>
+        </div>
+        <div class="tech-content" id="lte-content">
+            <div class="kpi-selection">
+                <div class="kpi-toggle">
+                    <input type="checkbox" class="kpi-checkbox" id="lte-all" checked onchange="toggleAllKPIs('lte', this.checked)">
+                    <span class="kpi-name">Select All LTE KPIs</span>
+                </div>
+                <div id="lte-kpi-list"></div>
+            </div>
+            <div class="chart-grid" id="lte-charts"></div>
+        </div>
+    </div>
+    
+    <!-- NR Section -->
+    <div class="tech-section" id="nr-section">
+        <div class="tech-header" onclick="toggleSection('nr')">
+            <div class="tech-title">NR KPIs</div>
+            <div class="toggle-icon" id="nr-toggle">▼</div>
+        </div>
+        <div class="tech-content" id="nr-content">
+            <div class="kpi-selection">
+                <div class="kpi-toggle">
+                    <input type="checkbox" class="kpi-checkbox" id="nr-all" checked onchange="toggleAllKPIs('nr', this.checked)">
+                    <span class="kpi-name">Select All NR KPIs</span>
+                </div>
+                <div id="nr-kpi-list"></div>
+            </div>
+            <div class="chart-grid" id="nr-charts"></div>
+        </div>
+    </div>
+    
+    <!-- NSA Section -->
+    <div class="tech-section" id="nsa-section">
+        <div class="tech-header" onclick="toggleSection('nsa')">
+            <div class="tech-title">NSA KPIs</div>
+            <div class="toggle-icon" id="nsa-toggle">▼</div>
+        </div>
+        <div class="tech-content" id="nsa-content">
+            <div class="kpi-selection">
+                <div class="kpi-toggle">
+                    <input type="checkbox" class="kpi-checkbox" id="nsa-all" checked onchange="toggleAllKPIs('nsa', this.checked)">
+                    <span class="kpi-name">Select All NSA KPIs</span>
+                </div>
+                <div id="nsa-kpi-list"></div>
+            </div>
+            <div class="chart-grid" id="nsa-charts"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration for each technology
+        const techConfig = {
+            gsm: {
+                name: "GSM",
+                sheetUrl: "https://docs.google.com/spreadsheets/d/e/YOUR_GSM_SHEET_ID/pub?output=csv",
+                kpis: [
+                    "Call setup success rate(%)",
+                    "SDCCH Congestion Rate(%)",
+                    "TCH Congestion Rate(%)",
+                    "Call drop rate(%)",
+                    "Handover Success Rate(%)",
+                    "Cell Availability(%)"
+                ],
+                defaultUnchecked: ["SDCCH Congestion Rate(%)", "TCH Congestion Rate(%)"], // These will be unchecked by default
+                color: "#2F80ED" // Blue
+            },
+            lte: {
+                name: "LTE",
+                sheetUrl: "https://docs.google.com/spreadsheets/d/e/YOUR_LTE_SHEET_ID/pub?output=csv",
+                kpis: [
+                    "RRC Setup Success Rate(%)",
+                    "ERAB Setup Success Rate(%)",
+                    "DL PRB Utilization(%)",
+                    "UL PRB Utilization(%)",
+                    "Average DL Throughput(Mbps)",
+                    "Average UL Throughput(Mbps)",
+                    "Handover Success Rate(%)"
+                ],
+                defaultUnchecked: ["DL PRB Utilization(%)", "UL PRB Utilization(%)"],
+                color: "#27AE60" // Green
+            },
+            nr: {
+                name: "NR",
+                sheetUrl: "https://docs.google.com/spreadsheets/d/e/YOUR_NR_SHEET_ID/pub?output=csv",
+                kpis: [
+                    "NR RRC Setup Success Rate(%)",
+                    "NR PDU Session Setup Success Rate(%)",
+                    "NR DL Throughput(Mbps)",
+                    "NR UL Throughput(Mbps)",
+                    "NR Cell Availability(%)",
+                    "NR Handover Success Rate(%)"
+                ],
+                defaultUnchecked: ["NR Handover Success Rate(%)"],
+                color: "#8E44AD" // Purple
+            },
+            nsa: {
+                name: "NSA",
+                sheetUrl: "https://docs.google.com/spreadsheets/d/e/YOUR_NSA_SHEET_ID/pub?output=csv",
+                kpis: [
+                    "NSA Anchor Addition Success Rate(%)",
+                    "NSA SCG Addition Success Rate(%)",
+                    "NSA DL Throughput(Mbps)",
+                    "NSA UL Throughput(Mbps)",
+                    "NSA Session Drop Rate(%)"
+                ],
+                defaultUnchecked: ["NSA Session Drop Rate(%)"],
+                color: "#D24726" // Orange
+            }
+        };
+
+        // State management
+        let allData = {
+            gsm: [],
+            lte: [],
+            nr: [],
+            nsa: []
+        };
+        
+        let selectedKPIs = {
+            gsm: [],
+            lte: [],
+            nr: [],
+            nsa: []
+        };
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeKPISelection();
+            fetchAllData();
+        });
+
+        // Initialize KPI selection checkboxes
+        function initializeKPISelection() {
+            for (const tech in techConfig) {
+                const config = techConfig[tech];
+                const container = document.getElementById(`${tech}-kpi-list`);
+                
+                config.kpis.forEach(kpi => {
+                    const isDefaultUnchecked = config.defaultUnchecked.includes(kpi);
+                    const checkboxId = `${tech}-${kpi.replace(/[^a-zA-Z0-9]/g, '-')}`;
+                    
+                    const div = document.createElement('div');
+                    div.className = 'kpi-toggle';
+                    div.innerHTML = `
+                        <input type="checkbox" class="kpi-checkbox" id="${checkboxId}" 
+                               ${!isDefaultUnchecked ? 'checked' : ''}
+                               onchange="updateSelectedKPIs('${tech}', '${kpi}', this.checked)">
+                        <span class="kpi-name">${kpi}</span>
+                    `;
+                    container.appendChild(div);
+                    
+                    // Update selected KPIs state
+                    if (!isDefaultUnchecked) {
+                        selectedKPIs[tech].push(kpi);
+                    }
+                });
+            }
+        }
+
+        // Toggle all KPIs for a technology
+        function toggleAllKPIs(tech, checked) {
+            const config = techConfig[tech];
+            selectedKPIs[tech] = checked ? [...config.kpis] : [];
+            
+            // Update checkboxes
+            config.kpis.forEach(kpi => {
+                const checkboxId = `${tech}-${kpi.replace(/[^a-zA-Z0-9]/g, '-')}`;
+                const checkbox = document.getElementById(checkboxId);
+                if (checkbox) {
+                    checkbox.checked = checked;
+                }
+            });
+            
+            // Refresh charts for this technology
+            renderCharts(tech);
+        }
+
+        // Update selected KPIs when checkbox is toggled
+        function updateSelectedKPIs(tech, kpi, isChecked) {
+            if (isChecked) {
+                if (!selectedKPIs[tech].includes(kpi)) {
+                    selectedKPIs[tech].push(kpi);
+                }
+            } else {
+                const index = selectedKPIs[tech].indexOf(kpi);
+                if (index > -1) {
+                    selectedKPIs[tech].splice(index, 1);
+                }
+            }
+            
+            // Update "Select All" checkbox
+            const allCheckbox = document.getElementById(`${tech}-all`);
+            if (allCheckbox) {
+                allCheckbox.checked = selectedKPIs[tech].length === techConfig[tech].kpis.length;
+            }
+            
+            // Refresh charts for this technology
+            renderCharts(tech);
+        }
+
+        // Fetch data from all sheets
+        async function fetchAllData() {
+            for (const tech in techConfig) {
+                try {
+                    const response = await fetch(`${techConfig[tech].sheetUrl}&t=${Date.now()}`);
+                    const csvText = await response.text();
+                    const rows = csvText.trim().split('\n');
+                    const headers = rows[0].split(',').map(h => h.trim());
+                    
+                    allData[tech] = rows.slice(1).map(row => {
+                        const values = row.split(',');
+                        const obj = {};
+                        headers.forEach((header, index) => {
+                            const val = values[index] ? values[index].trim() : '';
+                            obj[header] = val === '' ? null : (isNaN(val) ? val : parseFloat(val));
+                        });
+                        return obj;
+                    });
+                    
+                    renderCharts(tech);
+                } catch (error) {
+                    console.error(`Error loading ${tech} data:`, error);
+                    document.getElementById(`${tech}-charts`).innerHTML = 
+                        `<div class="error">Failed to load ${tech.toUpperCase()} data. Please check the sheet URL.</div>`;
+                }
+            }
+        }
+
+        // Render charts for a specific technology
+        function renderCharts(tech) {
+            const container = document.getElementById(`${tech}-charts`);
+            const data = allData[tech];
+            const config = techConfig[tech];
+            
+            if (data.length === 0) {
+                container.innerHTML = '<div class="loading">Loading data...</div>';
+                return;
+            }
+            
+            if (selectedKPIs[tech].length === 0) {
+                container.innerHTML = '<div class="loading">No KPIs selected</div>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            // Get timeline (assuming first column is Date)
+            const timeline = [...new Set(data.map(d => d["Date"] || d["date"] || d["DATE"]))].sort();
+            
+            selectedKPIs[tech].forEach((kpi, index) => {
+                const card = document.createElement('div');
+                card.className = 'chart-card';
+                
+                const canvas = document.createElement('canvas');
+                canvas.id = `${tech}-chart-${index}`;
+                
+                const containerDiv = document.createElement('div');
+                containerDiv.className = 'chart-container';
+                containerDiv.appendChild(canvas);
+                card.appendChild(containerDiv);
+                container.appendChild(card);
+                
+                // Extract data for this KPI
+                const kpiData = timeline.map(date => {
+                    const values = data
+                        .filter(d => (d["Date"] || d["date"] || d["DATE"]) === date)
+                        .map(d => d[kpi])
+                        .filter(v => v !== null && !isNaN(v));
+                    
+                    return values.length > 0 ? values.reduce((a, b) => a + b) / values.length : null;
+                });
+                
+                // Create chart
+                new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels: timeline,
+                        datasets: [{
+                            label: kpi,
+                            data: kpiData,
+                            borderColor: config.color,
+                            backgroundColor: `${config.color}20`,
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            title: {
+                                display: true,
+                                text: kpi,
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                }
+                            },
+                            y: {
+                                beginAtZero: kpi.toLowerCase().includes('rate') || kpi.toLowerCase().includes('%')
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        // Toggle section expand/collapse
+        function toggleSection(tech) {
+            const content = document.getElementById(`${tech}-content`);
+            const toggleIcon = document.getElementById(`${tech}-toggle`);
+            
+            if (content.classList.contains('collapsed')) {
+                content.classList.remove('collapsed');
+                content.style.maxHeight = content.scrollHeight + 'px';
+                toggleIcon.style.transform = 'rotate(0deg)';
+            } else {
+                content.classList.add('collapsed');
+                content.style.maxHeight = '0';
+                toggleIcon.style.transform = 'rotate(-90deg)';
+            }
+        }
+
+        // Collapse all sections
+        function collapseAllSections() {
+            for (const tech in techConfig) {
+                const content = document.getElementById(`${tech}-content`);
+                const toggleIcon = document.getElementById(`${tech}-toggle`);
+                
+                content.classList.add('collapsed');
+                content.style.maxHeight = '0';
+                toggleIcon.style.transform = 'rotate(-90deg)';
+            }
+        }
+
+        // Expand all sections
+        function expandAllSections() {
+            for (const tech in techConfig) {
+                const content = document.getElementById(`${tech}-content`);
+                const toggleIcon = document.getElementById(`${tech}-toggle`);
+                
+                content.classList.remove('collapsed');
+                content.style.maxHeight = content.scrollHeight + 'px';
+                toggleIcon.style.transform = 'rotate(0deg)';
+            }
+        }
+    </script>
+</body>
+</html>
