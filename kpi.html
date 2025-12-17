@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>KPI Dashboard</title>
+    <title>KPI Dashboard - GSM/LTE</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
     <style>
@@ -23,6 +23,35 @@
             background:white; 
             box-shadow:0 2px 4px rgba(0,0,0,0.05); 
             margin-bottom:15px; 
+        }
+        
+        /* --- TECH SWITCHER --- */
+        .tech-switcher {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tech-switcher button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+        .tech-switcher button.active {
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .tech-switcher button.gsm-lte {
+            background: #2F80ED;
+            color: white;
+        }
+        .tech-switcher button.nr {
+            background: #D24726;
+            color: white;
         }
         
         /* --- CONTROLS --- */
@@ -199,7 +228,6 @@
         }
         .tech-color-btn.gsm { background: #2F80ED; }
         .tech-color-btn.lte { background: #27AE60; }
-        .tech-color-btn.nr { background: #D24726; }
 
         /* --- COLOR PICKER MODAL --- */
         .color-picker-modal {
@@ -387,7 +415,12 @@
     </style>
 </head>
 <body onload="initDashboard()">
-    <header>KPI Dashboard</header>
+    <header>KPI Dashboard - GSM/LTE</header>
+
+    <div class="tech-switcher">
+        <button class="gsm-lte active" onclick="switchToDashboard('gsm-lte')">GSM/LTE</button>
+        <button class="nr" onclick="switchToDashboard('nr')">NR</button>
+    </div>
 
     <div class="controls">
         <button class="action-btn" onclick="openPPTExport()">📊 Export PPT</button>
@@ -421,7 +454,6 @@
                 <div class="tech-color-buttons">
                     <button class="tech-color-btn gsm" onclick="openColorPicker('GSM')">GSM Color</button>
                     <button class="tech-color-btn lte" onclick="openColorPicker('LTE')">LTE Color</button>
-                    <button class="tech-color-btn nr" onclick="openColorPicker('NR')">NR Color</button>
                 </div>
             </div>
         </div>
@@ -517,11 +549,10 @@
         let pptLayout = 9; // Default: 3 graphs per slide
         let selectedTechForExport = {
             GSM: true,
-            LTE: true,
-            NR: true
+            LTE: true
         };
 
-        // --- KPI Definitions ---
+        // --- KPI Definitions (GSM/LTE only) ---
         const kpiDefinitions = [
             { tech: "GSM", kpi: "Call setup success rate(%)", initialChecked: true, color: "#2F80ED" },
             { tech: "GSM", kpi: "Call drop rate(%)", initialChecked: true, color: "#2F80ED" },
@@ -533,25 +564,19 @@
             { tech: "LTE", kpi: "UL -USER Average Throughput (Mbit/s)", initialChecked: true, color: "#27AE60" },
             { tech: "LTE", kpi: "DL Data Total Volume (Gbyte)", initialChecked: true, color: "#27AE60" },
             { tech: "LTE", kpi: "UL Data Total Volume (Gbyte)", initialChecked: true, color: "#27AE60" },
-            { tech: "LTE", kpi: "DL PRB Utilization (%)", initialChecked: true, color: "#27AE60" },
-                       
-            { tech: "NR", kpi: "SgNB Addition Success Rate (CU)(%)", initialChecked: true, color: "#D24726" },
-            { tech: "NR", kpi: "DL Traffic Volume (GB)", initialChecked: true, color: "#D24726" },
-            { tech: "NR", kpi: "DL User Throughput(Mbps)", initialChecked: true, color: "#D24726" },
+            { tech: "LTE", kpi: "DL PRB Utilization (%)", initialChecked: true, color: "#27AE60" }
         ];
 
-        // --- Sheet URLs ---
+        // --- Sheet URLs (GSM/LTE only) ---
         const sheetUrls = {
-            GSM: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=1849454115&single=true&output=csv",
-            LTE: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=692796639&single=true&output=csv",
-            NR: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=864132099&single=true&output=csv"
+            GSM: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=1977848975&single=true&output=csv",
+            LTE: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=893314169&single=true&output=csv"
         };
         
         let activeChartStyle = null;
         let techColors = {
             GSM: "#2F80ED",
-            LTE: "#27AE60",
-            NR: "#D24726"
+            LTE: "#27AE60"
         };
 
         // --- Color Palette Options ---
@@ -633,6 +658,16 @@
         const style = document.createElement('style');
         style.textContent = actionBtnStyle;
         document.head.appendChild(style);
+
+        // --- DASHBOARD SWITCHER ---
+        function switchToDashboard(type) {
+            if (type === 'gsm-lte') {
+                // Already here
+                return;
+            } else if (type === 'nr') {
+                window.location.href = 'nr.html';
+            }
+        }
 
         // --- INITIALIZATION ---
         function initDashboard() {
@@ -994,11 +1029,9 @@
         function updateTechColorButtons() {
             const gsmBtn = document.querySelector('.tech-color-btn.gsm');
             const lteBtn = document.querySelector('.tech-color-btn.lte');
-            const nrBtn = document.querySelector('.tech-color-btn.nr');
             
             if (gsmBtn) gsmBtn.style.background = techColors.GSM;
             if (lteBtn) lteBtn.style.background = techColors.LTE;
-            if (nrBtn) nrBtn.style.background = techColors.NR;
         }
 
         // --- COLOR PICKER FUNCTIONS ---
@@ -1064,7 +1097,7 @@
             }
         }
 
-        // --- PPT EXPORT FUNCTIONS --- FIXED: Simple mixed technology layout
+        // --- PPT EXPORT FUNCTIONS ---
         function openPPTExport() {
             const charts = document.querySelectorAll("canvas");
             if (charts.length === 0) {
@@ -1249,7 +1282,7 @@
             
             // Title slide
             const titleSlide = pptx.addSlide();
-            titleSlide.addText('KPI Dashboard Report', {
+            titleSlide.addText('KPI Dashboard Report - GSM/LTE', {
                 x: 0.5, y: 1, w: 9, h: 1,
                 fontSize: 36, bold: true, color: '2F80ED'
             });
@@ -1371,7 +1404,7 @@
             // Download
             const timestamp = new Date().getTime();
             try {
-                await pptx.writeFile({ fileName: `KPI_Report_${timestamp}.pptx` });
+                await pptx.writeFile({ fileName: `GSM_LTE_KPI_Report_${timestamp}.pptx` });
                 closePPTExport();
             } catch (e) {
                 alert("Error generating PPT: " + e.message);
