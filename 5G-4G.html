@@ -50,7 +50,7 @@ header {
     font-size: 18px;
     font-weight: 600;
     color: #0a2540;
-    text-align: center; /* center the chart title */
+    text-align: center; 
 }
 
 canvas {
@@ -79,18 +79,15 @@ canvas {
 </div>
 
 <script>
-const SHEET_URL =
-"https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
+const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
 
 /* ---------- Helpers ---------- */
 function num(v) { if (!v) return null; return parseFloat(v); }
 function percent(v) { if (!v) return null; return parseFloat(v.toString().replace("%","")); }
 function paddedRange(values, pad=0.1){ 
     const clean = values.filter(v=>v!==null && !isNaN(v));
-    const min = Math.min(...clean);
     const max = Math.max(...clean);
-    const range = max-min || max || 1;
-    return {min: min-range*pad, max: max+range*pad};
+    return {min: 0, max: max + (max * pad)}; // Always set min to 0
 }
 
 /* ---------- 5G % Progressive animation ---------- */
@@ -103,7 +100,7 @@ const progressiveAnimation = {
         delay(ctx){
             if(ctx.type!=='data'||ctx.xStarted) return 0;
             ctx.xStarted = true;
-            return ctx.dataset.type==='line'? ctx.index*60 : 0; // Only 5G % line
+            return ctx.dataset.type==='line'? ctx.index*60 : 0; 
         }
     }
 };
@@ -154,7 +151,7 @@ Papa.parse(SHEET_URL,{
 
 /* ---------- Charts ---------- */
 function barLine(id, labels, b1, b2, ln, l1, l2, ll){
-    const rightRange = paddedRange(ln,0.1); // ±10% only for 5G %
+    const rightRange = paddedRange(ln,0.1);
 
     new Chart(document.getElementById(id),{
         data:{labels,
@@ -171,12 +168,15 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
         options:{
             responsive:true,
             maintainAspectRatio:false,
-            interaction:{mode:'index', intersect:false}, // shared tooltip
+            interaction:{mode:'index', intersect:false},
             scales:{
-                y:{title:{display:true,text:"Value"}},
+                y:{
+                    min: 0, // Force Y-axis to start at 0
+                    title:{display:true,text:"Value"}
+                },
                 y1:{
                     position:"right",
-                    suggestedMin:rightRange.min,
+                    min: 0, // Force right Y-axis to start at 0
                     suggestedMax:rightRange.max,
                     grid:{drawOnChartArea:false},
                     title:{display:true,text:"%"},
@@ -210,7 +210,13 @@ function barOnly(id, labels, b1, b2, l1, l2){
         options:{
             responsive:true,
             maintainAspectRatio:false,
-            scales:{y:{suggestedMin:r.min, suggestedMax:r.max,title:{display:true,text:"Mbps"}}},
+            scales:{
+                y:{
+                    min: 0, // Force Y-axis to start at 0
+                    suggestedMax:r.max,
+                    title:{display:true,text:"Mbps"}
+                }
+            },
             plugins:{
                 legend:{position:"top", labels:{boxWidth:18, padding:15}}
             }
