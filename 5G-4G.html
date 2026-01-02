@@ -7,171 +7,173 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 
 <style>
-body { margin: 0; font-family: "Segoe UI", sans-serif; background: #eef2f7; }
+body {
+    margin: 0;
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    background: #eef2f7;
+}
 
 header {
-    background: #FFA500;
+    background: #0a2540;
     color: #fff;
-    padding: 15px 0;
-    font-size: 24px;
+    padding: 25px 0;
+    font-size: 26px;
     font-weight: 700;
     text-align: center;
-    position: relative;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
 }
-
-.btn-container { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); }
-
-.export-btn {
-    background: #004C97;
-    color: white;
-    border: 2px solid white;
-    padding: 10px 20px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: bold;
-}
-
-#capture-area { padding: 20px 40px; background: #eef2f7; }
 
 .container {
+    padding: 30px 50px;
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 25px;
+    gap: 30px;
 }
 
 .card {
     background: #ffffff;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+    border-radius: 16px;
+    padding: 25px 20px 30px 20px;
+    box-shadow: 0 12px 25px rgba(0,0,0,0.07);
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
 }
 
 .card h3 {
-    margin: 0 0 15px 0;
-    font-size: 15px;
-    color: #004C97;
+    margin: 0 0 18px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #0a2540;
     text-align: center; 
 }
 
-canvas { height: 400px !important; }
-
-#previewModal {
-    display: none;
-    position: fixed;
-    z-index: 10000;
-    left: 0; top: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.85);
-    padding: 20px;
+canvas {
+    height: 350px !important;
 }
 
-.modal-content {
-    background: #fff;
-    margin: 0 auto;
-    padding: 20px;
-    width: 95%;
-    max-width: 1100px;
-    max-height: 90vh; 
-    overflow-y: auto;
-    border-radius: 12px;
+@media (max-width: 1200px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
 }
-
-#previewImg { width: 100%; height: auto; border: 1px solid #ddd; margin: 15px 0; }
-.close-modal { float: right; font-size: 35px; cursor: pointer; color: #333; font-weight: bold; }
-.dl-group { margin-top: 10px; padding-bottom: 20px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; }
-.action-btn { padding: 14px 28px; margin: 5px; cursor: pointer; border: none; border-radius: 5px; color: #fff; font-weight: bold; }
-
-@media (max-width: 1000px) { .container { grid-template-columns: 1fr; } }
 </style>
 </head>
 
 <body>
 
-<header>
-    📊 4G–5G KPI Dashboard
-    <div class="btn-container">
-        <button class="export-btn" onclick="takeScreenshot()">Export Dashboard</button>
-    </div>
-</header>
+<header>📊 4G–5G Combined Performance Dashboard (200 Sites)</header>
 
-<div id="capture-area">
-    <div class="container">
-        <div class="card" id="card-0"><h3>1. % of DL Traffic Volume 5G_4G for 200 sites</h3><canvas id="dlTraffic"></canvas></div>
-        <div class="card" id="card-1"><h3>2. % of UL Traffic Volume 5G_4G for 200 sites</h3><canvas id="ulTraffic"></canvas></div>
-        <div class="card" id="card-2"><h3>3. % of RRC User 5G_4G for 200 sites</h3><canvas id="rrcUser"></canvas></div>
-        <div class="card" id="card-3"><h3>4. % of DL PRB Utilization 5G_4G for 200 sites</h3><canvas id="dlPrb"></canvas></div>
-        <div class="card" id="card-4"><h3>5. DL User Throughput Comparison 5G_4G for 200 sites</h3><canvas id="dlTp"></canvas></div>
-        <div class="card" id="card-5"><h3>6. UL User Throughput Comparison 5G_4G for 200 sites</h3><canvas id="ulTp"></canvas></div>
-    </div>
-</div>
-
-<div id="previewModal">
-    <div class="modal-content">
-        <span class="close-modal" onclick="closeModal()">&times;</span>
-        <h2 style="color:#004C97;">Export Preview</h2>
-        <img id="previewImg" src="">
-        <div class="dl-group">
-            <button class="action-btn" style="background:#004C97" onclick="downloadPNG()">Save as PNG</button>
-            <button class="action-btn" style="background:#FFA500" onclick="downloadPPT()">Save as PPTX (6 Images)</button>
-        </div>
-    </div>
+<div class="container">
+    <div class="card"><h3>DL Traffic Volume % (4G vs 5G)</h3><canvas id="dlTraffic"></canvas></div>
+    <div class="card"><h3>UL Traffic Volume % (4G vs 5G)</h3><canvas id="ulTraffic"></canvas></div>
+    <div class="card"><h3>RRC User Distribution %</h3><canvas id="rrcUser"></canvas></div>
+    <div class="card"><h3>DL PRB Utilization %</h3><canvas id="dlPrb"></canvas></div>
+    <div class="card"><h3>DL User Throughput Comparison</h3><canvas id="dlTp"></canvas></div>
+    <div class="card"><h3>UL User Throughput Comparison</h3><canvas id="ulTp"></canvas></div>
 </div>
 
 <script>
 Chart.register(ChartDataLabels);
+
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
 
-const CC_ORANGE = "#FFA500";
-const CC_BLUE = "#004C97";
-const CC_RED = "#e15759";
+/* ---------- Helpers ---------- */
+function num(v) { if (!v) return null; return parseFloat(v); }
+function percent(v) { if (!v) return null; return parseFloat(v.toString().replace("%","")); }
 
-function getTimestamp() {
-    const now = new Date();
-    const pad = (n) => n.toString().padStart(2, '0');
-    return `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+// Logic for Right Axis (y1): Force 0 and use padding
+function paddedRange(values, pad=0.1){ 
+    const clean = values.filter(v=>v!==null && !isNaN(v));
+    const max = Math.max(...clean) || 100;
+    return {min: 0, max: max + (max * pad)}; 
 }
 
+const progressiveAnimation = {
+    x: {
+        type: 'number',
+        easing: 'linear',
+        duration: 1200,
+        from: NaN,
+        delay(ctx){
+            if(ctx.type!=='data'||ctx.xStarted) return 0;
+            ctx.xStarted = true;
+            return ctx.dataset.type==='line'? ctx.index*60 : 0; 
+        }
+    }
+};
+
+/* ---------- Load CSV ---------- */
 Papa.parse(SHEET_URL,{
-    download:true, header:true,
+    download:true,
+    header:true,
     complete: res=>{
         const d = res.data.filter(r=>r.Time);
         const t = d.map(r=>r.Time);
-        function num(v) { return v ? parseFloat(v) : null; }
-        function percent(v) { return v ? parseFloat(v.toString().replace("%","")) : null; }
 
-        barLine("dlTraffic", t, d.map(r=>num(r["LTE DL Data Total Volume(GB)"])), d.map(r=>num(r["NR DL Traffic Volume (GB)"])), d.map(r=>percent(r["5G DL Traffic Percentage (%)"])), "LTE DL Data Total Volume(GB)", "NR DL Traffic Volume(GB)", "5G DL Traffic Percentage (%)");
-        barLine("ulTraffic", t, d.map(r=>num(r["LTE UL Data Total Volume(GB)"])), d.map(r=>num(r["NR UL Traffic Volume (GB)"])), d.map(r=>percent(r["5G UL Traffic Percentage (%)"])), "LTE UL Data Total Volume(GB)", "NR UL Traffic Volume(GB)", "5G UL Traffic Percentage (%)");
-        barLine("rrcUser", t, d.map(r=>num(r["L.Traffic.User.Avg"])), d.map(r=>num(r["NR RRC User Avg"])), d.map(r=>percent(r["5G User Percentage (%)"])), "L.Traffic.User.Avg", "NR RRC User Avg", "5G User Percentage (%)");
-        barLine("dlPrb", t, d.map(r=>num(r["DL PRB Utilization(%)"])), d.map(r=>num(r["NR DL PRB Utilization"])), d.map(r=>percent(r["5G DL PRB %"])), "DL PRB Utilization(%)", "NR DL PRB Utilization(%)", "5G DL PRB %");
-        barOnly("dlTp", t, d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"])), "LTE DL Avg Throughput per User (Mbps)", "NR DL User Throughput (Rmv LastTTI)");
-        barOnly("ulTp", t, d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR UL User Throughput"])), "LTE UL Avg Throughput per User (Mbps)", "NR UL User Throughput");
+        barLine("dlTraffic", t, d.map(r=>num(r["LTE DL Data Total Volume(GB)"])), d.map(r=>num(r["NR DL Traffic Volume (GB)"])), d.map(r=>percent(r["5G DL Traffic Percentage (%)"])), "LTE DL (GB)", "NR DL (GB)", "5G DL %");
+        barLine("ulTraffic", t, d.map(r=>num(r["LTE UL Data Total Volume(GB)"])), d.map(r=>num(r["NR UL Traffic Volume (GB)"])), d.map(r=>percent(r["5G UL Traffic Percentage (%)"])), "LTE UL (GB)", "NR UL (GB)", "5G UL %");
+        barLine("rrcUser", t, d.map(r=>num(r["L.Traffic.User.Avg"])), d.map(r=>num(r["NR RRC User Avg"])), d.map(r=>percent(r["5G User Percentage (%)"])), "LTE Users", "NR Users", "5G User %");
+        barLine("dlPrb", t, d.map(r=>num(r["DL PRB Utilization(%)"])), d.map(r=>num(r["NR DL PRB Utilization"])), d.map(r=>percent(r["5G DL PRB %"])), "LTE DL PRB %", "NR DL PRB %", "5G DL PRB %");
+        barOnly("dlTp", t, d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"])), "LTE DL TP (Mbps)", "NR DL TP (Mbps)");
+        barOnly("ulTp", t, d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR UL User Throughput"])), "LTE UL TP (Mbps)", "NR UL TP (Mbps)");
     }
 });
 
+/* ---------- Charts ---------- */
 function barLine(id, labels, b1, b2, ln, l1, l2, ll){
+    const rightRange = paddedRange(ln, 0.1);
     new Chart(document.getElementById(id),{
-        data:{labels, datasets:[
-            {type:"bar", label:l1, data:b1, backgroundColor: CC_BLUE, order: 2, datalabels: {display: false}},
-            {type:"bar", label:l2, data:b2, backgroundColor: CC_ORANGE, order: 2, datalabels: {display: false}},
-            {type:"line", label:ll, data:ln, yAxisID:"y1", borderColor: CC_RED, backgroundColor: CC_RED, tension: 0.3, pointRadius: 3, borderWidth: 2, order: 1,
-             datalabels: { display: true, align: 'top', offset: 5, color: CC_RED, formatter: v => v.toFixed(1) + '%', font: { size: 12, weight: 'bold' } }
-            }
-        ]},
-        options: { 
+        data:{labels,
+            datasets:[
+                {type:"bar", label:l1, data:b1, order:1, backgroundColor:"rgba(78, 121, 167, 0.8)", datalabels: {display: false}},
+                {type:"bar", label:l2, data:b2, order:1, backgroundColor:"rgba(242, 142, 44, 0.8)", datalabels: {display: false}},
+                {type:"line", label:ll, data:ln, yAxisID:"y1", order:0,
+                 borderColor:"#e15759", backgroundColor:"#e15759", tension:0.35, pointRadius:5, borderWidth:3,
+                 animation:progressiveAnimation,
+                 datalabels: { 
+                    display: true, 
+                    anchor: 'end', 
+                    align: 'top', 
+                    color: '#e15759', 
+                    formatter: v => v.toFixed(1) + '%', 
+                    font: { size: 10, weight: 'bold' }
+                 }
+                }
+            ]
+        },
+        options:{
             responsive:true, maintainAspectRatio:false,
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } }, datalabels: { clip: false } },
-            scales: { 
-                y: { beginAtZero: false }, 
-                y1: { 
-                    position: "right", 
-                    beginAtZero: true, 
-                    // AUTO SCALING: Removed manual max/step
-                    grid: { drawOnChartArea: false }, 
-                    ticks: { callback: v => v + "%" } 
-                } 
+            interaction:{
+                mode:'nearest', 
+                intersect:true // Tooltip ONLY shows when touching the element
+            },
+            scales:{
+                y:{ 
+                    beginAtZero: false, // Left axis auto-scales
+                    title:{display:true,text:"Value"} 
+                },
+                y1:{ 
+                    position:"right", 
+                    min: 0, // Right axis locked at 0
+                    suggestedMax:rightRange.max, 
+                    grid:{drawOnChartArea:false}, 
+                    title:{display:true,text:"%"}, 
+                    ticks:{callback:v=>v+"%"} 
+                }
+            },
+            plugins:{
+                datalabels: { clip: false },
+                tooltip:{
+                    callbacks:{
+                        label:ctx=>{
+                            const val=ctx.parsed.y;
+                            return ctx.dataset.type==='line'? `${ctx.dataset.label}: ${val.toFixed(2)}%` : `${ctx.dataset.label}: ${val.toFixed(2)}`;
+                        }
+                    }
+                },
+                legend:{position:"top", labels:{boxWidth:12}}
             }
         }
     });
@@ -180,43 +182,30 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
 function barOnly(id, labels, b1, b2, l1, l2){
     new Chart(document.getElementById(id),{
         type:"bar",
-        data:{labels, datasets:[
-            {label:l1, data:b1, backgroundColor: CC_BLUE, datalabels: {display: false}},
-            {label:l2, data:b2, backgroundColor: CC_ORANGE, datalabels: {display: false}}
+        data:{labels,datasets:[
+            {label:l1, data:b1, backgroundColor:"rgba(78, 121, 167, 0.8)", datalabels: {display: false}},
+            {label:l2, data:b2, backgroundColor:"rgba(242, 142, 44, 0.8)", datalabels: {display: false}}
         ]},
-        options: { 
+        options:{
             responsive:true, maintainAspectRatio:false,
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } },
-            scales: { y: { beginAtZero: false } } 
+            interaction:{
+                mode:'nearest', 
+                intersect:true 
+            },
+            scales:{ 
+                y:{ 
+                    beginAtZero: false, // Left axis auto-scales
+                    title:{display:true,text:"Mbps"} 
+                } 
+            },
+            plugins:{
+                datalabels: { display: false },
+                legend:{position:"top", labels:{boxWidth:12}}
+            }
         }
     });
 }
-
-let screenshotData = "";
-function takeScreenshot() {
-    html2canvas(document.getElementById('capture-area'), { scale: 2 }).then(canvas => {
-        screenshotData = canvas.toDataURL("image/png");
-        document.getElementById('previewImg').src = screenshotData;
-        document.getElementById('previewModal').style.display = 'block';
-    });
-}
-
-function closeModal() { document.getElementById('previewModal').style.display = 'none'; }
-function downloadPNG() { const l = document.createElement('a'); l.download = `Dashboard_${getTimestamp()}.png`; l.href = screenshotData; l.click(); }
-
-async function downloadPPT() {
-    let pptx = new PptxGenJS();
-    pptx.layout = 'LAYOUT_WIDE';
-    let slide = pptx.addSlide();
-    for (let i = 0; i < 6; i++) {
-        const card = document.getElementById(`card-${i}`);
-        const canvas = await html2canvas(card, { scale: 2 });
-        const imgData = canvas.toDataURL("image/png");
-        let col = i % 2; let row = Math.floor(i / 2);
-        slide.addImage({ data: imgData, x: 0.2 + (col * 6.6), y: 0.2 + (row * 2.4), w: 6.3, h: 2.3 });
-    }
-    pptx.writeFile({ fileName: `KPI_Report_${getTimestamp()}.pptx` });
-}
 </script>
+
 </body>
 </html>
