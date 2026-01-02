@@ -79,11 +79,12 @@ Chart.register(ChartDataLabels);
 
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
 
+/* ---------- Helpers ---------- */
 function num(v) { if (!v) return null; return parseFloat(v); }
 function percent(v) { if (!v) return null; return parseFloat(v.toString().replace("%","")); }
 
-// Helper for Right Axis (5G %) logic
-function paddedRange(values, pad=0.25){ 
+// Logic for Right Axis (y1): Force 0 and use padding
+function paddedRange(values, pad=0.1){ 
     const clean = values.filter(v=>v!==null && !isNaN(v));
     const max = Math.max(...clean) || 100;
     return {min: 0, max: max + (max * pad)}; 
@@ -103,6 +104,7 @@ const progressiveAnimation = {
     }
 };
 
+/* ---------- Load CSV ---------- */
 Papa.parse(SHEET_URL,{
     download:true,
     header:true,
@@ -114,20 +116,19 @@ Papa.parse(SHEET_URL,{
         barLine("ulTraffic", t, d.map(r=>num(r["LTE UL Data Total Volume(GB)"])), d.map(r=>num(r["NR UL Traffic Volume (GB)"])), d.map(r=>percent(r["5G UL Traffic Percentage (%)"])), "LTE UL (GB)", "NR UL (GB)", "5G UL %");
         barLine("rrcUser", t, d.map(r=>num(r["L.Traffic.User.Avg"])), d.map(r=>num(r["NR RRC User Avg"])), d.map(r=>percent(r["5G User Percentage (%)"])), "LTE Users", "NR Users", "5G User %");
         barLine("dlPrb", t, d.map(r=>num(r["DL PRB Utilization(%)"])), d.map(r=>num(r["NR DL PRB Utilization"])), d.map(r=>percent(r["5G DL PRB %"])), "LTE DL PRB %", "NR DL PRB %", "5G DL PRB %");
-        
-        // Throughput Graphs (Bar only) also use auto-scaling on Y
         barOnly("dlTp", t, d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"])), "LTE DL TP (Mbps)", "NR DL TP (Mbps)");
         barOnly("ulTp", t, d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR UL User Throughput"])), "LTE UL TP (Mbps)", "NR UL TP (Mbps)");
     }
 });
 
+/* ---------- Charts ---------- */
 function barLine(id, labels, b1, b2, ln, l1, l2, ll){
-    const rightRange = paddedRange(ln, 0.25);
+    const rightRange = paddedRange(ln, 0.1);
     new Chart(document.getElementById(id),{
         data:{labels,
             datasets:[
-                {type:"bar", label:l1, data:b1, order:1, backgroundColor:"#4e79a7", datalabels: { display: false }},
-                {type:"bar", label:l2, data:b2, order:1, backgroundColor:"#f28e2c", datalabels: { display: false }},
+                {type:"bar", label:l1, data:b1, order:1, backgroundColor:"rgba(78, 121, 167, 0.8)", datalabels: {display: false}},
+                {type:"bar", label:l2, data:b2, order:1, backgroundColor:"rgba(242, 142, 44, 0.8)", datalabels: {display: false}},
                 {type:"line", label:ll, data:ln, yAxisID:"y1", order:0,
                  borderColor:"#e15759", backgroundColor:"#e15759", tension:0.35, pointRadius:5, borderWidth:3,
                  animation:progressiveAnimation,
@@ -144,15 +145,18 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
         },
         options:{
             responsive:true, maintainAspectRatio:false,
-            interaction:{mode:'index', intersect:false},
+            interaction:{
+                mode:'nearest', 
+                intersect:true // Tooltip ONLY shows when touching the element
+            },
             scales:{
                 y:{ 
-                    beginAtZero: false, // Enables Auto-scaling for left axis
+                    beginAtZero: false, // Left axis auto-scales
                     title:{display:true,text:"Value"} 
                 },
                 y1:{ 
                     position:"right", 
-                    min: 0, // Keeps 5G% logic locked at 0
+                    min: 0, // Right axis locked at 0
                     suggestedMax:rightRange.max, 
                     grid:{drawOnChartArea:false}, 
                     title:{display:true,text:"%"}, 
@@ -179,15 +183,18 @@ function barOnly(id, labels, b1, b2, l1, l2){
     new Chart(document.getElementById(id),{
         type:"bar",
         data:{labels,datasets:[
-            {label:l1, data:b1, backgroundColor:"#4e79a7", datalabels: { display: false }},
-            {label:l2, data:b2, backgroundColor:"#f28e2c", datalabels: { display: false }}
+            {label:l1, data:b1, backgroundColor:"rgba(78, 121, 167, 0.8)", datalabels: {display: false}},
+            {label:l2, data:b2, backgroundColor:"rgba(242, 142, 44, 0.8)", datalabels: {display: false}}
         ]},
         options:{
             responsive:true, maintainAspectRatio:false,
-            interaction:{mode:'index', intersect:false},
+            interaction:{
+                mode:'nearest', 
+                intersect:true 
+            },
             scales:{ 
                 y:{ 
-                    beginAtZero: false, // Auto-scaling for Throughput graphs
+                    beginAtZero: false, // Left axis auto-scales
                     title:{display:true,text:"Mbps"} 
                 } 
             },
