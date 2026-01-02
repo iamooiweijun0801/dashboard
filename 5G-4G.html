@@ -59,31 +59,6 @@ header {
 
 canvas { height: 400px !important; }
 
-#previewModal {
-    display: none;
-    position: fixed;
-    z-index: 10000;
-    left: 0; top: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.85);
-    padding: 20px;
-}
-
-.modal-content {
-    background: #fff;
-    margin: 0 auto;
-    padding: 20px;
-    width: 95%;
-    max-width: 1100px;
-    max-height: 90vh; 
-    overflow-y: auto;
-    border-radius: 12px;
-}
-
-#previewImg { width: 100%; height: auto; border: 1px solid #ddd; margin: 15px 0; }
-.close-modal { float: right; font-size: 35px; cursor: pointer; color: #333; font-weight: bold; }
-.dl-group { margin-top: 10px; padding-bottom: 20px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; }
-.action-btn { padding: 14px 28px; margin: 5px; cursor: pointer; border: none; border-radius: 5px; color: #fff; font-weight: bold; }
-
 @media (max-width: 1000px) { .container { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -108,138 +83,166 @@ canvas { height: 400px !important; }
     </div>
 </div>
 
-<div id="previewModal">
-    <div class="modal-content">
-        <span class="close-modal" onclick="closeModal()">&times;</span>
-        <h2 style="color:#004C97;">Export Preview</h2>
-        <img id="previewImg" src="">
-        <div class="dl-group">
-            <button class="action-btn" style="background:#004C97" onclick="downloadPNG()">Save as PNG</button>
-            <button class="action-btn" style="background:#FFA500" onclick="downloadPPT()">Save as PPTX (6 Images)</button>
-        </div>
-    </div>
-</div>
-
 <script>
 Chart.register(ChartDataLabels);
+
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
 
 const CC_ORANGE = "#FFA500";
 const CC_BLUE = "#004C97";
 const CC_RED = "#e15759";
 
-function num(v) { if (!v) return null; return parseFloat(v); }
-function percent(v) { if (!v) return null; return parseFloat(v.toString().replace("%","")); }
+function num(v){ if(!v) return null; return parseFloat(v); }
+function percent(v){ if(!v) return null; return parseFloat(v.toString().replace("%","")); }
 
-// Standard Logic: Min 0 + Padding to prevent ceiling hit
 function paddedRange(values, pad=0.1){ 
     const clean = values.filter(v=>v!==null && !isNaN(v));
     const max = Math.max(...clean) || 100;
-    return {min: 0, max: max + (max * pad)}; 
+    return {min:0, max:max+(max*pad)}; 
 }
 
-function getTimestamp() {
-    const now = new Date();
-    const pad = (n) => n.toString().padStart(2, '0');
-    return `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+/* ================= AUTO REFRESH SUPPORT ================= */
+let lastCsvText = "";
+let charts = [];
+
+function loadData(){
+    Papa.parse(SHEET_URL,{
+        download:true,
+        header:true,
+        complete: res=>{
+            const csvText = JSON.stringify(res.data);
+            if(csvText === lastCsvText) return;
+            lastCsvText = csvText;
+
+            charts.forEach(c=>c.destroy());
+            charts = [];
+
+            const d = res.data.filter(r=>r.Time);
+            const t = d.map(r=>r.Time);
+
+            charts.push(barLine("dlTraffic", t,
+                d.map(r=>num(r["LTE DL Data Total Volume(GB)"])),
+                d.map(r=>num(r["NR DL Traffic Volume (GB)"])),
+                d.map(r=>percent(r["5G DL Traffic Percentage (%)"])),
+                "LTE DL Data Total Volume(GB)",
+                "NR DL Traffic Volume(GB)",
+                "5G DL Traffic Percentage (%)"
+            ));
+
+            charts.push(barLine("ulTraffic", t,
+                d.map(r=>num(r["LTE UL Data Total Volume(GB)"])),
+                d.map(r=>num(r["NR UL Traffic Volume (GB)"])),
+                d.map(r=>percent(r["5G UL Traffic Percentage (%)"])),
+                "LTE UL Data Total Volume(GB)",
+                "NR UL Traffic Volume(GB)",
+                "5G UL Traffic Percentage (%)"
+            ));
+
+            charts.push(barLine("rrcUser", t,
+                d.map(r=>num(r["L.Traffic.User.Avg"])),
+                d.map(r=>num(r["NR RRC User Avg"])),
+                d.map(r=>percent(r["5G User Percentage (%)"])),
+                "L.Traffic.User.Avg",
+                "NR RRC User Avg",
+                "5G User Percentage (%)"
+            ));
+
+            charts.push(barLine("dlPrb", t,
+                d.map(r=>num(r["DL PRB Utilization(%)"])),
+                d.map(r=>num(r["NR DL PRB Utilization"])),
+                d.map(r=>percent(r["5G DL PRB %"])),
+                "DL PRB Utilization(%)",
+                "NR DL PRB Utilization(%)",
+                "5G DL PRB %"
+            ));
+
+            charts.push(barOnly("dlTp", t,
+                d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])),
+                d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"])),
+                "LTE DL Avg Throughput per User (Mbps)",
+                "NR DL User Throughput (Rmv LastTTI)"
+            ));
+
+            charts.push(barOnly("ulTp", t,
+                d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])),
+                d.map(r=>num(r["NR UL User Throughput"])),
+                "LTE UL Avg Throughput per User (Mbps)",
+                "NR UL User Throughput"
+            ));
+        }
+    });
 }
 
-Papa.parse(SHEET_URL,{
-    download:true, header:true,
-    complete: res=>{
-        const d = res.data.filter(r=>r.Time);
-        const t = d.map(r=>r.Time);
+loadData();
+setInterval(loadData, 30000);
 
-        barLine("dlTraffic", t, d.map(r=>num(r["LTE DL Data Total Volume(GB)"])), d.map(r=>num(r["NR DL Traffic Volume (GB)"])), d.map(r=>percent(r["5G DL Traffic Percentage (%)"])), "LTE DL Data Total Volume(GB)", "NR DL Traffic Volume(GB)", "5G DL Traffic Percentage (%)");
-        barLine("ulTraffic", t, d.map(r=>num(r["LTE UL Data Total Volume(GB)"])), d.map(r=>num(r["NR UL Traffic Volume (GB)"])), d.map(r=>percent(r["5G UL Traffic Percentage (%)"])), "LTE UL Data Total Volume(GB)", "NR UL Traffic Volume(GB)", "5G UL Traffic Percentage (%)");
-        barLine("rrcUser", t, d.map(r=>num(r["L.Traffic.User.Avg"])), d.map(r=>num(r["NR RRC User Avg"])), d.map(r=>percent(r["5G User Percentage (%)"])), "L.Traffic.User.Avg", "NR RRC User Avg", "5G User Percentage (%)");
-        barLine("dlPrb", t, d.map(r=>num(r["DL PRB Utilization(%)"])), d.map(r=>num(r["NR DL PRB Utilization"])), d.map(r=>percent(r["5G DL PRB %"])), "DL PRB Utilization(%)", "NR DL PRB Utilization(%)", "5G DL PRB %");
-        barOnly("dlTp", t, d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"])), "LTE DL Avg Throughput per User (Mbps)", "NR DL User Throughput (Rmv LastTTI)");
-        barOnly("ulTp", t, d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR UL User Throughput"])), "LTE UL Avg Throughput per User (Mbps)", "NR UL User Throughput");
-    }
-});
+/* ================= CHART FUNCTIONS ================= */
 
 function barLine(id, labels, b1, b2, ln, l1, l2, ll){
-    const rightRange = paddedRange(ln, 0.1); 
-    new Chart(document.getElementById(id),{
-        data:{labels, datasets:[
-            {type:"bar", label:l1, data:b1, backgroundColor: CC_BLUE, order: 2, datalabels: {display: false}},
-            {type:"bar", label:l2, data:b2, backgroundColor: CC_ORANGE, order: 2, datalabels: {display: false}},
-            {type:"line", label:ll, data:ln, yAxisID:"y1", borderColor: CC_RED, backgroundColor: CC_RED, tension: 0.3, pointRadius: 3, borderWidth: 2, order: 1,
-             datalabels: { 
-                display: true, align: 'top', offset: 5, color: CC_RED, 
-                formatter: v => v.toFixed(1) + '%', font: { size: 12, weight: 'bold' } 
-             }
+    const rightRange = paddedRange(ln,0.1);
+
+    return new Chart(document.getElementById(id),{
+        data:{labels,datasets:[
+            {type:"bar",label:l1,data:b1,backgroundColor:CC_BLUE,datalabels:{display:false}},
+            {type:"bar",label:l2,data:b2,backgroundColor:CC_ORANGE,datalabels:{display:false}},
+            {
+                type:"line",
+                label:ll,
+                data:ln,
+                yAxisID:"y1",
+                borderColor:CC_RED,
+                backgroundColor:CC_RED,
+                tension:0.3,
+                pointRadius:3,
+                borderWidth:2,
+                datalabels:{
+                    display:true,
+                    color:CC_RED,
+                    font:{size:12,weight:'bold'},
+                    align: ctx => ctx.dataIndex % 2 === 0 ? 'top' : 'bottom',
+                    offset: ctx => {
+                        const v = ctx.dataset.data[ctx.dataIndex];
+                        const p = ctx.dataset.data[ctx.dataIndex-1];
+                        return (p!==undefined && Math.abs(v-p)<2) ? 14 : 6;
+                    },
+                    formatter:v=>v.toFixed(1)+'%'
+                }
             }
         ]},
-        options: { 
-            responsive:true, maintainAspectRatio:false,
-            plugins: { 
-                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } },
-                datalabels: { clip: false }
-            },
-            scales: { 
-                y: { 
-                    beginAtZero: true, // FIXED: Left axis now starts at 0
-                    ticks: { font: { size: 10 } }
-                }, 
-                y1: { 
-                    position: "right", 
-                    beginAtZero: true, // FIXED: Right axis starts at 0
-                    suggestedMax: rightRange.max, 
-                    grid: { drawOnChartArea: false }, 
-                    ticks: { callback: v => v + "%", font: { size: 10 } } 
-                } 
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            plugins:{legend:{position:'bottom'},datalabels:{clip:false}},
+            scales:{
+                y:{beginAtZero:true},
+                y1:{
+                    position:"right",
+                    beginAtZero:true,
+                    suggestedMax:rightRange.max,
+                    grid:{drawOnChartArea:false},
+                    ticks:{callback:v=>v+'%'}
+                }
             }
         }
     });
 }
 
 function barOnly(id, labels, b1, b2, l1, l2){
-    new Chart(document.getElementById(id),{
+    return new Chart(document.getElementById(id),{
         type:"bar",
-        data:{labels, datasets:[
-            {label:l1, data:b1, backgroundColor: CC_BLUE, datalabels: {display: false}},
-            {label:l2, data:b2, backgroundColor: CC_ORANGE, datalabels: {display: false}}
+        data:{labels,datasets:[
+            {label:l1,data:b1,backgroundColor:CC_BLUE,datalabels:{display:false}},
+            {label:l2,data:b2,backgroundColor:CC_ORANGE,datalabels:{display:false}}
         ]},
-        options: { 
-            responsive:true, maintainAspectRatio:false,
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } },
-            scales: { 
-                y: { 
-                    beginAtZero: true, // FIXED: Throughput charts start at 0
-                    ticks: { font: { size: 10 } }
-                } 
-            }
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            plugins:{legend:{position:'bottom'}},
+            scales:{y:{beginAtZero:true}}
         }
     });
 }
-
-let screenshotData = "";
-function takeScreenshot() {
-    html2canvas(document.getElementById('capture-area'), { scale: 2 }).then(canvas => {
-        screenshotData = canvas.toDataURL("image/png");
-        document.getElementById('previewImg').src = screenshotData;
-        document.getElementById('previewModal').style.display = 'block';
-    });
-}
-
-function closeModal() { document.getElementById('previewModal').style.display = 'none'; }
-function downloadPNG() { const l = document.createElement('a'); l.download = `Dashboard_${getTimestamp()}.png`; l.href = screenshotData; l.click(); }
-
-async function downloadPPT() {
-    let pptx = new PptxGenJS();
-    pptx.layout = 'LAYOUT_WIDE';
-    let slide = pptx.addSlide();
-    for (let i = 0; i < 6; i++) {
-        const card = document.getElementById(`card-${i}`);
-        const canvas = await html2canvas(card, { scale: 2 });
-        const imgData = canvas.toDataURL("image/png");
-        let col = i % 2; let row = Math.floor(i / 2);
-        slide.addImage({ data: imgData, x: 0.2 + (col * 6.6), y: 0.2 + (row * 2.4), w: 6.3, h: 2.3 });
-    }
-    pptx.writeFile({ fileName: `KPI_Report_${getTimestamp()}.pptx` });
-}
 </script>
+
 </body>
 </html>
