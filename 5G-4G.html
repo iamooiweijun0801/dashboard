@@ -128,7 +128,7 @@ const CC_ORANGE = "#FFA500";
 const CC_BLUE = "#004C97";
 const CC_RED = "#e15759";
 
-let charts = {}; // Store chart instances for updating
+let charts = {}; 
 
 function num(v) { if (!v) return null; return parseFloat(v); }
 function percent(v) { if (!v) return null; return parseFloat(v.toString().replace("%","")); }
@@ -145,7 +145,6 @@ function getTimestamp() {
     return `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
-// MAIN DATA FETCHING FUNCTION
 function fetchData() {
     Papa.parse(SHEET_URL, {
         download: true, 
@@ -153,7 +152,6 @@ function fetchData() {
         complete: res => {
             const d = res.data.filter(r => r.Time);
             const t = d.map(r => r.Time);
-
             updateOrBuild("dlTraffic", t, [d.map(r=>num(r["LTE DL Data Total Volume(GB)"])), d.map(r=>num(r["NR DL Traffic Volume (GB)"])), d.map(r=>percent(r["5G DL Traffic Percentage (%)"]))], ["LTE DL Data Total Volume(GB)", "NR DL Traffic Volume(GB)", "5G DL Traffic Percentage (%)"], true);
             updateOrBuild("ulTraffic", t, [d.map(r=>num(r["LTE UL Data Total Volume(GB)"])), d.map(r=>num(r["NR UL Traffic Volume (GB)"])), d.map(r=>percent(r["5G UL Traffic Percentage (%)"]))], ["LTE UL Data Total Volume(GB)", "NR UL Traffic Volume(GB)", "5G UL Traffic Percentage (%)"], true);
             updateOrBuild("rrcUser", t, [d.map(r=>num(r["L.Traffic.User.Avg"])), d.map(r=>num(r["NR RRC User Avg"])), d.map(r=>percent(r["5G User Percentage (%)"]))], ["L.Traffic.User.Avg", "NR RRC User Avg", "5G User Percentage (%)"], true);
@@ -164,19 +162,16 @@ function fetchData() {
     });
 }
 
-// FUNCTION TO EITHER CREATE NEW CHART OR UPDATE EXISTING DATA
 function updateOrBuild(id, labels, dataSets, names, isLine) {
     if (charts[id]) {
-        // Update existing chart
         charts[id].data.labels = labels;
         dataSets.forEach((ds, i) => { charts[id].data.datasets[i].data = ds; });
         if(isLine) {
             const range = paddedRange(dataSets[2], 0.1);
             charts[id].options.scales.y1.suggestedMax = range.max;
         }
-        charts[id].update('none'); // Update without heavy animation
+        charts[id].update('none'); 
     } else {
-        // First time build
         if (isLine) {
             charts[id] = barLine(id, labels, dataSets[0], dataSets[1], dataSets[2], names[0], names[1], names[2]);
         } else {
@@ -194,7 +189,13 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
             {type:"line", label:ll, data:ln, yAxisID:"y1", borderColor: CC_RED, backgroundColor: CC_RED, tension: 0.3, pointRadius: 3, borderWidth: 2, order: 1,
              datalabels: { 
                 display: true, align: 'top', offset: 5, color: CC_RED, 
-                formatter: v => v.toFixed(1) + '%', font: { size: 12, weight: 'bold' } 
+                formatter: v => v.toFixed(1) + '%', 
+                font: function(context) {
+                    // DYNAMIC FONT LOGIC
+                    var width = context.chart.width;
+                    var size = width < 400 ? 9 : 12; // If chart is less than 400px wide, use 9pt, else 12pt
+                    return { size: size, weight: 'bold' };
+                }
              }
             }
         ]},
@@ -233,9 +234,8 @@ function barOnly(id, labels, b1, b2, l1, l2){
     });
 }
 
-// Initialization and Refresh Timer
 fetchData();
-setInterval(fetchData, 30000); // 30 seconds logic
+setInterval(fetchData, 30000); 
 
 let screenshotData = "";
 function takeScreenshot() {
