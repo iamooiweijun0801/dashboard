@@ -2,24 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>4G–5G Performance Dashboard</title>
+<title>4G–5G KPI Dashboard</title>
 
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<!-- PapaParse -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <style>
     body {
         margin: 0;
         font-family: "Segoe UI", Roboto, Arial, sans-serif;
-        background: #f4f6f9;
+        background: #f2f4f8;
     }
 
     header {
         background: #0a2540;
-        color: white;
+        color: #fff;
         padding: 20px 40px;
         font-size: 22px;
         font-weight: 600;
@@ -33,21 +30,21 @@
     }
 
     .card {
-        background: white;
-        border-radius: 12px;
+        background: #ffffff;
+        border-radius: 14px;
         padding: 20px;
-        box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.08);
     }
 
     .card h3 {
-        margin: 0 0 15px 0;
+        margin: 0 0 12px 0;
         font-size: 16px;
         font-weight: 600;
-        color: #333;
+        color: #222;
     }
 
     canvas {
-        height: 320px !important;
+        height: 330px !important;
     }
 
     @media (max-width: 1200px) {
@@ -66,172 +63,126 @@
 
 <div class="container">
 
-    <div class="card">
-        <h3>1️⃣ DL Traffic Volume % (4G vs 5G)</h3>
-        <canvas id="dlTraffic"></canvas>
-    </div>
-
-    <div class="card">
-        <h3>2️⃣ UL Traffic Volume % (4G vs 5G)</h3>
-        <canvas id="ulTraffic"></canvas>
-    </div>
-
-    <div class="card">
-        <h3>3️⃣ RRC User Distribution %</h3>
-        <canvas id="rrcUser"></canvas>
-    </div>
-
-    <div class="card">
-        <h3>4️⃣ DL PRB Utilization %</h3>
-        <canvas id="dlPrb"></canvas>
-    </div>
-
-    <div class="card">
-        <h3>5️⃣ DL User Throughput Comparison</h3>
-        <canvas id="dlTp"></canvas>
-    </div>
-
-    <div class="card">
-        <h3>6️⃣ UL User Throughput Comparison</h3>
-        <canvas id="ulTp"></canvas>
-    </div>
+    <div class="card"><h3>1️⃣ DL Traffic Volume % (4G vs 5G)</h3><canvas id="dlTraffic"></canvas></div>
+    <div class="card"><h3>2️⃣ UL Traffic Volume % (4G vs 5G)</h3><canvas id="ulTraffic"></canvas></div>
+    <div class="card"><h3>3️⃣ RRC User Distribution %</h3><canvas id="rrcUser"></canvas></div>
+    <div class="card"><h3>4️⃣ DL PRB Utilization %</h3><canvas id="dlPrb"></canvas></div>
+    <div class="card"><h3>5️⃣ DL User Throughput Comparison</h3><canvas id="dlTp"></canvas></div>
+    <div class="card"><h3>6️⃣ UL User Throughput Comparison</h3><canvas id="ulTp"></canvas></div>
 
 </div>
 
 <script>
-const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
+const SHEET_URL =
+"https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
 
+// ---------- Helpers ----------
+function num(v) {
+    if (v === null || v === undefined || v === "") return null;
+    return parseFloat(v);
+}
+
+function percent(v) {
+    if (!v) return null;
+    return parseFloat(v.toString().replace("%", ""));
+}
+
+// ---------- Load CSV ----------
 Papa.parse(SHEET_URL, {
     download: true,
     header: true,
-    complete: function(results) {
-        const data = results.data;
+    complete: res => {
+        const d = res.data.filter(r => r.Time);
 
-        const time = data.map(d => d["Time"]);
+        const t = d.map(r => r.Time);
 
-        createBarLineChart(
-            "dlTraffic",
-            time,
-            data.map(d => +d["LTE DL Data Total Volume(GB)"]),
-            data.map(d => +d["NR DL Traffic Volume (GB)"]),
-            data.map(d => +d["5G DL Traffic Percentage (%)"]),
-            "LTE DL (GB)",
-            "NR DL (GB)",
-            "5G DL %"
-        );
+        barLine("dlTraffic", t,
+            d.map(r => num(r["LTE DL Data Total Volume(GB)"])),
+            d.map(r => num(r["NR DL Traffic Volume (GB)"])),
+            d.map(r => percent(r["5G DL Traffic Percentage (%)"])),
+            "LTE DL (GB)", "NR DL (GB)", "5G DL %");
 
-        createBarLineChart(
-            "ulTraffic",
-            time,
-            data.map(d => +d["LTE UL Data Total Volume(GB)"]),
-            data.map(d => +d["NR UL Traffic Volume (GB)"]),
-            data.map(d => +d["5G UL Traffic Percentage (%)"]),
-            "LTE UL (GB)",
-            "NR UL (GB)",
-            "5G UL %"
-        );
+        barLine("ulTraffic", t,
+            d.map(r => num(r["LTE UL Data Total Volume(GB)"])),
+            d.map(r => num(r["NR UL Traffic Volume (GB)"])),
+            d.map(r => percent(r["5G UL Traffic Percentage (%)"])),
+            "LTE UL (GB)", "NR UL (GB)", "5G UL %");
 
-        createBarLineChart(
-            "rrcUser",
-            time,
-            data.map(d => +d["L.Traffic.User.Avg"]),
-            data.map(d => +d["NR RRC User Avg"]),
-            data.map(d => +d["5G User Percentage (%)"]),
-            "LTE Users",
-            "NR Users",
-            "5G User %"
-        );
+        barLine("rrcUser", t,
+            d.map(r => num(r["L.Traffic.User.Avg"])),
+            d.map(r => num(r["NR RRC User Avg"])),
+            d.map(r => percent(r["5G User Percentage (%)"])),
+            "LTE Users", "NR Users", "5G User %");
 
-        createBarLineChart(
-            "dlPrb",
-            time,
-            data.map(d => +d["DL PRB Utilization(%)"]),
-            data.map(d => +d["NR DL PRB Utilization"]),
-            data.map(d => +d["5G DL PRB %"]),
-            "LTE DL PRB %",
-            "NR DL PRB %",
-            "5G DL PRB %"
-        );
+        barLine("dlPrb", t,
+            d.map(r => num(r["DL PRB Utilization(%)"])),
+            d.map(r => num(r["NR DL PRB Utilization"])),
+            d.map(r => percent(r["5G DL PRB %"])),
+            "LTE DL PRB %", "NR DL PRB %", "5G DL PRB %");
 
-        createBarChart(
-            "dlTp",
-            time,
-            data.map(d => +d["LTE DL Avg Throughput per User (Mbps)"]),
-            data.map(d => +d["NR DL User Throughput (Rmv LastTTI)"]),
-            "LTE DL TP (Mbps)",
-            "NR DL TP (Mbps)"
-        );
+        barOnly("dlTp", t,
+            d.map(r => num(r["LTE DL Avg Throughput per User (Mbps)"])),
+            d.map(r => num(r["NR DL User Throughput (Rmv LastTTI)"])),
+            "LTE DL TP (Mbps)", "NR DL TP (Mbps)");
 
-        createBarChart(
-            "ulTp",
-            time,
-            data.map(d => +d["LTE UL Avg Throughput per User (Mbps)"]),
-            data.map(d => +d["NR UL User Throughput"]),
-            "LTE UL TP (Mbps)",
-            "NR UL TP (Mbps)"
-        );
+        barOnly("ulTp", t,
+            d.map(r => num(r["LTE UL Avg Throughput per User (Mbps)"])),
+            d.map(r => num(r["NR UL User Throughput"])),
+            "LTE UL TP (Mbps)", "NR UL TP (Mbps)");
     }
 });
 
-function createBarLineChart(canvasId, labels, bar1, bar2, line, bar1Label, bar2Label, lineLabel) {
-    new Chart(document.getElementById(canvasId), {
+// ---------- Charts ----------
+function barLine(id, labels, b1, b2, ln, l1, l2, ll) {
+    new Chart(document.getElementById(id), {
         data: {
-            labels: labels,
+            labels,
             datasets: [
-                {
-                    type: "bar",
-                    label: bar1Label,
-                    data: bar1
-                },
-                {
-                    type: "bar",
-                    label: bar2Label,
-                    data: bar2
-                },
+                { type: "bar", label: l1, data: b1, order: 1 },
+                { type: "bar", label: l2, data: b2, order: 1 },
                 {
                     type: "line",
-                    label: lineLabel,
-                    data: line,
+                    label: ll,
+                    data: ln,
                     yAxisID: "y1",
-                    tension: 0.3,
-                    pointRadius: 3
+                    order: 0,
+                    tension: 0.35,
+                    pointRadius: 4,
+                    borderWidth: 2
                 }
             ]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             scales: {
-                y: {
-                    title: { display: true, text: "Value" }
-                },
+                y: { title: { display: true, text: "Value" } },
                 y1: {
                     position: "right",
-                    min: 0,
-                    max: 100,
                     grid: { drawOnChartArea: false },
-                    title: { display: true, text: "%" }
+                    title: { display: true, text: "%" },
+                    ticks: { callback: v => v + "%" }
                 }
             }
         }
     });
 }
 
-function createBarChart(canvasId, labels, bar1, bar2, bar1Label, bar2Label) {
-    new Chart(document.getElementById(canvasId), {
+function barOnly(id, labels, b1, b2, l1, l2) {
+    new Chart(document.getElementById(id), {
         type: "bar",
         data: {
-            labels: labels,
+            labels,
             datasets: [
-                { label: bar1Label, data: bar1 },
-                { label: bar2Label, data: bar2 }
+                { label: l1, data: b1 },
+                { label: l2, data: b2 }
             ]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             scales: {
-                y: {
-                    title: { display: true, text: "Mbps" }
-                }
+                y: { title: { display: true, text: "Mbps" } }
             }
         }
     });
