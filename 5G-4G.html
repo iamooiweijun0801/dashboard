@@ -7,17 +7,27 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 
     <style>
         body{margin:0;font-family:"Segoe UI",sans-serif;background:#eef2f7}
         header{background:#FFA500;color:#fff;padding:15px 0;font-size:24px;font-weight:700;text-align:center;position:relative}
         .btn-container{position:absolute;right:20px;top:50%;transform:translateY(-50%)}
         .export-btn{background:#004C97;color:white;border:2px solid white;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:bold}
-        #capture-area{padding:20px 40px}
+        #capture-area{padding:20px 40px; background:#eef2f7}
         .container{display:grid;grid-template-columns:repeat(2,1fr);gap:25px}
         .card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 8px 20px rgba(0,0,0,.05)}
         .card h3{margin:0 0 15px 0;font-size:15px;color:#004C97;text-align:center}
         canvas{height:400px!important}
+        
+        /* Modal Styles */
+        #previewModal{display:none;position:fixed;z-index:10000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.85);padding:20px}
+        .modal-content{background:#fff;margin:0 auto;padding:20px;width:95%;max-width:1100px;max-height:90vh;overflow-y:auto;border-radius:12px;position:relative}
+        #previewImg{width:100%;height:auto;border:1px solid #ddd;margin:15px 0}
+        .close-modal{float:right;font-size:30px;cursor:pointer;font-weight:bold}
+        .dl-group{text-align:center;padding-top:20px;border-top:1px solid #eee}
+        .action-btn{padding:12px 25px;margin:5px;cursor:pointer;border:none;border-radius:5px;color:#fff;font-weight:bold}
+
         @media(max-width:1000px){.container{grid-template-columns:1fr}}
     </style>
 </head>
@@ -25,9 +35,7 @@
 <body>
 <header>
     📊 4G–5G KPI Dashboard
-    <div class="btn-container">
-        <button class="export-btn" onclick="takeScreenshot()">Export Dashboard</button>
-    </div>
+    <div class="btn-container"><button class="export-btn" onclick="takeScreenshot()">Export Dashboard</button></div>
 </header>
 
 <div id="capture-area">
@@ -41,12 +49,23 @@
     </div>
 </div>
 
+<div id="previewModal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="closeModal()">&times;</span>
+        <h2 style="color:#004C97;margin-top:0">Export Preview</h2>
+        <img id="previewImg" src="">
+        <div class="dl-group">
+            <button class="action-btn" style="background:#004C97" onclick="downloadPNG()">Save PNG</button>
+            <button class="action-btn" style="background:#FFA500" onclick="downloadPPT()">Save PPTX</button>
+        </div>
+    </div>
+</div>
+
 <script>
 Chart.register(ChartDataLabels);
 
 const SHEET_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
 const CC_BLUE="#004C97", CC_ORANGE="#FFA500", CC_RED="#e15759";
-
 let charts={}, lastHash="";
 
 const num = v => (v && v !== "") ? parseFloat(v) : null;
@@ -54,16 +73,13 @@ const pct = v => (v && v !== "") ? parseFloat(v.toString().replace("%","")) : nu
 
 const ceilMax = (arr, step=5) => {
     const clean = arr.filter(v => v != null);
-    if (clean.length === 0) return 100;
-    const m = Math.max(...clean);
-    const buffered = m + (m * 0.01); 
-    return Math.ceil(buffered / step) * step;
+    const m = clean.length ? Math.max(...clean) : 100;
+    return Math.ceil((m + (m * 0.02)) / step) * step;
 };
 
-// Timeline Animation Config
 const timelineAnimation = {
-    x: { type: 'number', easing: 'linear', duration: 1000, from: NaN, delay(ctx) { if (ctx.type !== 'data' || ctx.xStarted) return 0; ctx.xStarted = true; return ctx.index * 50; } },
-    y: { type: 'number', easing: 'easeOutQuart', duration: 1000, from: (ctx) => ctx.chart.scales.y.getPixelForValue(0), delay(ctx) { if (ctx.type !== 'data' || ctx.yStarted) return 0; ctx.yStarted = true; return ctx.index * 50; } }
+    x: { type: 'number', easing: 'linear', duration: 800, from: NaN, delay(ctx) { return ctx.index * 40; } },
+    y: { type: 'number', easing: 'easeOutQuart', duration: 800, from: (ctx) => ctx.chart.scales.y.getPixelForValue(0), delay(ctx) { return ctx.index * 40; } }
 };
 
 function build(id, l, d, n, isLine) {
@@ -90,14 +106,15 @@ function build(id, l, d, n, isLine) {
                         formatter: v => v.toFixed(1) + "%",
                         anchor: "end",
                         align: c => {
+                            // Zig-zag logic: alternate based on index but shift if slope is too steep
                             const val = d[2][c.dataIndex];
-                            const prev = c.dataIndex > 0 ? d[2][c.dataIndex - 1] : null;
-                            return (prev !== null && val < prev) ? "bottom" : "top";
+                            const prev = c.dataIndex > 0 ? d[2][c.dataIndex - 1] : val;
+                            return (c.dataIndex % 2 === 0) ? (val >= prev ? "top" : "bottom") : (val >= prev ? "bottom" : "top");
                         },
                         offset: c => {
                             const val = d[2][c.dataIndex];
-                            const prev = c.dataIndex > 0 ? d[2][c.dataIndex - 1] : null;
-                            return (prev !== null && Math.abs(val - prev) < 2) ? 14 : 7;
+                            const prev = c.dataIndex > 0 ? d[2][c.dataIndex - 1] : val;
+                            return Math.abs(val - prev) < 1.5 ? 18 : 8;
                         }
                     }
                 }] : [])
@@ -105,7 +122,7 @@ function build(id, l, d, n, isLine) {
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            layout: { padding: { top: 30 } },
+            layout: { padding: { top: 35 } },
             plugins: { legend: { position: "bottom" }, datalabels: { clip: false } },
             scales: {
                 y: { beginAtZero: true, min: 0 },
@@ -116,47 +133,73 @@ function build(id, l, d, n, isLine) {
 }
 
 function fetchData() {
-    fetch(SHEET_URL).then(r => r.text()).then(t => {
-        if (t === lastHash) return;
-        lastHash = t;
-        Papa.parse(t, {
-            header: true,
-            complete: r => {
-                const d = r.data.filter(x => x.Time);
-                const sites = [...new Set(d.map(x => x["Site Name"]))].length;
-                const l = d.map(x => x.Time);
+    Papa.parse(SHEET_URL, {
+        download: true,
+        header: true,
+        complete: r => {
+            const dataStr = JSON.stringify(r.data);
+            if (dataStr === lastHash) return;
+            lastHash = dataStr;
 
-                const titles = {
-                    "dlTraffic": `% of DL Traffic Volume 5G_4G for ${sites} sites`,
-                    "ulTraffic": `% of UL Traffic Volume 5G_4G for ${sites} sites`,
-                    "rrcUser": `% of RRC User 5G_4G for ${sites} sites`,
-                    "dlPrb": `% of DL PRB Utilization 5G_4G for ${sites} sites`,
-                    "dlTp": `DL User Throughput Comparison 5G_4G for ${sites} sites`,
-                    "ulTp": `UL User Throughput Comparison 5G_4G for ${sites} sites`
-                };
+            const d = r.data.filter(x => x.Time && x.Time !== "");
+            
+            // FIX: Count sites by filtering out empty/null Site Name values correctly
+            const siteList = d.map(x => x["Site Name"]).filter(s => s && s.trim() !== "");
+            const sites = [...new Set(siteList)].length || 0;
 
-                Object.keys(titles).forEach(k => document.getElementById(`title-${k}`).innerText = titles[k]);
+            const l = d.map(x => x.Time);
 
-                build("dlTraffic", l, [d.map(x => num(x["LTE DL Data Total Volume(GB)"])), d.map(x => num(x["NR DL Traffic Volume (GB)"])), d.map(x => pct(x["5G DL Traffic Percentage (%)"]))], ["LTE DL Vol", "NR DL Vol", "5G DL %"], true);
-                build("ulTraffic", l, [d.map(x => num(x["LTE UL Data Total Volume(GB)"])), d.map(x => num(x["NR UL Traffic Volume (GB)"])), d.map(x => pct(x["5G UL Traffic Percentage (%)"]))], ["LTE UL Vol", "NR UL Vol", "5G UL %"], true);
-                build("rrcUser", l, [d.map(x => num(x["L.Traffic.User.Avg"])), d.map(x => num(x["NR RRC User Avg"])), d.map(x => pct(x["5G User Percentage (%)"]))], ["LTE Users", "NR Users", "5G User %"], true);
-                build("dlPrb", l, [d.map(x => num(x["DL PRB Utilization(%)"])), d.map(x => num(x["NR DL PRB Utilization"])), d.map(x => pct(x["5G DL PRB %"]))], ["LTE PRB %", "NR PRB %", "5G PRB %"], true);
-                build("dlTp", l, [d.map(x => num(x["LTE DL Avg Throughput per User (Mbps)"])), d.map(x => num(x["NR DL User Throughput (Rmv LastTTI)"]))], ["LTE DL Mbps", "NR DL Mbps"], false);
-                build("ulTp", l, [d.map(x => num(x["LTE UL Avg Throughput per User (Mbps)"])), d.map(x => num(x["NR UL User Throughput"]))], ["LTE UL Mbps", "NR UL Mbps"], false);
-            }
-        });
+            const titles = {
+                "dlTraffic": `% of DL Traffic Volume 5G_4G for ${sites} sites`,
+                "ulTraffic": `% of UL Traffic Volume 5G_4G for ${sites} sites`,
+                "rrcUser": `% of RRC User 5G_4G for ${sites} sites`,
+                "dlPrb": `% of DL PRB Utilization 5G_4G for ${sites} sites`,
+                "dlTp": `DL User Throughput Comparison 5G_4G for ${sites} sites`,
+                "ulTp": `UL User Throughput Comparison 5G_4G for ${sites} sites`
+            };
+
+            Object.keys(titles).forEach(k => {
+                const el = document.getElementById(`title-${k}`);
+                if(el) el.innerText = titles[k];
+            });
+
+            build("dlTraffic", l, [d.map(x => num(x["LTE DL Data Total Volume(GB)"])), d.map(x => num(x["NR DL Traffic Volume (GB)"])), d.map(x => pct(x["5G DL Traffic Percentage (%)"]))], ["LTE DL Vol", "NR DL Vol", "5G DL %"], true);
+            build("ulTraffic", l, [d.map(x => num(x["LTE UL Data Total Volume(GB)"])), d.map(x => num(x["NR UL Traffic Volume (GB)"])), d.map(x => pct(x["5G UL Traffic Percentage (%)"]))], ["LTE UL Vol", "NR UL Vol", "5G UL %"], true);
+            build("rrcUser", l, [d.map(x => num(x["L.Traffic.User.Avg"])), d.map(x => num(x["NR RRC User Avg"])), d.map(x => pct(x["5G User Percentage (%)"]))], ["LTE Users", "NR Users", "5G User %"], true);
+            build("dlPrb", l, [d.map(x => num(x["DL PRB Utilization(%)"])), d.map(x => num(x["NR DL PRB Utilization"])), d.map(x => pct(x["5G DL PRB %"]))], ["LTE PRB %", "NR PRB %", "5G PRB %"], true);
+            build("dlTp", l, [d.map(x => num(x["LTE DL Avg Throughput per User (Mbps)"])), d.map(x => num(x["NR DL User Throughput (Rmv LastTTI)"]))], ["LTE DL Mbps", "NR DL Mbps"], false);
+            build("ulTp", l, [d.map(x => num(x["LTE UL Avg Throughput per User (Mbps)"])), d.map(x => num(x["NR UL User Throughput"]))], ["LTE UL Mbps", "NR UL Mbps"], false);
+        }
     });
 }
 
 function takeScreenshot() {
     html2canvas(document.getElementById('capture-area'), { scale: 2 }).then(c => {
-        const a = document.createElement("a");
-        const now = new Date();
-        const ts = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
-        a.download = `Dashboard_${ts}.png`;
-        a.href = c.toDataURL();
-        a.click();
+        document.getElementById('previewImg').src = c.toDataURL("image/png");
+        document.getElementById('previewModal').style.display = 'block';
     });
+}
+
+function closeModal() { document.getElementById('previewModal').style.display = 'none'; }
+
+function downloadPNG() {
+    const a = document.createElement("a");
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    a.download = `KPI_Dashboard_${ts}.png`;
+    a.href = document.getElementById('previewImg').src;
+    a.click();
+}
+
+async function downloadPPT() {
+    let pptx = new PptxGenJS();
+    pptx.layout = 'LAYOUT_WIDE';
+    let slide = pptx.addSlide();
+    for (let i = 0; i < 6; i++) {
+        const canvas = await html2canvas(document.getElementById(`card-${i}`), { scale: 2 });
+        let col = i % 2, row = Math.floor(i / 2);
+        slide.addImage({ data: canvas.toDataURL("image/png"), x: 0.2 + (col * 6.6), y: 0.2 + (row * 2.4), w: 6.3, h: 2.3 });
+    }
+    pptx.writeFile({ fileName: `KPI_Report.pptx` });
 }
 
 fetchData();
