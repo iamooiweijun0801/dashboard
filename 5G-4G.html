@@ -87,7 +87,7 @@ function percent(v) { if (!v) return null; return parseFloat(v.toString().replac
 function paddedRange(values, pad=0.1){ 
     const clean = values.filter(v=>v!==null && !isNaN(v));
     const max = Math.max(...clean);
-    return {min: 0, max: max + (max * pad)}; // Always set min to 0
+    return {min: 0, max: max + (max * pad)}; 
 }
 
 /* ---------- 5G % Progressive animation ---------- */
@@ -168,15 +168,15 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
         options:{
             responsive:true,
             maintainAspectRatio:false,
-            interaction:{mode:'index', intersect:false},
+            interaction:{mode:'index', intersect:false}, // Combined Hover Tooltip
             scales:{
                 y:{
-                    min: 0, // Force Y-axis to start at 0
+                    min: 0, 
                     title:{display:true,text:"Value"}
                 },
                 y1:{
                     position:"right",
-                    min: 0, // Force right Y-axis to start at 0
+                    min: 0, 
                     suggestedMax:rightRange.max,
                     grid:{drawOnChartArea:false},
                     title:{display:true,text:"%"},
@@ -210,9 +210,10 @@ function barOnly(id, labels, b1, b2, l1, l2){
         options:{
             responsive:true,
             maintainAspectRatio:false,
+            interaction:{mode:'index', intersect:false}, // Combined Hover Tooltip
             scales:{
                 y:{
-                    min: 0, // Force Y-axis to start at 0
+                    min: 0, 
                     suggestedMax:r.max,
                     title:{display:true,text:"Mbps"}
                 }
