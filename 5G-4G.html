@@ -40,7 +40,7 @@ let lastDataJSON = "";
 function num(v){ if(!v) return null; return parseFloat(v); }
 function percent(v){ if(!v) return null; return parseFloat(v.toString().replace("%","")); }
 
-// Compute nice scale based on value
+// Compute dynamic nice scale
 function niceScale(maxValue){
     const steps = 5;
     if(maxValue === 0) return 5;
@@ -124,7 +124,6 @@ function loadAndRender(){
 function renderBarLine(id, labels, b1, b2, ln, l1,l2,ll){
     const leftMax = Math.max(...[...b1,...b2].filter(v=>v!==null));
     const rightMax = Math.max(...ln.filter(v=>v!==null));
-    const leftYMax = niceScale(leftMax);
     const rightYMax = niceScale(rightMax);
 
     if(charts[id]) charts[id].destroy();
@@ -137,12 +136,10 @@ function renderBarLine(id, labels, b1, b2, ln, l1,l2,ll){
         options:{
             responsive:true, maintainAspectRatio:false,
             interaction:{mode:'index', intersect:false},
-            scales:{
-                y:{min:0, max:leftYMax, title:{display:true,text:"Value"}},
-                y1:{min:0, max:rightYMax, position:"right", title:{display:true,text:"%"}, grid:{drawOnChartArea:false}, ticks:{callback:v=>v+"%"}}
-            },
             plugins:{
                 tooltip:{
+                    enabled:true,
+                    filter:ctx=>ctx.parsed.y!==null, // show only when hovering bar/line
                     callbacks:{
                         label:ctx=>{
                             const label = ctx.dataset.label||'';
@@ -152,6 +149,10 @@ function renderBarLine(id, labels, b1, b2, ln, l1,l2,ll){
                     }
                 },
                 legend:{position:"top", labels:{boxWidth:18,padding:15}}
+            },
+            scales:{
+                y:{min:0, title:{display:true,text:"Value"}},
+                y1:{min:0, max:rightYMax, position:"right", title:{display:true,text:"%"}, grid:{drawOnChartArea:false}, ticks:{callback:v=>v+"%"}}
             }
         }
     });
