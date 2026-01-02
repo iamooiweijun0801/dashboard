@@ -69,6 +69,12 @@ const CC_ORANGE="#FFA500", CC_BLUE="#004C97", CC_RED="#e15759";
 let charts = {};
 let lastCSVHash = "";
 
+function getTimestamp(){
+    const d = new Date();
+    const p = n => n.toString().padStart(2,'0');
+    return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
 function hashCSV(text){ return text.length + ":" + text.slice(0,100); }
 
 function num(v){ if(!v) return null; return parseFloat(v); }
@@ -118,13 +124,13 @@ function updateOrBuild(id,labels,dataSets,names,isLine){
 function barLine(id,labels,b1,b2,ln,l1,l2,ll){
     return new Chart(document.getElementById(id),{
         data:{labels,datasets:[
-            {type:"bar",label:l1,data:b1,backgroundColor:CC_BLUE},
-            {type:"bar",label:l2,data:b2,backgroundColor:CC_ORANGE},
+            {type:"bar",label:l1,data:b1,backgroundColor:CC_BLUE,datalabels:{display:false}},
+            {type:"bar",label:l2,data:b2,backgroundColor:CC_ORANGE,datalabels:{display:false}},
             {type:"line",label:ll,data:ln,yAxisID:"y1",borderColor:CC_RED,backgroundColor:CC_RED,pointRadius:4,borderWidth:2,
              datalabels:{
                 display:true,
                 color:CC_RED,
-                font:{ size:10, weight:'bold' },   /* 👈 smaller label */
+                font:{ size:10, weight:'bold' },
                 formatter:v=>v.toFixed(1)+'%',
                 anchor:'end',
                 align:ctx=>ctx.dataIndex%2===0?'top':'bottom',
@@ -150,8 +156,8 @@ function barOnly(id,labels,b1,b2,l1,l2){
     return new Chart(document.getElementById(id),{
         type:"bar",
         data:{labels,datasets:[
-            {label:l1,data:b1,backgroundColor:CC_BLUE},
-            {label:l2,data:b2,backgroundColor:CC_ORANGE}
+            {label:l1,data:b1,backgroundColor:CC_BLUE,datalabels:{display:false}},
+            {label:l2,data:b2,backgroundColor:CC_ORANGE,datalabels:{display:false}}
         ]},
         options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}
     });
@@ -170,7 +176,7 @@ function takeScreenshot(){
 function closeModal(){ previewModal.style.display='none'; }
 function downloadPNG(){
     const a=document.createElement('a');
-    a.download='Dashboard.png';
+    a.download=`Dashboard_${getTimestamp()}.png`;
     a.href=previewImg.src;
     a.click();
 }
@@ -183,7 +189,7 @@ async function downloadPPT(){
         let col=i%2,row=Math.floor(i/2);
         slide.addImage({data:c.toDataURL(),x:0.2+(col*6.6),y:0.2+(row*2.4),w:6.3,h:2.3});
     }
-    pptx.writeFile({fileName:'KPI_Report.pptx'});
+    pptx.writeFile({fileName:`KPI_Report_${getTimestamp()}.pptx`});
 }
 </script>
 </body>
