@@ -99,12 +99,12 @@ canvas { height: 400px !important; }
 
 <div id="capture-area">
     <div class="container">
-        <div class="card" id="card-0"><h3>% of DL Traffic Volume 5G_4G for 200 sites</h3><canvas id="dlTraffic"></canvas></div>
-        <div class="card" id="card-1"><h3>% of UL Traffic Volume 5G_4G for 200 sites</h3><canvas id="ulTraffic"></canvas></div>
-        <div class="card" id="card-2"><h3>% of RRC User 5G_4G for 200 sites</h3><canvas id="rrcUser"></canvas></div>
-        <div class="card" id="card-3"><h3>% of DL PRB Utilization 5G_4G for 200 sites</h3><canvas id="dlPrb"></canvas></div>
-        <div class="card" id="card-4"><h3>DL User Throughput Comparison 5G_4G for 200 sites</h3><canvas id="dlTp"></canvas></div>
-        <div class="card" id="card-5"><h3>UL User Throughput Comparison 5G_4G for 200 sites</h3><canvas id="ulTp"></canvas></div>
+        <div class="card" id="card-0"><h3>1. % of DL Traffic Volume 5G_4G</h3><canvas id="dlTraffic"></canvas></div>
+        <div class="card" id="card-1"><h3>2. % of UL Traffic Volume 5G_4G</h3><canvas id="ulTraffic"></canvas></div>
+        <div class="card" id="card-2"><h3>3. % of RRC User 5G_4G</h3><canvas id="rrcUser"></canvas></div>
+        <div class="card" id="card-3"><h3>4. % of DL PRB Utilization 5G_4G</h3><canvas id="dlPrb"></canvas></div>
+        <div class="card" id="card-4"><h3>5. DL User Throughput Comparison</h3><canvas id="dlTp"></canvas></div>
+        <div class="card" id="card-5"><h3>6. UL User Throughput Comparison</h3><canvas id="ulTp"></canvas></div>
     </div>
 </div>
 
@@ -130,19 +130,39 @@ const CC_RED = "#e15759";
 
 let charts = {}; 
 
+// --- Timeline Animation Logic ---
+const timelineAnimation = {
+    x: {
+        type: 'number',
+        easing: 'linear',
+        duration: 1000,
+        from: NaN, 
+        delay(ctx) {
+            if (ctx.type !== 'data' || ctx.xStarted) return 0;
+            ctx.xStarted = true;
+            return ctx.index * 50; // Delay each point to create left-to-right flow
+        }
+    },
+    y: {
+        type: 'number',
+        easing: 'easeOutQuart',
+        duration: 1000,
+        from: (ctx) => ctx.chart.scales.y.getPixelForValue(0),
+        delay(ctx) {
+            if (ctx.type !== 'data' || ctx.yStarted) return 0;
+            ctx.yStarted = true;
+            return ctx.index * 50;
+        }
+    }
+};
+
 function num(v) { if (!v) return null; return parseFloat(v); }
 function percent(v) { if (!v) return null; return parseFloat(v.toString().replace("%","")); }
 
-function paddedRange(values, pad=0.15){ // Increased padding slightly to accommodate labels
+function paddedRange(values, pad=0.2){ 
     const clean = values.filter(v=>v!==null && !isNaN(v));
     const max = Math.max(...clean) || 100;
     return {min: 0, max: max + (max * pad)}; 
-}
-
-function getTimestamp() {
-    const now = new Date();
-    const pad = (n) => n.toString().padStart(2, '0');
-    return `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
 function fetchData() {
@@ -152,12 +172,12 @@ function fetchData() {
         complete: res => {
             const d = res.data.filter(r => r.Time);
             const t = d.map(r => r.Time);
-            updateOrBuild("dlTraffic", t, [d.map(r=>num(r["LTE DL Data Total Volume(GB)"])), d.map(r=>num(r["NR DL Traffic Volume (GB)"])), d.map(r=>percent(r["5G DL Traffic Percentage (%)"]))], ["LTE DL Data Total Volume(GB)", "NR DL Traffic Volume(GB)", "5G DL Traffic Percentage (%)"], true);
-            updateOrBuild("ulTraffic", t, [d.map(r=>num(r["LTE UL Data Total Volume(GB)"])), d.map(r=>num(r["NR UL Traffic Volume (GB)"])), d.map(r=>percent(r["5G UL Traffic Percentage (%)"]))], ["LTE UL Data Total Volume(GB)", "NR UL Traffic Volume(GB)", "5G UL Traffic Percentage (%)"], true);
-            updateOrBuild("rrcUser", t, [d.map(r=>num(r["L.Traffic.User.Avg"])), d.map(r=>num(r["NR RRC User Avg"])), d.map(r=>percent(r["5G User Percentage (%)"]))], ["L.Traffic.User.Avg", "NR RRC User Avg", "5G User Percentage (%)"], true);
-            updateOrBuild("dlPrb", t, [d.map(r=>num(r["DL PRB Utilization(%)"])), d.map(r=>num(r["NR DL PRB Utilization"])), d.map(r=>percent(r["5G DL PRB %"]))], ["DL PRB Utilization(%)", "NR DL PRB Utilization(%)", "5G DL PRB %"], true);
-            updateOrBuild("dlTp", t, [d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"]))], ["LTE DL Avg Throughput per User (Mbps)", "NR DL User Throughput (Rmv LastTTI)"], false);
-            updateOrBuild("ulTp", t, [d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR UL User Throughput"]))], ["LTE UL Avg Throughput per User (Mbps)", "NR UL User Throughput"], false);
+            updateOrBuild("dlTraffic", t, [d.map(r=>num(r["LTE DL Data Total Volume(GB)"])), d.map(r=>num(r["NR DL Traffic Volume (GB)"])), d.map(r=>percent(r["5G DL Traffic Percentage (%)"]))], ["LTE DL", "NR DL", "5G DL %"], true);
+            updateOrBuild("ulTraffic", t, [d.map(r=>num(r["LTE UL Data Total Volume(GB)"])), d.map(r=>num(r["NR UL Traffic Volume (GB)"])), d.map(r=>percent(r["5G UL Traffic Percentage (%)"]))], ["LTE UL", "NR UL", "5G UL %"], true);
+            updateOrBuild("rrcUser", t, [d.map(r=>num(r["L.Traffic.User.Avg"])), d.map(r=>num(r["NR RRC User Avg"])), d.map(r=>percent(r["5G User Percentage (%)"]))], ["LTE Users", "NR Users", "5G User %"], true);
+            updateOrBuild("dlPrb", t, [d.map(r=>num(r["DL PRB Utilization(%)"])), d.map(r=>num(r["NR DL PRB Utilization"])), d.map(r=>percent(r["5G DL PRB %"]))], ["LTE DL PRB %", "NR DL PRB %", "5G DL PRB %"], true);
+            updateOrBuild("dlTp", t, [d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"]))], ["LTE DL Mbps", "NR DL Mbps"], false);
+            updateOrBuild("ulTp", t, [d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR UL User Throughput"]))], ["LTE UL Mbps", "NR UL Mbps"], false);
         }
     });
 }
@@ -166,11 +186,10 @@ function updateOrBuild(id, labels, dataSets, names, isLine) {
     if (charts[id]) {
         charts[id].data.labels = labels;
         dataSets.forEach((ds, i) => { charts[id].data.datasets[i].data = ds; });
-        if(isLine) {
-            const range = paddedRange(dataSets[2], 0.15);
-            charts[id].options.scales.y1.suggestedMax = range.max;
-        }
-        charts[id].update('none'); 
+        if(isLine) charts[id].options.scales.y1.suggestedMax = paddedRange(dataSets[2], 0.2).max;
+        
+        // Reset animation states for refresh
+        charts[id].update(); 
     } else {
         if (isLine) {
             charts[id] = barLine(id, labels, dataSets[0], dataSets[1], dataSets[2], names[0], names[1], names[2]);
@@ -181,28 +200,31 @@ function updateOrBuild(id, labels, dataSets, names, isLine) {
 }
 
 function barLine(id, labels, b1, b2, ln, l1, l2, ll){
-    const rightRange = paddedRange(ln, 0.15); 
+    const rightRange = paddedRange(ln, 0.2); 
     return new Chart(document.getElementById(id),{
         data:{labels, datasets:[
-            {type:"bar", label:l1, data:b1, backgroundColor: CC_BLUE, order: 2, datalabels: {display: false}},
-            {type:"bar", label:l2, data:b2, backgroundColor: CC_ORANGE, order: 2, datalabels: {display: false}},
-            {type:"line", label:ll, data:ln, yAxisID:"y1", borderColor: CC_RED, backgroundColor: CC_RED, tension: 0.3, pointRadius: 3, borderWidth: 2, order: 1,
+            {type:"bar", label:l1, data:b1, backgroundColor: CC_BLUE, order: 2, datalabels: {display: false}, animation: timelineAnimation},
+            {type:"bar", label:l2, data:b2, backgroundColor: CC_ORANGE, order: 2, datalabels: {display: false}, animation: timelineAnimation},
+            {type:"line", label:ll, data:ln, yAxisID:"y1", borderColor: CC_RED, backgroundColor: CC_RED, tension: 0.3, pointRadius: 4, borderWidth: 2, order: 1,
+             animation: timelineAnimation,
              datalabels: { 
                 display: true, 
                 color: CC_RED, 
                 formatter: v => v.toFixed(1) + '%', 
                 font: { size: 12, weight: 'bold' },
-                // OVERLAP PREVENTION LOGIC:
-                anchor: 'end',    // Ties the label to the end of the data point
-                align: 'auto',   // Automatically moves label to avoid overlapping or going off-chart
-                offset: 8,       // Distance from the point
-                padding: 4       // Internal label padding
+                anchor: 'end',
+                align: 'top',
+                offset: 10,
+                // These settings help avoid overlap
+                clamp: true,
+                clip: false,
+                display: (ctx) => ctx.dataset.data[ctx.dataIndex] !== null
              }
             }
         ]},
         options: { 
             responsive:true, maintainAspectRatio:false,
-            layout: { padding: { top: 20 } }, // Extra room at top of chart area
+            layout: { padding: { top: 30 } },
             plugins: { 
                 legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } },
                 datalabels: { clip: false }
@@ -223,15 +245,13 @@ function barOnly(id, labels, b1, b2, l1, l2){
     return new Chart(document.getElementById(id),{
         type:"bar",
         data:{labels, datasets:[
-            {label:l1, data:b1, backgroundColor: CC_BLUE, datalabels: {display: false}},
-            {label:l2, data:b2, backgroundColor: CC_ORANGE, datalabels: {display: false}}
+            {label:l1, data:b1, backgroundColor: CC_BLUE, datalabels: {display: false}, animation: timelineAnimation},
+            {label:l2, data:b2, backgroundColor: CC_ORANGE, datalabels: {display: false}, animation: timelineAnimation}
         ]},
         options: { 
             responsive:true, maintainAspectRatio:false,
             plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } },
-            scales: { 
-                y: { beginAtZero: true, ticks: { font: { size: 10 } } } 
-            }
+            scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } } }
         }
     });
 }
@@ -239,17 +259,21 @@ function barOnly(id, labels, b1, b2, l1, l2){
 fetchData();
 setInterval(fetchData, 30000); 
 
-let screenshotData = "";
 function takeScreenshot() {
     html2canvas(document.getElementById('capture-area'), { scale: 2 }).then(canvas => {
-        screenshotData = canvas.toDataURL("image/png");
+        const screenshotData = canvas.toDataURL("image/png");
         document.getElementById('previewImg').src = screenshotData;
         document.getElementById('previewModal').style.display = 'block';
     });
 }
 
 function closeModal() { document.getElementById('previewModal').style.display = 'none'; }
-function downloadPNG() { const l = document.createElement('a'); l.download = `Dashboard_${getTimestamp()}.png`; l.href = screenshotData; l.click(); }
+function downloadPNG() { 
+    const l = document.createElement('a'); 
+    l.download = `Dashboard.png`; 
+    l.href = document.getElementById('previewImg').src; 
+    l.click(); 
+}
 
 async function downloadPPT() {
     let pptx = new PptxGenJS();
@@ -262,7 +286,7 @@ async function downloadPPT() {
         let col = i % 2; let row = Math.floor(i / 2);
         slide.addImage({ data: imgData, x: 0.2 + (col * 6.6), y: 0.2 + (row * 2.4), w: 6.3, h: 2.3 });
     }
-    pptx.writeFile({ fileName: `KPI_Report_${getTimestamp()}.pptx` });
+    pptx.writeFile({ fileName: `KPI_Report.pptx` });
 }
 </script>
 </body>
