@@ -62,21 +62,19 @@
 </header>
 
 <div class="container">
-
     <div class="card"><h3>1️⃣ DL Traffic Volume % (4G vs 5G)</h3><canvas id="dlTraffic"></canvas></div>
     <div class="card"><h3>2️⃣ UL Traffic Volume % (4G vs 5G)</h3><canvas id="ulTraffic"></canvas></div>
     <div class="card"><h3>3️⃣ RRC User Distribution %</h3><canvas id="rrcUser"></canvas></div>
     <div class="card"><h3>4️⃣ DL PRB Utilization %</h3><canvas id="dlPrb"></canvas></div>
     <div class="card"><h3>5️⃣ DL User Throughput Comparison</h3><canvas id="dlTp"></canvas></div>
     <div class="card"><h3>6️⃣ UL User Throughput Comparison</h3><canvas id="ulTp"></canvas></div>
-
 </div>
 
 <script>
 const SHEET_URL =
 "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
 
-// ---------- Helpers ----------
+/* ---------- Helpers ---------- */
 function num(v) {
     if (v === null || v === undefined || v === "") return null;
     return parseFloat(v);
@@ -87,13 +85,39 @@ function percent(v) {
     return parseFloat(v.toString().replace("%", ""));
 }
 
-// ---------- Load CSV ----------
+function paddedRange(values, pad = 0.1) {
+    const clean = values.filter(v => v !== null && !isNaN(v));
+    const min = Math.min(...clean);
+    const max = Math.max(...clean);
+    const range = max - min || max || 1;
+
+    return {
+        min: min - range * pad,
+        max: max + range * pad
+    };
+}
+
+/* ---------- Animation (Left → Right) ---------- */
+const progressiveAnimation = {
+    x: {
+        type: 'number',
+        easing: 'linear',
+        duration: 1200,
+        from: NaN,
+        delay(ctx) {
+            if (ctx.type !== 'data' || ctx.xStarted) return 0;
+            ctx.xStarted = true;
+            return ctx.index * 60;   // controls left→right speed
+        }
+    }
+};
+
+/* ---------- Load CSV ---------- */
 Papa.parse(SHEET_URL, {
     download: true,
     header: true,
     complete: res => {
         const d = res.data.filter(r => r.Time);
-
         const t = d.map(r => r.Time);
 
         barLine("dlTraffic", t,
@@ -132,8 +156,12 @@ Papa.parse(SHEET_URL, {
     }
 });
 
-// ---------- Charts ----------
+/* ---------- Charts ---------- */
 function barLine(id, labels, b1, b2, ln, l1, l2, ll) {
+
+    const left = paddedRange([...b1, ...b2]);
+    const right = paddedRange(ln);
+
     new Chart(document.getElementById(id), {
         data: {
             labels,
@@ -155,10 +183,17 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: progressiveAnimation,
             scales: {
-                y: { title: { display: true, text: "Value" } },
+                y: {
+                    suggestedMin: left.min,
+                    suggestedMax: left.max,
+                    title: { display: true, text: "Value" }
+                },
                 y1: {
                     position: "right",
+                    suggestedMin: right.min,
+                    suggestedMax: right.max,
                     grid: { drawOnChartArea: false },
                     title: { display: true, text: "%" },
                     ticks: { callback: v => v + "%" }
@@ -169,6 +204,9 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll) {
 }
 
 function barOnly(id, labels, b1, b2, l1, l2) {
+
+    const r = paddedRange([...b1, ...b2]);
+
     new Chart(document.getElementById(id), {
         type: "bar",
         data: {
@@ -181,8 +219,13 @@ function barOnly(id, labels, b1, b2, l1, l2) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: progressiveAnimation,
             scales: {
-                y: { title: { display: true, text: "Mbps" } }
+                y: {
+                    suggestedMin: r.min,
+                    suggestedMax: r.max,
+                    title: { display: true, text: "Mbps" }
+                }
             }
         }
     });
