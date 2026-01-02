@@ -11,7 +11,7 @@
 
     <style>
         body{margin:0;font-family:"Segoe UI",sans-serif;background:#eef2f7}
-        header{background:#CC7A00;color:#fff;padding:15px 0;font-size:24px;font-weight:700;text-align:center;position:relative}
+        header{background:#FFA500;color:#fff;padding:15px 0;font-size:24px;font-weight:700;text-align:center;position:relative}
         .btn-container{position:absolute;right:20px;top:50%;transform:translateY(-50%)}
         .export-btn{background:#004C97;color:white;border:2px solid white;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:bold}
         #capture-area{padding:20px 40px; background:#eef2f7}
@@ -73,7 +73,7 @@ const pct = v => (v && v !== "") ? parseFloat(v.toString().replace("%","")) : nu
 const ceilMax = (arr, step=5) => {
     const clean = arr.filter(v => v != null);
     const m = clean.length ? Math.max(...clean) : 100;
-    return Math.ceil((m + 2) / step) * step;
+    return Math.ceil((m + 1.5) / step) * step;
 };
 
 const timelineAnimation = {
@@ -98,20 +98,24 @@ function build(id, l, d, n, isLine) {
                 { type: "bar", label: n[1], data: d[1], backgroundColor: CC_ORANGE, datalabels: { display: false }, animation: timelineAnimation },
                 ...(isLine ? [{
                     type: "line", label: n[2], data: d[2], yAxisID: "y1",
-                    borderColor: CC_RED, backgroundColor: CC_RED, pointRadius: 4, borderWidth: 2,
+                    borderColor: CC_RED, backgroundColor: CC_RED, pointRadius: 3, borderWidth: 1.5,
                     animation: timelineAnimation,
                     datalabels: {
-                        display: true, color: CC_RED, font: { size: 12, weight: "bold" },
+                        display: true, 
+                        color: CC_RED, 
+                        font: { size: 9, weight: "bold" },
                         formatter: v => v.toFixed(1) + "%",
                         anchor: 'end',
                         align: (c) => {
                             const val = d[2][c.dataIndex];
                             const prev = c.dataIndex > 0 ? d[2][c.dataIndex - 1] : val;
-                            // If rising, put label above. If falling, put label below to prevent overlap with line
                             return val >= prev ? 'top' : 'bottom';
                         },
-                        offset: 6, // Keep it tight to the point
-                        padding: 2
+                        offset: 4,
+                        padding: 1,
+                        // Stroke helps visibility against bars
+                        textStrokeColor: 'rgba(255,255,255,0.8)',
+                        textStrokeWidth: 2
                     }
                 }] : [])
             ]
@@ -119,10 +123,10 @@ function build(id, l, d, n, isLine) {
         options: {
             responsive: true, maintainAspectRatio: false,
             layout: { padding: { top: 30 } },
-            plugins: { legend: { position: "bottom" }, datalabels: { clip: false } },
+            plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } }, datalabels: { clip: false } },
             scales: {
-                y: { beginAtZero: true, min: 0 },
-                y1: isLine ? { position: "right", beginAtZero: true, min: 0, max: ceilMax(d[2]), ticks: { callback: v => v + "%" }, grid: { drawOnChartArea: false } } : { display: false }
+                y: { beginAtZero: true, min: 0, ticks: { font: { size: 10 } } },
+                y1: isLine ? { position: "right", beginAtZero: true, min: 0, max: ceilMax(d[2]), ticks: { callback: v => v + "%", font: { size: 10 } }, grid: { drawOnChartArea: false } } : { display: false }
             }
         }
     });
@@ -138,10 +142,7 @@ function fetchData() {
             lastHash = dataStr;
 
             const d = r.data.filter(x => x.Time && x.Time !== "");
-            
-            // Search for site count value in 'Site Name' column
             const siteCountVal = d.find(x => x["Site Name"])?.["Site Name"] || "xx";
-
             const l = d.map(x => x.Time);
 
             const titles = {
