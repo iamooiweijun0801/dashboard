@@ -75,16 +75,15 @@ canvas {
 </div>
 
 <script>
-// Register the plugin globally
 Chart.register(ChartDataLabels);
 
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
 
 function num(v) { if (!v) return null; return parseFloat(v); }
 function percent(v) { if (!v) return null; return parseFloat(v.toString().replace("%","")); }
-function paddedRange(values, pad=0.15){ 
+function paddedRange(values, pad=0.2){ 
     const clean = values.filter(v=>v!==null && !isNaN(v));
-    const max = Math.max(...clean);
+    const max = Math.max(...clean) || 100;
     return {min: 0, max: max + (max * pad)}; 
 }
 
@@ -119,18 +118,24 @@ Papa.parse(SHEET_URL,{
 });
 
 function barLine(id, labels, b1, b2, ln, l1, l2, ll){
-    const rightRange = paddedRange(ln, 0.2);
+    const rightRange = paddedRange(ln, 0.25);
     new Chart(document.getElementById(id),{
         data:{labels,
             datasets:[
                 {type:"bar", label:l1, data:b1, order:1, backgroundColor:"#4e79a7", datalabels: { display: false }},
-                {type:"bar", label:l2, data:b2, order:1, backgroundColor:"#f28e2c", 
-                    datalabels: { display: true, anchor: 'end', align: 'top', color: '#888', font: { size: 10, weight: 'bold' } }
-                },
+                {type:"bar", label:l2, data:b2, order:1, backgroundColor:"#f28e2c", datalabels: { display: false }},
                 {type:"line", label:ll, data:ln, yAxisID:"y1", order:0,
-                 borderColor:"#e15759", backgroundColor:"#e15759", tension:0.35, pointRadius:4, borderWidth:2,
+                 borderColor:"#FF007F", backgroundColor:"#FF007F", tension:0.35, pointRadius:5, borderWidth:3,
                  animation:progressiveAnimation,
-                 datalabels: { display: true, anchor: 'center', align: 'top', color: '#e15759', formatter: v => v.toFixed(1) + '%', font: { size: 10, weight: 'bold' } }
+                 datalabels: { 
+                    display: true, 
+                    anchor: 'end', 
+                    align: 'top', 
+                    color: '#FF007F', 
+                    formatter: v => v.toFixed(1) + '%', 
+                    font: { size: 11, weight: 'bold' },
+                    offset: 4
+                 }
                 }
             ]
         },
@@ -139,10 +144,17 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
             interaction:{mode:'index', intersect:false},
             scales:{
                 y:{ min: 0, title:{display:true,text:"Value"} },
-                y1:{ position:"right", min: 0, suggestedMax:rightRange.max, grid:{drawOnChartArea:false}, title:{display:true,text:"%"}, ticks:{callback:v=>v+"%"} }
+                y1:{ 
+                    position:"right", 
+                    min: 0, 
+                    suggestedMax:rightRange.max, 
+                    grid:{drawOnChartArea:false}, 
+                    title:{display:true,text:"%"}, 
+                    ticks:{callback:v=>v+"%"} 
+                }
             },
             plugins:{
-                datalabels: { clip: false }, // Prevent labels from being cut off
+                datalabels: { clip: false },
                 tooltip:{
                     callbacks:{
                         label:ctx=>{
@@ -163,16 +175,14 @@ function barOnly(id, labels, b1, b2, l1, l2){
         type:"bar",
         data:{labels,datasets:[
             {label:l1, data:b1, backgroundColor:"#4e79a7", datalabels: { display: false }},
-            {label:l2, data:b2, backgroundColor:"#f28e2c", 
-                datalabels: { display: true, anchor: 'end', align: 'top', color: '#888', font: { size: 10, weight: 'bold' } }
-            }
+            {label:l2, data:b2, backgroundColor:"#f28e2c", datalabels: { display: false }}
         ]},
         options:{
             responsive:true, maintainAspectRatio:false,
             interaction:{mode:'index', intersect:false},
             scales:{ y:{ min: 0, suggestedMax:r.max, title:{display:true,text:"Mbps"} } },
             plugins:{
-                datalabels: { clip: false },
+                datalabels: { display: false },
                 legend:{position:"top", labels:{boxWidth:12}}
             }
         }
