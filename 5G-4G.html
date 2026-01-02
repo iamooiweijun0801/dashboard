@@ -26,9 +26,7 @@ canvas{height:400px!important}
 <body>
 <header>
 📊 4G–5G KPI Dashboard
-<div class="btn-container">
-<button class="export-btn" onclick="takeScreenshot()">Export Dashboard</button>
-</div>
+<div class="btn-container"><button class="export-btn" onclick="takeScreenshot()">Export Dashboard</button></div>
 </header>
 
 <div id="capture-area">
@@ -44,36 +42,36 @@ canvas{height:400px!important}
 
 <script>
 Chart.register(ChartDataLabels);
-
 const SHEET_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
 const CC_BLUE="#004C97",CC_ORANGE="#FFA500",CC_RED="#e15759";
 
-let charts={},lastHash="";
+let charts={}, lastHash="";
 
 const num=v=>v?parseFloat(v):null;
 const pct=v=>v?parseFloat(v.replace("%","")):null;
 
-const ceilMax=(arr,step=5)=>{
+function ceilMax(arr,step=5){
 const m=Math.max(...arr.filter(v=>v!=null))||0;
 return Math.ceil(m/step)*step;
-};
+}
 
 function fetchData(){
 fetch(SHEET_URL).then(r=>r.text()).then(t=>{
-if(t===lastHash)return; lastHash=t;
-Papa.parse(t,{header:true,complete:r=>{
+if(t===lastHash) return; lastHash=t;
+
+Papa.parse(t,{header:true,skipEmptyLines:true,complete:r=>{
 const d=r.data.filter(x=>x.Time);
 
 // get number of unique sites dynamically
-const sites = [...new Set(d.map(x=>x["Site Name"]))].length;
+const sites=[...new Set(d.map(x=>x["Site Name"]))].length;
 
-// update titles with dynamic site count
-document.getElementById("title-dlTraffic").innerText = `% of DL Traffic Volume 5G_4G for ${sites} sites`;
-document.getElementById("title-ulTraffic").innerText = `% of UL Traffic Volume 5G_4G for ${sites} sites`;
-document.getElementById("title-rrcUser").innerText = `% of RRC User 5G_4G for ${sites} sites`;
-document.getElementById("title-dlPrb").innerText = `% of DL PRB Utilizaition 5G_4G for ${sites} sites`;
-document.getElementById("title-dlTp").innerText = `DL User Throughput Comparison 5G_4G for ${sites} sites`;
-document.getElementById("title-ulTp").innerText = `UL User Throughput Comparison 5G_4G for ${sites} sites`;
+// update card titles
+document.getElementById("title-dlTraffic").innerText=`% of DL Traffic Volume 5G_4G for ${sites} sites`;
+document.getElementById("title-ulTraffic").innerText=`% of UL Traffic Volume 5G_4G for ${sites} sites`;
+document.getElementById("title-rrcUser").innerText=`% of RRC User 5G_4G for ${sites} sites`;
+document.getElementById("title-dlPrb").innerText=`% of DL PRB Utilization 5G_4G for ${sites} sites`;
+document.getElementById("title-dlTp").innerText=`DL User Throughput Comparison 5G_4G for ${sites} sites`;
+document.getElementById("title-ulTp").innerText=`UL User Throughput Comparison 5G_4G for ${sites} sites`;
 
 const l=d.map(x=>x.Time);
 
@@ -85,7 +83,7 @@ build("dlTraffic",l,
 
 build("ulTraffic",l,
 [d.map(x=>num(x["LTE UL Data Total Volume(GB)"])),
- d.map(x=>num(x["NR UL Traffic Volume (GB)"])),
+ d.map(x=>num(x["NR UL Traffic Volume(GB)"])),
  d.map(x=>pct(x["5G UL Traffic Percentage (%)"]))],
 ["LTE UL Data Total Volume(GB)","NR UL Traffic Volume(GB)","5G UL Traffic Percentage (%)"],true);
 
@@ -112,37 +110,36 @@ build("ulTp",l,
 ["LTE UL Avg Throughput per User (Mbps)","NR UL User Throughput"],false);
 
 }});
+});
 }
 
 function build(id,l,d,n,isLine){
 if(charts[id]){
 charts[id].data.labels=l;
 d.forEach((x,i)=>charts[id].data.datasets[i].data=x);
-if(isLine)charts[id].options.scales.y1.max=ceilMax(d[2]);
+if(isLine) charts[id].options.scales.y1.max=ceilMax(d[2]);
 charts[id].update("none");
 return;
 }
+
 charts[id]=new Chart(document.getElementById(id),{
 data:{labels:l,datasets:[
 {type:"bar",label:n[0],data:d[0],backgroundColor:CC_BLUE,datalabels:{display:false}},
 {type:"bar",label:n[1],data:d[1],backgroundColor:CC_ORANGE,datalabels:{display:false}},
 ...(isLine?[{type:"line",label:n[2],data:d[2],yAxisID:"y1",
 borderColor:CC_RED,backgroundColor:CC_RED,pointRadius:4,borderWidth:2,
-datalabels:{
-display:true,color:CC_RED,font:{size:10,weight:"bold"},
-formatter:v=>v.toFixed(1)+"%",
-anchor:"end",
+datalabels:{display:true,color:CC_RED,font:{size:10,weight:"bold"},
+formatter:v=>v.toFixed(1)+"%",anchor:"end",
 align:c=>c.dataIndex%2?"bottom":"top",
-offset:c=>Math.abs((d[2][c.dataIndex]-d[2][c.dataIndex-1])||0)<2?14:6
+offset:c=>c.dataIndex>0 && Math.abs(d[2][c.dataIndex]-d[2][c.dataIndex-1])<2?14:6
 }}]:[])
 ]},
 options:{
 responsive:true,maintainAspectRatio:false,
-plugins:{legend:{position:"bottom"}},
+plugins:{legend:{position:"bottom"},datalabels:{clip:false}},
 scales:{
 y:{beginAtZero:true},
-y1:isLine?{position:"right",beginAtZero:true,max:ceilMax(d[2]),
-ticks:{callback:v=>v+"%"},grid:{drawOnChartArea:false}}:{}
+y1:isLine?{position:"right",beginAtZero:true,max:ceilMax(d[2]),ticks:{callback:v=>v+"%"},grid:{drawOnChartArea:false}}:{}
 }}
 });
 }
@@ -150,14 +147,12 @@ ticks:{callback:v=>v+"%"},grid:{drawOnChartArea:false}}:{}
 fetchData();
 setInterval(fetchData,30000);
 
-/* export */
+/* Export button */
 function takeScreenshot(){
 html2canvas(document.getElementById('capture-area'),{scale:2}).then(c=>{
-const a=document.createElement("a");
 const now=new Date();
 const ts=`${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}${now.getSeconds().toString().padStart(2,'0')}`;
-a.download=`Dashboard_${ts}.png`;
-a.href=c.toDataURL();a.click();
+const a=document.createElement("a"); a.download=`Dashboard_${ts}.png`; a.href=c.toDataURL(); a.click();
 });
 }
 </script>
