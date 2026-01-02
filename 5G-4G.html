@@ -1,160 +1,166 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>4G–5G KPI Dashboard</title>
+    <meta charset="UTF-8">
+    <title>4G–5G KPI Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-
-<style>
-body{margin:0;font-family:"Segoe UI",sans-serif;background:#eef2f7}
-header{background:#FFA500;color:#fff;padding:15px 0;font-size:24px;font-weight:700;text-align:center;position:relative}
-.btn-container{position:absolute;right:20px;top:50%;transform:translateY(-50%)}
-.export-btn{background:#004C97;color:white;border:2px solid white;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:bold}
-#capture-area{padding:20px 40px}
-.container{display:grid;grid-template-columns:repeat(2,1fr);gap:25px}
-.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 8px 20px rgba(0,0,0,.05)}
-.card h3{margin:0 0 15px 0;font-size:15px;color:#004C97;text-align:center}
-canvas{height:400px!important}
-@media(max-width:1000px){.container{grid-template-columns:1fr}}
-</style>
+    <style>
+        body{margin:0;font-family:"Segoe UI",sans-serif;background:#eef2f7}
+        header{background:#FFA500;color:#fff;padding:15px 0;font-size:24px;font-weight:700;text-align:center;position:relative}
+        .btn-container{position:absolute;right:20px;top:50%;transform:translateY(-50%)}
+        .export-btn{background:#004C97;color:white;border:2px solid white;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:bold}
+        #capture-area{padding:20px 40px}
+        .container{display:grid;grid-template-columns:repeat(2,1fr);gap:25px}
+        .card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 8px 20px rgba(0,0,0,.05)}
+        .card h3{margin:0 0 15px 0;font-size:15px;color:#004C97;text-align:center}
+        canvas{height:400px!important}
+        @media(max-width:1000px){.container{grid-template-columns:1fr}}
+    </style>
 </head>
 
 <body>
 <header>
-📊 4G–5G KPI Dashboard
-<div class="btn-container"><button class="export-btn" onclick="takeScreenshot()">Export Dashboard</button></div>
+    📊 4G–5G KPI Dashboard
+    <div class="btn-container">
+        <button class="export-btn" onclick="takeScreenshot()">Export Dashboard</button>
+    </div>
 </header>
 
 <div id="capture-area">
-<div class="container">
-<div class="card" id="card-0"><h3 id="title-dlTraffic"></h3><canvas id="dlTraffic"></canvas></div>
-<div class="card" id="card-1"><h3 id="title-ulTraffic"></h3><canvas id="ulTraffic"></canvas></div>
-<div class="card" id="card-2"><h3 id="title-rrcUser"></h3><canvas id="rrcUser"></canvas></div>
-<div class="card" id="card-3"><h3 id="title-dlPrb"></h3><canvas id="dlPrb"></canvas></div>
-<div class="card" id="card-4"><h3 id="title-dlTp"></h3><canvas id="dlTp"></canvas></div>
-<div class="card" id="card-5"><h3 id="title-ulTp"></h3><canvas id="ulTp"></canvas></div>
-</div>
+    <div class="container">
+        <div class="card" id="card-0"><h3 id="title-dlTraffic"></h3><canvas id="dlTraffic"></canvas></div>
+        <div class="card" id="card-1"><h3 id="title-ulTraffic"></h3><canvas id="ulTraffic"></canvas></div>
+        <div class="card" id="card-2"><h3 id="title-rrcUser"></h3><canvas id="rrcUser"></canvas></div>
+        <div class="card" id="card-3"><h3 id="title-dlPrb"></h3><canvas id="dlPrb"></canvas></div>
+        <div class="card" id="card-4"><h3 id="title-dlTp"></h3><canvas id="dlTp"></canvas></div>
+        <div class="card" id="card-5"><h3 id="title-ulTp"></h3><canvas id="ulTp"></canvas></div>
+    </div>
 </div>
 
 <script>
 Chart.register(ChartDataLabels);
+
 const SHEET_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
-const CC_BLUE="#004C97",CC_ORANGE="#FFA500",CC_RED="#e15759";
+const CC_BLUE="#004C97", CC_ORANGE="#FFA500", CC_RED="#e15759";
 
 let charts={}, lastHash="";
 
-const num=v=>v?parseFloat(v):null;
-const pct=v=>v?parseFloat(v.replace("%","")):null;
+const num = v => (v && v !== "") ? parseFloat(v) : null;
+const pct = v => (v && v !== "") ? parseFloat(v.toString().replace("%","")) : null;
 
-function ceilMax(arr,step=5){
-const m=Math.max(...arr.filter(v=>v!=null))||0;
-return Math.ceil(m/step)*step;
+const ceilMax = (arr, step=5) => {
+    const clean = arr.filter(v => v != null);
+    if (clean.length === 0) return 100;
+    const m = Math.max(...clean);
+    const buffered = m + (m * 0.01); 
+    return Math.ceil(buffered / step) * step;
+};
+
+// Timeline Animation Config
+const timelineAnimation = {
+    x: { type: 'number', easing: 'linear', duration: 1000, from: NaN, delay(ctx) { if (ctx.type !== 'data' || ctx.xStarted) return 0; ctx.xStarted = true; return ctx.index * 50; } },
+    y: { type: 'number', easing: 'easeOutQuart', duration: 1000, from: (ctx) => ctx.chart.scales.y.getPixelForValue(0), delay(ctx) { if (ctx.type !== 'data' || ctx.yStarted) return 0; ctx.yStarted = true; return ctx.index * 50; } }
+};
+
+function build(id, l, d, n, isLine) {
+    if (charts[id]) {
+        charts[id].data.labels = l;
+        d.forEach((x, i) => charts[id].data.datasets[i].data = x);
+        if (isLine) charts[id].options.scales.y1.max = ceilMax(d[2]);
+        charts[id].update();
+        return;
+    }
+    
+    charts[id] = new Chart(document.getElementById(id), {
+        data: {
+            labels: l,
+            datasets: [
+                { type: "bar", label: n[0], data: d[0], backgroundColor: CC_BLUE, datalabels: { display: false }, animation: timelineAnimation },
+                { type: "bar", label: n[1], data: d[1], backgroundColor: CC_ORANGE, datalabels: { display: false }, animation: timelineAnimation },
+                ...(isLine ? [{
+                    type: "line", label: n[2], data: d[2], yAxisID: "y1",
+                    borderColor: CC_RED, backgroundColor: CC_RED, pointRadius: 4, borderWidth: 2,
+                    animation: timelineAnimation,
+                    datalabels: {
+                        display: true, color: CC_RED, font: { size: 11, weight: "bold" },
+                        formatter: v => v.toFixed(1) + "%",
+                        anchor: "end",
+                        align: c => {
+                            const val = d[2][c.dataIndex];
+                            const prev = c.dataIndex > 0 ? d[2][c.dataIndex - 1] : null;
+                            return (prev !== null && val < prev) ? "bottom" : "top";
+                        },
+                        offset: c => {
+                            const val = d[2][c.dataIndex];
+                            const prev = c.dataIndex > 0 ? d[2][c.dataIndex - 1] : null;
+                            return (prev !== null && Math.abs(val - prev) < 2) ? 14 : 7;
+                        }
+                    }
+                }] : [])
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            layout: { padding: { top: 30 } },
+            plugins: { legend: { position: "bottom" }, datalabels: { clip: false } },
+            scales: {
+                y: { beginAtZero: true, min: 0 },
+                y1: isLine ? { position: "right", beginAtZero: true, min: 0, max: ceilMax(d[2]), ticks: { callback: v => v + "%" }, grid: { drawOnChartArea: false } } : { display: false }
+            }
+        }
+    });
 }
 
-function fetchData(){
-fetch(SHEET_URL).then(r=>r.text()).then(t=>{
-if(t===lastHash) return; lastHash=t;
+function fetchData() {
+    fetch(SHEET_URL).then(r => r.text()).then(t => {
+        if (t === lastHash) return;
+        lastHash = t;
+        Papa.parse(t, {
+            header: true,
+            complete: r => {
+                const d = r.data.filter(x => x.Time);
+                const sites = [...new Set(d.map(x => x["Site Name"]))].length;
+                const l = d.map(x => x.Time);
 
-Papa.parse(t,{header:true,skipEmptyLines:true,complete:r=>{
-const d=r.data.filter(x=>x.Time);
+                const titles = {
+                    "dlTraffic": `% of DL Traffic Volume 5G_4G for ${sites} sites`,
+                    "ulTraffic": `% of UL Traffic Volume 5G_4G for ${sites} sites`,
+                    "rrcUser": `% of RRC User 5G_4G for ${sites} sites`,
+                    "dlPrb": `% of DL PRB Utilization 5G_4G for ${sites} sites`,
+                    "dlTp": `DL User Throughput Comparison 5G_4G for ${sites} sites`,
+                    "ulTp": `UL User Throughput Comparison 5G_4G for ${sites} sites`
+                };
 
-// get number of unique sites dynamically
-const sites=[...new Set(d.map(x=>x["Site Name"]))].length;
+                Object.keys(titles).forEach(k => document.getElementById(`title-${k}`).innerText = titles[k]);
 
-// update card titles
-document.getElementById("title-dlTraffic").innerText=`% of DL Traffic Volume 5G_4G for ${sites} sites`;
-document.getElementById("title-ulTraffic").innerText=`% of UL Traffic Volume 5G_4G for ${sites} sites`;
-document.getElementById("title-rrcUser").innerText=`% of RRC User 5G_4G for ${sites} sites`;
-document.getElementById("title-dlPrb").innerText=`% of DL PRB Utilization 5G_4G for ${sites} sites`;
-document.getElementById("title-dlTp").innerText=`DL User Throughput Comparison 5G_4G for ${sites} sites`;
-document.getElementById("title-ulTp").innerText=`UL User Throughput Comparison 5G_4G for ${sites} sites`;
-
-const l=d.map(x=>x.Time);
-
-build("dlTraffic",l,
-[d.map(x=>num(x["LTE DL Data Total Volume(GB)"])),
- d.map(x=>num(x["NR DL Traffic Volume (GB)"])),
- d.map(x=>pct(x["5G DL Traffic Percentage (%)"]))],
-["LTE DL Data Total Volume(GB)","NR DL Traffic Volume(GB)","5G DL Traffic Percentage (%)"],true);
-
-build("ulTraffic",l,
-[d.map(x=>num(x["LTE UL Data Total Volume(GB)"])),
- d.map(x=>num(x["NR UL Traffic Volume(GB)"])),
- d.map(x=>pct(x["5G UL Traffic Percentage (%)"]))],
-["LTE UL Data Total Volume(GB)","NR UL Traffic Volume(GB)","5G UL Traffic Percentage (%)"],true);
-
-build("rrcUser",l,
-[d.map(x=>num(x["L.Traffic.User.Avg"])),
- d.map(x=>num(x["NR RRC User Avg"])),
- d.map(x=>pct(x["5G User Percentage (%)"]))],
-["L.Traffic.User.Avg","NR RRC User Avg","5G User Percentage (%)"],true);
-
-build("dlPrb",l,
-[d.map(x=>num(x["DL PRB Utilization(%)"])),
- d.map(x=>num(x["NR DL PRB Utilization"])),
- d.map(x=>pct(x["5G DL PRB %"]))],
-["DL PRB Utilization(%)","NR DL PRB Utilization(%)","5G DL PRB %"],true);
-
-build("dlTp",l,
-[d.map(x=>num(x["LTE DL Avg Throughput per User (Mbps)"])),
- d.map(x=>num(x["NR DL User Throughput (Rmv LastTTI)"]))],
-["LTE DL Avg Throughput per User (Mbps)","NR DL User Throughput (Rmv LastTTI)"],false);
-
-build("ulTp",l,
-[d.map(x=>num(x["LTE UL Avg Throughput per User (Mbps)"])),
- d.map(x=>num(x["NR UL User Throughput"]))],
-["LTE UL Avg Throughput per User (Mbps)","NR UL User Throughput"],false);
-
-}});
-});
+                build("dlTraffic", l, [d.map(x => num(x["LTE DL Data Total Volume(GB)"])), d.map(x => num(x["NR DL Traffic Volume (GB)"])), d.map(x => pct(x["5G DL Traffic Percentage (%)"]))], ["LTE DL Vol", "NR DL Vol", "5G DL %"], true);
+                build("ulTraffic", l, [d.map(x => num(x["LTE UL Data Total Volume(GB)"])), d.map(x => num(x["NR UL Traffic Volume (GB)"])), d.map(x => pct(x["5G UL Traffic Percentage (%)"]))], ["LTE UL Vol", "NR UL Vol", "5G UL %"], true);
+                build("rrcUser", l, [d.map(x => num(x["L.Traffic.User.Avg"])), d.map(x => num(x["NR RRC User Avg"])), d.map(x => pct(x["5G User Percentage (%)"]))], ["LTE Users", "NR Users", "5G User %"], true);
+                build("dlPrb", l, [d.map(x => num(x["DL PRB Utilization(%)"])), d.map(x => num(x["NR DL PRB Utilization"])), d.map(x => pct(x["5G DL PRB %"]))], ["LTE PRB %", "NR PRB %", "5G PRB %"], true);
+                build("dlTp", l, [d.map(x => num(x["LTE DL Avg Throughput per User (Mbps)"])), d.map(x => num(x["NR DL User Throughput (Rmv LastTTI)"]))], ["LTE DL Mbps", "NR DL Mbps"], false);
+                build("ulTp", l, [d.map(x => num(x["LTE UL Avg Throughput per User (Mbps)"])), d.map(x => num(x["NR UL User Throughput"]))], ["LTE UL Mbps", "NR UL Mbps"], false);
+            }
+        });
+    });
 }
 
-function build(id,l,d,n,isLine){
-if(charts[id]){
-charts[id].data.labels=l;
-d.forEach((x,i)=>charts[id].data.datasets[i].data=x);
-if(isLine) charts[id].options.scales.y1.max=ceilMax(d[2]);
-charts[id].update("none");
-return;
-}
-
-charts[id]=new Chart(document.getElementById(id),{
-data:{labels:l,datasets:[
-{type:"bar",label:n[0],data:d[0],backgroundColor:CC_BLUE,datalabels:{display:false}},
-{type:"bar",label:n[1],data:d[1],backgroundColor:CC_ORANGE,datalabels:{display:false}},
-...(isLine?[{type:"line",label:n[2],data:d[2],yAxisID:"y1",
-borderColor:CC_RED,backgroundColor:CC_RED,pointRadius:4,borderWidth:2,
-datalabels:{display:true,color:CC_RED,font:{size:10,weight:"bold"},
-formatter:v=>v.toFixed(1)+"%",anchor:"end",
-align:c=>c.dataIndex%2?"bottom":"top",
-offset:c=>c.dataIndex>0 && Math.abs(d[2][c.dataIndex]-d[2][c.dataIndex-1])<2?14:6
-}}]:[])
-]},
-options:{
-responsive:true,maintainAspectRatio:false,
-plugins:{legend:{position:"bottom"},datalabels:{clip:false}},
-scales:{
-y:{beginAtZero:true},
-y1:isLine?{position:"right",beginAtZero:true,max:ceilMax(d[2]),ticks:{callback:v=>v+"%"},grid:{drawOnChartArea:false}}:{}
-}}
-});
+function takeScreenshot() {
+    html2canvas(document.getElementById('capture-area'), { scale: 2 }).then(c => {
+        const a = document.createElement("a");
+        const now = new Date();
+        const ts = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+        a.download = `Dashboard_${ts}.png`;
+        a.href = c.toDataURL();
+        a.click();
+    });
 }
 
 fetchData();
-setInterval(fetchData,30000);
-
-/* Export button */
-function takeScreenshot(){
-html2canvas(document.getElementById('capture-area'),{scale:2}).then(c=>{
-const now=new Date();
-const ts=`${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}${now.getSeconds().toString().padStart(2,'0')}`;
-const a=document.createElement("a"); a.download=`Dashboard_${ts}.png`; a.href=c.toDataURL(); a.click();
-});
-}
+setInterval(fetchData, 30000);
 </script>
 </body>
 </html>
