@@ -86,7 +86,16 @@ const SHEET_URL =
 function num(v) { if (!v) return null; return parseFloat(v); }
 function percent(v) { if (!v) return null; return parseFloat(v.toString().replace("%","")); }
 
-/* ---------- 5G % Progressive animation ---------- */
+// "Nice" Y-max for 5G % axis
+function niceMax(value) {
+    if(!value) return 10;
+    let step = 5; // scale step
+    let maxRound = Math.ceil(value/step)*step;
+    if(maxRound - value < 1) maxRound += step; // if <1 difference, move to next scale
+    return maxRound;
+}
+
+/* ---------- Animation settings for bars & line ---------- */
 const progressiveAnimation = {
     x: {
         type: 'number',
@@ -96,58 +105,69 @@ const progressiveAnimation = {
         delay(ctx){
             if(ctx.type!=='data'||ctx.xStarted) return 0;
             ctx.xStarted = true;
-            return ctx.dataset.type==='line'? ctx.index*60 : 0; // Only 5G % line
+            return ctx.index*50; // all bars & lines animate together
         }
     }
 };
 
-/* ---------- Load CSV ---------- */
-Papa.parse(SHEET_URL,{
-    download:true,
-    header:true,
-    complete: res=>{
-        const d = res.data.filter(r=>r.Time);
-        const t = d.map(r=>r.Time);
+/* ---------- Chart variables ---------- */
+let charts = [];
 
-        barLine("dlTraffic", t,
-            d.map(r=>num(r["LTE DL Data Total Volume(GB)"])),
-            d.map(r=>num(r["NR DL Traffic Volume (GB)"])),
-            d.map(r=>percent(r["5G DL Traffic Percentage (%)"])),
-            "LTE DL (GB)", "NR DL (GB)", "5G DL %");
+/* ---------- Load CSV and render ---------- */
+function loadAndRender(){
+    Papa.parse(SHEET_URL,{
+        download:true,
+        header:true,
+        complete: res=>{
+            const d = res.data.filter(r=>r.Time);
+            const t = d.map(r=>r.Time);
 
-        barLine("ulTraffic", t,
-            d.map(r=>num(r["LTE UL Data Total Volume(GB)"])),
-            d.map(r=>num(r["NR UL Traffic Volume (GB)"])),
-            d.map(r=>percent(r["5G UL Traffic Percentage (%)"])),
-            "LTE UL (GB)", "NR UL (GB)", "5G UL %");
+            // First four charts: with 5G % line
+            renderBarLine("dlTraffic", t,
+                d.map(r=>num(r["LTE DL Data Total Volume(GB)"])),
+                d.map(r=>num(r["NR DL Traffic Volume (GB)"])),
+                d.map(r=>percent(r["5G DL Traffic Percentage (%)"])),
+                "LTE DL (GB)", "NR DL (GB)", "5G DL %");
 
-        barLine("rrcUser", t,
-            d.map(r=>num(r["L.Traffic.User.Avg"])),
-            d.map(r=>num(r["NR RRC User Avg"])),
-            d.map(r=>percent(r["5G User Percentage (%)"])),
-            "LTE Users", "NR Users", "5G User %");
+            renderBarLine("ulTraffic", t,
+                d.map(r=>num(r["LTE UL Data Total Volume(GB)"])),
+                d.map(r=>num(r["NR UL Traffic Volume (GB)"])),
+                d.map(r=>percent(r["5G UL Traffic Percentage (%)"])),
+                "LTE UL (GB)", "NR UL (GB)", "5G UL %");
 
-        barLine("dlPrb", t,
-            d.map(r=>num(r["DL PRB Utilization(%)"])),
-            d.map(r=>num(r["NR DL PRB Utilization"])),
-            d.map(r=>percent(r["5G DL PRB %"])),
-            "LTE DL PRB %", "NR DL PRB %", "5G DL PRB %");
+            renderBarLine("rrcUser", t,
+                d.map(r=>num(r["L.Traffic.User.Avg"])),
+                d.map(r=>num(r["NR RRC User Avg"])),
+                d.map(r=>percent(r["5G User Percentage (%)"])),
+                "LTE Users", "NR Users", "5G User %");
 
-        barOnly("dlTp", t,
-            d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])),
-            d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"])),
-            "LTE DL TP (Mbps)", "NR DL TP (Mbps)");
+            renderBarLine("dlPrb", t,
+                d.map(r=>num(r["DL PRB Utilization(%)"])),
+                d.map(r=>num(r["NR DL PRB Utilization"])),
+                d.map(r=>percent(r["5G DL PRB %"])),
+                "LTE DL PRB %", "NR DL PRB %", "5G DL PRB %");
 
-        barOnly("ulTp", t,
-            d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])),
-            d.map(r=>num(r["NR UL User Throughput"])),
-            "LTE UL TP (Mbps)", "NR UL TP (Mbps)");
-    }
-});
+            // Last two charts: only LTE & NR
+            renderBarOnly("dlTp", t,
+                d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])),
+                d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"])),
+                "LTE DL TP (Mbps)", "NR DL TP (Mbps)");
 
-/* ---------- Charts ---------- */
-function barLine(id, labels, b1, b2, ln, l1, l2, ll){
-    new Chart(document.getElementById(id),{
+            renderBarOnly("ulTp", t,
+                d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])),
+                d.map(r=>num(r["NR UL User Throughput"])),
+                "LTE UL TP (Mbps)", "NR UL TP (Mbps)");
+        }
+    });
+}
+
+/* ---------- Render charts ---------- */
+function renderBarLine(id, labels, b1, b2, ln, l1, l2, ll){
+    const maxLine = Math.max(...ln.filter(v=>v!==null && !isNaN(v)));
+    const y1Max = niceMax(maxLine);
+
+    if(charts[id]) charts[id].destroy(); // destroy old chart if exists
+    charts[id] = new Chart(document.getElementById(id),{
         data:{labels,
             datasets:[
                 {type:"bar", label:l1, data:b1, order:1, backgroundColor:"#4e79a7"},
@@ -164,10 +184,8 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
             maintainAspectRatio:false,
             interaction:{mode:'index', intersect:false},
             scales:{
-                y:{min:0, title:{display:true,text:"Value"}}, // Left axis min=0
-                y1:{min:0, position:"right", title:{display:true,text:"%"},
-                    grid:{drawOnChartArea:false}, ticks:{callback:v=>v+"%"} // Right axis min=0%
-                }
+                y:{min:0, title:{display:true,text:"Value"}},
+                y1:{min:0, max:y1Max, position:"right", title:{display:true,text:"%"}, grid:{drawOnChartArea:false}, ticks:{callback:v=>v+"%"}}
             },
             plugins:{
                 tooltip:{
@@ -185,8 +203,10 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
     });
 }
 
-function barOnly(id, labels, b1, b2, l1, l2){
-    new Chart(document.getElementById(id),{
+function renderBarOnly(id, labels, b1, b2, l1, l2){
+    const maxVal = Math.max(...[...b1,...b2].filter(v=>v!==null && !isNaN(v)));
+    if(charts[id]) charts[id].destroy();
+    charts[id] = new Chart(document.getElementById(id),{
         type:"bar",
         data:{labels,datasets:[
             {label:l1,data:b1, backgroundColor:"#4e79a7"},
@@ -195,11 +215,19 @@ function barOnly(id, labels, b1, b2, l1, l2){
         options:{
             responsive:true,
             maintainAspectRatio:false,
-            scales:{y:{min:0,title:{display:true,text:"Mbps"}}}, // min=0
+            animation:progressiveAnimation,
+            scales:{y:{min:0, max:maxVal, title:{display:true,text:"Mbps"}}},
             plugins:{legend:{position:"top", labels:{boxWidth:18, padding:15}}}
         }
     });
 }
+
+/* ---------- Initial load ---------- */
+loadAndRender();
+
+/* ---------- Auto-refresh every 1 min ---------- */
+setInterval(loadAndRender, 60*1000);
+
 </script>
 
 </body>
