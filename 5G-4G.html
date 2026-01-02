@@ -70,7 +70,6 @@ let charts={}, lastHash="";
 const num = v => (v && v !== "") ? parseFloat(v) : null;
 const pct = v => (v && v !== "") ? parseFloat(v.toString().replace("%","")) : null;
 
-// RESTORED CEILING LOGIC: Rounds up based on dynamic data
 function getCeiling(values, step = 5) {
     const clean = values.filter(v => v !== null && !isNaN(v));
     const maxVal = Math.max(...clean) || 0;
@@ -124,9 +123,7 @@ function build(id, l, d, n, isLine) {
             scales: {
                 y: { beginAtZero: true, min: 0, ticks: { font: { size: 10 } } },
                 y1: isLine ? { 
-                    position: "right", 
-                    beginAtZero: true, 
-                    min: 0, // LOCKED AT ZERO
+                    position: "right", beginAtZero: true, min: 0,
                     max: getCeiling(d[2], 5), 
                     ticks: { callback: v => v + "%", font: { size: 10 } }, 
                     grid: { drawOnChartArea: false } 
@@ -146,7 +143,6 @@ function fetchData() {
             lastHash = dataStr;
 
             const d = r.data.filter(x => x.Time && x.Time !== "");
-            // Site count fix: Look for the specific number in the Site Name column
             const siteCountVal = d.find(x => x["Site Name"])?.["Site Name"] || "xx";
             const l = d.map(x => x.Time);
 
@@ -164,12 +160,13 @@ function fetchData() {
                 if(el) el.innerText = titles[k];
             });
 
-            build("dlTraffic", l, [d.map(x => num(x["LTE DL Data Total Volume(GB)"])), d.map(x => num(x["NR DL Traffic Volume (GB)"])), d.map(x => pct(x["5G DL Traffic Percentage (%)"]))], ["LTE DL Vol", "NR DL Vol", "5G DL %"], true);
-            build("ulTraffic", l, [d.map(x => num(x["LTE UL Data Total Volume(GB)"])), d.map(x => num(x["NR UL Traffic Volume (GB)"])), d.map(x => pct(x["5G UL Traffic Percentage (%)"]))], ["LTE UL Vol", "NR UL Vol", "5G UL %"], true);
-            build("rrcUser", l, [d.map(x => num(x["L.Traffic.User.Avg"])), d.map(x => num(x["NR RRC User Avg"])), d.map(x => pct(x["5G User Percentage (%)"]))], ["LTE Users", "NR Users", "5G User %"], true);
-            build("dlPrb", l, [d.map(x => num(x["DL PRB Utilization(%)"])), d.map(x => num(x["NR DL PRB Utilization"])), d.map(x => pct(x["5G DL PRB %"]))], ["LTE PRB %", "NR PRB %", "5G PRB %"], true);
-            build("dlTp", l, [d.map(x => num(x["LTE DL Avg Throughput per User (Mbps)"])), d.map(x => num(x["NR DL User Throughput (Rmv LastTTI)"]))], ["LTE DL Mbps", "NR DL Mbps"], false);
-            build("ulTp", l, [d.map(x => num(x["LTE UL Avg Throughput per User (Mbps)"])), d.map(x => num(x["NR UL User Throughput"]))], ["LTE UL Mbps", "NR UL Mbps"], false);
+            // STRICT NAMING FOR LEGENDS
+            build("dlTraffic", l, [d.map(x => num(x["LTE DL Data Total Volume(GB)"])), d.map(x => num(x["NR DL Traffic Volume (GB)"])), d.map(x => pct(x["5G DL Traffic Percentage (%)"]))], ["LTE DL Data Total Volume(GB)", "NR DL Traffic Volume(GB)", "5G DL Traffic Percentage (%)"], true);
+            build("ulTraffic", l, [d.map(x => num(x["LTE UL Data Total Volume(GB)"])), d.map(x => num(x["NR UL Traffic Volume (GB)"])), d.map(x => pct(x["5G UL Traffic Percentage (%)"]))], ["LTE UL Data Total Volume(GB)", "NR UL Traffic Volume(GB)", "5G UL Traffic Percentage (%)"], true);
+            build("rrcUser", l, [d.map(x => num(x["L.Traffic.User.Avg"])), d.map(x => num(x["NR RRC User Avg"])), d.map(x => pct(x["5G User Percentage (%)"]))], ["L.Traffic.User.Avg", "NR RRC User Avg", "5G User Percentage (%)"], true);
+            build("dlPrb", l, [d.map(x => num(x["DL PRB Utilization(%)"])), d.map(x => num(x["NR DL PRB Utilization"])), d.map(x => pct(x["5G DL PRB %"]))], ["DL PRB Utilization(%)", "NR DL PRB Utilization(%)", "5G DL PRB %"], true);
+            build("dlTp", l, [d.map(x => num(x["LTE DL Avg Throughput per User (Mbps)"])), d.map(x => num(x["NR DL User Throughput (Rmv LastTTI)"]))], ["LTE DL Avg Throughput per User (Mbps)", "NR DL User Throughput (Rmv LastTTI)"], false);
+            build("ulTp", l, [d.map(x => num(x["LTE UL Avg Throughput per User (Mbps)"])), d.map(x => num(x["NR UL User Throughput"]))], ["LTE UL Avg Throughput per User (Mbps)", "NR UL User Throughput"], false);
         }
     });
 }
