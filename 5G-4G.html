@@ -133,7 +133,7 @@ let charts = {};
 function num(v) { if (!v) return null; return parseFloat(v); }
 function percent(v) { if (!v) return null; return parseFloat(v.toString().replace("%","")); }
 
-function paddedRange(values, pad=0.1){ 
+function paddedRange(values, pad=0.15){ // Increased padding slightly to accommodate labels
     const clean = values.filter(v=>v!==null && !isNaN(v));
     const max = Math.max(...clean) || 100;
     return {min: 0, max: max + (max * pad)}; 
@@ -167,7 +167,7 @@ function updateOrBuild(id, labels, dataSets, names, isLine) {
         charts[id].data.labels = labels;
         dataSets.forEach((ds, i) => { charts[id].data.datasets[i].data = ds; });
         if(isLine) {
-            const range = paddedRange(dataSets[2], 0.1);
+            const range = paddedRange(dataSets[2], 0.15);
             charts[id].options.scales.y1.suggestedMax = range.max;
         }
         charts[id].update('none'); 
@@ -181,26 +181,28 @@ function updateOrBuild(id, labels, dataSets, names, isLine) {
 }
 
 function barLine(id, labels, b1, b2, ln, l1, l2, ll){
-    const rightRange = paddedRange(ln, 0.1); 
+    const rightRange = paddedRange(ln, 0.15); 
     return new Chart(document.getElementById(id),{
         data:{labels, datasets:[
             {type:"bar", label:l1, data:b1, backgroundColor: CC_BLUE, order: 2, datalabels: {display: false}},
             {type:"bar", label:l2, data:b2, backgroundColor: CC_ORANGE, order: 2, datalabels: {display: false}},
             {type:"line", label:ll, data:ln, yAxisID:"y1", borderColor: CC_RED, backgroundColor: CC_RED, tension: 0.3, pointRadius: 3, borderWidth: 2, order: 1,
              datalabels: { 
-                display: true, align: 'top', offset: 5, color: CC_RED, 
+                display: true, 
+                color: CC_RED, 
                 formatter: v => v.toFixed(1) + '%', 
-                font: function(context) {
-                    // DYNAMIC FONT LOGIC
-                    var width = context.chart.width;
-                    var size = width < 400 ? 9 : 12; // If chart is less than 400px wide, use 9pt, else 12pt
-                    return { size: size, weight: 'bold' };
-                }
+                font: { size: 12, weight: 'bold' },
+                // OVERLAP PREVENTION LOGIC:
+                anchor: 'end',    // Ties the label to the end of the data point
+                align: 'auto',   // Automatically moves label to avoid overlapping or going off-chart
+                offset: 8,       // Distance from the point
+                padding: 4       // Internal label padding
              }
             }
         ]},
         options: { 
             responsive:true, maintainAspectRatio:false,
+            layout: { padding: { top: 20 } }, // Extra room at top of chart area
             plugins: { 
                 legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } },
                 datalabels: { clip: false }
