@@ -68,12 +68,12 @@ const d=r.data.filter(x=>x.Time);
 const sites = [...new Set(d.map(x=>x["Site Name"]))].length;
 
 // update titles with dynamic site count
-document.getElementById("title-dlTraffic").innerText = `1. % of DL Traffic Volume 5G_4G for ${sites} sites`;
-document.getElementById("title-ulTraffic").innerText = `2. % of UL Traffic Volume 5G_4G for ${sites} sites`;
-document.getElementById("title-rrcUser").innerText = `3. % of RRC User 5G_4G for ${sites} sites`;
-document.getElementById("title-dlPrb").innerText = `4. % of DL PRB Utilizaition 5G_4G for ${sites} sites`;
-document.getElementById("title-dlTp").innerText = `5. DL User Throughput Comparison 5G_4G for ${sites} sites`;
-document.getElementById("title-ulTp").innerText = `6. UL User Throughput Comparison 5G_4G for ${sites} sites`;
+document.getElementById("title-dlTraffic").innerText = `% of DL Traffic Volume 5G_4G for ${sites} sites`;
+document.getElementById("title-ulTraffic").innerText = `% of UL Traffic Volume 5G_4G for ${sites} sites`;
+document.getElementById("title-rrcUser").innerText = `% of RRC User 5G_4G for ${sites} sites`;
+document.getElementById("title-dlPrb").innerText = `% of DL PRB Utilizaition 5G_4G for ${sites} sites`;
+document.getElementById("title-dlTp").innerText = `DL User Throughput Comparison 5G_4G for ${sites} sites`;
+document.getElementById("title-ulTp").innerText = `UL User Throughput Comparison 5G_4G for ${sites} sites`;
 
 const l=d.map(x=>x.Time);
 
