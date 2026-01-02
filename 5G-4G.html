@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>KPI Dashboard - 5G/4G Combined</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+    <style>
+        /* --- BASE STYLES --- */
+        body { 
+            font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin:0; 
+            padding:0; 
+            background:#f4f7f6; 
+            overflow-x:hidden; 
+        }
+        header { 
+            text-align:center; 
+            padding:15px 0; 
+            font-size:28px; 
+            font-weight:700; 
+            color:#333; 
+            background:white; 
+            box-shadow:0 2px 4px rgba(0,0,0,0.05); 
+            margin-bottom:15px; 
+        }
+        
+        /* --- CONTROLS --- */
+        .controls-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+            padding: 0 20px;
+        }
+        
+        /* --- EXPORT BUTTON --- */
+        .export-btn-wrapper {
+            display: flex;
+            align-items: center;
+        }
+        
+        /* --- DRAWER TOGGLE BUTTONS --- */
+        .drawer-toggle-buttons { 
+            position: fixed; 
+            top: 20px; 
+            right: 0; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 8px; 
+            z-index: 900; 
+        }
+        .chartStyleDrawerToggle, .kpiDrawerToggle { 
+            width: 36px; 
+            height: 36px; 
+            background: #8E44AD; 
+            color: white; 
+            border-radius: 6px 0 0 6px; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 20px; 
+            transition: 0.2s; 
+        }
+        .kpiDrawerToggle { 
+            background: #2F80ED; 
+            margin-top: 8px; 
+        }
+        .chartStyleDrawerToggle:hover, .kpiDrawerToggle:hover { 
+            opacity: 0.9; 
+        }
+        
+        /* --- GRID LAYOUT (2 Graphs per row for 6 graphs) --- */
+        .chart-grid { 
+            display:grid; 
+            grid-template-columns: repeat(2, 1fr); 
+            gap:20px; 
+            padding:0 20px 40px 20px; 
+            max-width: 1400px; 
+            margin: 0 auto; 
+        }
+        @media (max-width: 1200px) { 
+            .chart-grid { 
+                grid-template-columns: repeat(2, 1fr); 
+            } 
+        }
+        @media (max-width: 768px) { 
+            .chart-grid { 
+                grid-template-columns: 1fr; 
+            } 
+        }
+        
+        /* --- CARDS & CHARTS --- */
+        .chart-card { 
+            background:white; 
+            border-radius:8px; 
+            padding:15px; 
+            box-shadow:0 2px 8px rgba(0,0,0,0.08); 
+            display:flex; 
+            flex-direction:column; 
+        }
+        .chart-container { 
+            position: relative; 
+            height: 350px; 
+            width: 100%; 
+        }
+        
+        /* --- DRAWERS --- */
+        .chartStyleDrawer, .kpiDrawer { 
+            position: fixed; 
+            top: 0; 
+            right: 0; 
+            width: 320px; 
+            height: 100%; 
+            background: white; 
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1); 
+            z-index: 1000; 
+            transform: translateX(100%); 
+            transition: 0.3s; 
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column; 
+        }
+        .chartStyleDrawer.open, .kpiDrawer.open { 
+            transform: translateX(0); 
+        }
+        .drawer-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 15px; 
+            padding-bottom: 10px; 
+            border-bottom: 1px solid #eee; 
+        }
+        .kpi-options-body, .style-options-body { 
+            flex-grow: 1; 
+            overflow-y: auto; 
+            padding-right: 5px; 
+            padding-bottom: 40px; 
+        }
+        .drawer-controls { 
+            display: flex; 
+            gap: 5px; 
+            align-items: center; 
+        }
+        .drawer-controls .action-btn { 
+            padding: 6px 10px; 
+            font-size: 13px; 
+        }
+
+        /* --- KPI OPTIONS STYLING --- */
+        .kpi-group-title { 
+            font-weight: bold; 
+            color: #2F80ED; 
+            margin-top: 15px; 
+            margin-bottom: 5px; 
+            border-bottom: 1px solid #eee; 
+            padding-bottom: 3px; 
+        }
+        .kpi-option { 
+            display: block; 
+            margin-bottom: 5px; 
+            cursor: pointer; 
+            user-select: none; 
+        }
+        .kpi-option input[type="checkbox"] { 
+            margin-right: 8px; 
+        }
+        
+        /* --- Chart Style Buttons --- */
+        .style-button { 
+            padding: 10px 12px; 
+            margin: 6px 0; 
+            background: #f5f5f5; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: 500; 
+            border: 1px solid #ddd; 
+            transition: 0.2s; 
+        }
+        .style-button:hover { 
+            background: #e9e9e9; 
+        }
+        .style-button.active { 
+            background: #8E44AD; 
+            color: white; 
+            border-color: #8E44AD; 
+        }
+        
+        /* --- TECH COLOR BUTTONS --- */
+        .tech-color-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 15px;
+        }
+        .tech-color-btn {
+            padding: 8px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            color: white;
+            text-align: center;
+        }
+        .tech-color-btn.lte { background: #27AE60; }
+        .tech-color-btn.nr { background: #D24726; }
+
+        /* --- COLOR PICKER MODAL --- */
+        .color-picker-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        .color-picker-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            text-align: center;
+        }
+        .color-picker-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .color-option {
+            width: 50px;
+            height: 50px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 0 auto;
+            border: 2px solid transparent;
+        }
+        .color-option.selected {
+            border: 2px solid #333;
+        }
+        .color-picker-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        
+        /* --- PPT EXPORT MODAL --- */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 2001;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(3px);
+        }
+        .modal-content {
+            background: white;
+            width: 95%;
+            max-width: 1400px;
+            height: 90vh;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        .modal-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .modal-body {
+            flex: 1;
+            display: flex;
+            padding: 0;
+            overflow: hidden;
+        }
+        #previewBody {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .preview-slide {
+            background: white;
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            aspect-ratio: 16/9;
+            position: relative;
+        }
+        .preview-slide-title {
+            position: absolute;
+            top: 10px;
+            left: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #D24726;
+        }
+        .preview-grid {
+            display: grid;
+            height: 100%;
+            align-items: center;
+            padding-top: 30px;
+        }
+        .preview-img-box {
+            text-align: center;
+            padding: 5px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .preview-img-box img {
+            max-width: 100%;
+            max-height: calc(100% - 20px);
+            object-fit: contain;
+            border: 1px solid #eee;
+        }
+        #previewSettingsPanel {
+            width: 250px;
+            background: #fff;
+            border-left: 1px solid #eee;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .settings-group {
+            margin-bottom: 20px;
+        }
+        .settings-group h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #555;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        .graph-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .graph-options button {
+            padding: 6px 10px;
+            font-size: 13px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .graph-options button.active {
+            background: #2F80ED;
+            color: white;
+            border-color: #2F80ED;
+        }
+        .tech-export-options {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .tech-export-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tech-export-option input {
+            margin: 0;
+        }
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+            text-align: right;
+            flex-shrink: 0;
+        }
+        
+        /* --- Combined Chart Specific Styles --- */
+        .chart-title {
+            font-size: 16px !important;
+            font-weight: bold !important;
+            margin-bottom: 5px !important;
+        }
+        .chart-subtitle {
+            font-size: 12px !important;
+            color: #666 !important;
+            margin-bottom: 15px !important;
+        }
+        .legend-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+        }
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body onload="initDashboard()">
+    <header>KPI Dashboard - 5G/4G Combined Analysis</header>
+
+    <div class="controls-container">
+        <div class="export-btn-wrapper">
+            <button class="action-btn" onclick="openPPTExport()">📊 Export PPT</button>
+        </div>
+    </div>
+
+    <div class="chart-grid" id="mainChartContainer">
+        <!-- Charts will be loaded here -->
+    </div>
+
+    <!-- Drawer Toggle Buttons -->
+    <div class="drawer-toggle-buttons">
+        <div class="chartStyleDrawerToggle" onclick="toggleChartStyleDrawer()">🎨</div>
+        <div class="kpiDrawerToggle" onclick="toggleDrawer()">⚙</div>
+    </div>
+
+    <!-- Chart Style Drawer -->
+    <div id="chartStyleDrawer" class="chartStyleDrawer">
+        <div class="drawer-header"> 
+            <h3>Chart Styles</h3> 
+            <button onclick="toggleChartStyleDrawer()" style="border:none; background:none; font-size:22px; cursor:pointer;">✕</button> 
+        </div>
+        <div class="style-options-body">
+            <div class="style-button" onclick="applyChartStyle(0)">Filled Area</div>
+            <div class="style-button" onclick="applyChartStyle(1)">Line with Dots</div>
+            <div class="style-button" onclick="applyChartStyle(2)">Smooth Line</div>
+            <div class="style-button" onclick="applyChartStyle(3)">Thick Line</div>
+            <div class="style-button" onclick="applyChartStyle(4)">Thin Line with dots</div>
+            
+            <div style="margin: 20px 0; border-top: 1px solid #eee; padding-top: 15px;">
+                <label><b>Technology Colors</b></label>
+                <div class="tech-color-buttons">
+                    <button class="tech-color-btn lte" onclick="openColorPicker('LTE')">4G (LTE) Color</button>
+                    <button class="tech-color-btn nr" onclick="openColorPicker('NR')">5G (NR) Color</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Settings Drawer -->
+    <div id="kpiDrawer" class="kpiDrawer">
+        <div class="drawer-header"> 
+            <h3 id="drawerHeaderTitle">Graph Settings</h3> 
+            <button onclick="toggleDrawer()" style="border:none; background:none; font-size:24px; cursor:pointer; color:#777;">✕</button> 
+        </div>
+        <div class="drawer-controls">
+            <button class="action-btn" onclick="selectVisibleKpis()" style="background:#5cb85c;">Select All</button>
+            <button class="action-btn" onclick="clearVisibleKpis()" style="background:#f0ad4e;">Clear All</button>
+            <button class="action-btn" onclick="applyKpis()" style="background:#2F80ED;">Apply</button>
+        </div>
+        <div class="kpi-options-body" id="kpiOptionsList">
+            <!-- KPI options will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Color Picker Modal -->
+    <div id="colorPickerModal" class="color-picker-modal">
+        <div class="color-picker-content">
+            <h3 id="colorPickerTitle">Select Color for LTE</h3>
+            <div class="color-picker-grid" id="colorPickerGrid">
+                <!-- Color options will be added here -->
+            </div>
+            <div class="color-picker-actions">
+                <button class="action-btn" onclick="closeColorPicker()" style="background:#888;">Cancel</button>
+                <button class="action-btn" onclick="applySelectedColor()" style="background:#27AE60;">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PPT Export Modal -->
+    <div id="pptModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>PPT Export Preview</span>
+                <button onclick="closePPTExport()" style="border:none; background:none; font-size:20px; cursor:pointer;">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="previewBody">
+                    <!-- Preview slides will be loaded here -->
+                </div>
+                <div id="previewSettingsPanel">
+                    <h3>Export Settings</h3>
+                    
+                    <div class="settings-group">
+                        <h4>Layout</h4>
+                        <div class="graph-options">
+                            <button onclick="updatePPTPreview(1)" data-count="1">1 Graph</button>
+                            <button onclick="updatePPTPreview(2)" data-count="2">2 Graphs</button>
+                            <button onclick="updatePPTPreview(3)" data-count="3">3 Graphs</button>
+                            <button onclick="updatePPTPreview(4)" data-count="4">4 Graphs</button>
+                            <button onclick="updatePPTPreview(6)" data-count="6">6 Graphs</button>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <h4>Export Options</h4>
+                        <div style="font-size: 12px; color: #666; margin-top: 10px;">
+                            <p>• Maintains chart colors</p>
+                            <p>• Preserves chart titles</p>
+                            <p>• Optimized for PowerPoint</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="action-btn" onclick="closePPTExport()" style="background:#888;">Cancel</button>
+                <button class="action-btn ppt-btn" onclick="downloadPPT()" style="background:#D24726;">Download PPT</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIG & STATE ---
+        let allData = [];
+        let allCharts = {};
+        let selectedGraphs = [];
+        let selectedTechForColor = '';
+        let selectedColor = '';
+        let pptLayout = 6; // Default: 6 graphs (2 per slide)
+        let dateHeaderName = 'Time';
+
+        // --- Graph Definitions ---
+        const graphDefinitions = [
+            {
+                id: 1,
+                title: "% of DL Traffic Volume 5G/4G for 200 sites",
+                datasets: [
+                    { 
+                        name: "LTE DL Data Total Volume(GB)", 
+                        type: "bar", 
+                        yAxisID: 'y', 
+                        color: "#27AE60",
+                        borderColor: "#27AE60",
+                        backgroundColor: "rgba(39, 174, 96, 0.7)"
+                    },
+                    { 
+                        name: "NR DL Traffic Volume(GB)", 
+                        type: "bar", 
+                        yAxisID: 'y', 
+                        color: "#D24726",
+                        borderColor: "#D24726",
+                        backgroundColor: "rgba(210, 71, 38, 0.7)"
+                    },
+                    { 
+                        name: "5G DL Traffic Percentage (%)", 
+                        type: "line", 
+                        yAxisID: 'y1', 
+                        color: "#8E44AD",
+                        borderColor: "#8E44AD",
+                        backgroundColor: "transparent",
+                        borderWidth: 3,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }
+                ],
+                yAxisLabel: "Traffic Volume (GB)",
+                y1AxisLabel: "Percentage (%)"
+            },
+            {
+                id: 2,
+                title: "% of UL Traffic Volume 5G/4G for 200 sites",
+                datasets: [
+                    { 
+                        name: "LTE UL Data Total Volume(GB)", 
+                        type: "bar", 
+                        yAxisID: 'y', 
+                        color: "#27AE60",
+                        borderColor: "#27AE60",
+                        backgroundColor: "rgba(39, 174, 96, 0.7)"
+                    },
+                    { 
+                        name: "NR UL Traffic Volume(GB)", 
+                        type: "bar", 
+                        yAxisID: 'y', 
+                        color: "#D24726",
+                        borderColor: "#D24726",
+                        backgroundColor: "rgba(210, 71, 38, 0.7)"
+                    },
+                    { 
+                        name: "5G UL Traffic Percentage (%)", 
+                        type: "line", 
+                        yAxisID: 'y1', 
+                        color: "#8E44AD",
+                        borderColor: "#8E44AD",
+                        backgroundColor: "transparent",
+                        borderWidth: 3,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }
+                ],
+                yAxisLabel: "Traffic Volume (GB)",
+                y1AxisLabel: "Percentage (%)"
+            },
+            {
+                id: 3,
+                title: "% of RRC User 5G/4G for 200 sites",
+                datasets: [
+                    { 
+                        name: "L.Traffic.User.Avg", 
+                        type: "bar", 
+                        yAxisID: 'y', 
+                        color: "#27AE60",
+                        borderColor: "#27AE60",
+                        backgroundColor: "rgba(39, 174, 96, 0.7)"
+                    },
+                    { 
+                        name: "NR RRC User Avg", 
+                        type: "bar", 
+                        yAxisID: 'y', 
+                        color: "#D24726",
+                        borderColor: "#D24726",
+                        backgroundColor: "rgba(210, 71, 38, 0.7)"
+                    },
+                    { 
+                        name: "5G User Percentage (%)", 
+                        type: "line", 
+                        yAxisID: 'y1', 
+                        color: "#8E44AD",
+                        borderColor: "#8E44AD",
+                        backgroundColor: "transparent",
+                        borderWidth: 3,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }
+                ],
+                yAxisLabel: "Average Users",
+                y1AxisLabel: "Percentage (%)"
+            },
+            {
+                id: 4,
+                title: "% of DL PRB Utilization 5G/4G for 200 sites",
+                datasets: [
+                    { 
+                        name: "DL PRB Utilization(%)", 
+                        type: "bar", 
+                        yAxisID: 'y', 
+                        color: "#27AE60",
+                        borderColor: "#27AE60",
+                        backgroundColor: "rgba(39, 174, 96, 0.7)"
+                    },
+                    { 
+                        name: "NR DL PRB Utilization(%)", 
+                        type: "bar", 
+                        yAxisID: 'y', 
+                        color: "#D24726",
+                        borderColor: "#D24726",
+                        backgroundColor: "rgba(210, 71, 38, 0.7)"
+                    },
+                    { 
+                        name: "5G DL PRB %", 
+                        type: "line", 
+                        yAxisID: 'y1', 
+                        color: "#8E44AD",
+                        borderColor: "#8E44AD",
+                        backgroundColor: "transparent",
+                        borderWidth: 3,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }
+                ],
+                yAxisLabel: "PRB Utilization (%)",
+                y1AxisLabel: "Percentage (%)"
+            },
+            {
+                id: 5,
+                title: "DL User Throughput Comparison 5G/4G for 200 sites",
+                datasets: [
+                    { 
+                        name: "LTE DL Avg Throughput per User (Mbps)", 
+                        type: "bar", 
+                        yAxisID: 'y', 
+                        color: "#27AE60",
+                        borderColor: "#27AE60",
+                        backgroundColor: "rgba(39, 174, 96, 0.7)"
+                    },
+                    { 
+                        name: "NR DL User Throughput (Rmv LastTTI)", 
+                        type: "bar", 
+                        yAxisID: 'y', 
+                        color: "#D24726",
+                        borderColor: "#D24726",
+                        backgroundColor: "rgba(210, 71, 38, 0.7)"
+                    }
+                ],
+                yAxisLabel: "Throughput (Mbps)",
+                y1AxisLabel: null
+            },
+            {
+                id: 6,
+                title: "UL User Throughput Comparison 5G/4G for 200 sites",
+                datasets: [
+                    { 
+                        name: "LTE UL Avg Throughput per User (Mbps)", 
+                        type: "bar", 
+                        yAxisID: 'y', 
+                        color: "#27AE60",
+                        borderColor: "#27AE60",
+                        backgroundColor: "rgba(39, 174, 96, 0.7)"
+                    },
+                    { 
+                        name: "NR UL User Throughput", 
+                        type: "bar", 
+                        yAxisID: 'y', 
+                        color: "#D24726",
+                        borderColor: "#D24726",
+                        backgroundColor: "rgba(210, 71, 38, 0.7)"
+                    }
+                ],
+                yAxisLabel: "Throughput (Mbps)",
+                y1AxisLabel: null
+            }
+        ];
+
+        // --- Sample Data URL (Replace with your actual data source) ---
+        const dataUrl = "https://docs.google.com/spreadsheets/d/e/YOUR_SHEET_ID/pub?gid=0&single=true&output=csv";
+
+        // --- Color Palette Options ---
+        const colorPalette = [
+            "#27AE60", "#D24726", "#8E44AD", "#2F80ED",
+            "#3498DB", "#2ECC71", "#E74C3C", "#9B59B6",
+            "#1ABC9C", "#F39C12", "#34495E", "#95A5A6",
+            "#2980B9", "#16A085", "#C0392B", "#8E44AD"
+        ];
+
+        // --- Tech Colors ---
+        let techColors = {
+            LTE: "#27AE60",
+            NR: "#D24726",
+            PERCENTAGE: "#8E44AD"
+        };
+
+        // --- ACTION BUTTON STYLING ---
+        const actionBtnStyle = `
+            .action-btn { 
+                padding: 8px 16px; 
+                cursor: pointer; 
+                border: none; 
+                background: #2F80ED; 
+                color: white; 
+                border-radius: 6px; 
+                font-weight: 600; 
+                transition: 0.2s; 
+            }
+            .action-btn:hover { 
+                background: #1f5ab5; 
+            }
+            .ppt-btn {
+                background: #D24726 !important;
+            }
+            .ppt-btn:hover {
+                background: #a8381e !important;
+            }
+        `;
+        
+        const style = document.createElement('style');
+        style.textContent = actionBtnStyle;
+        document.head.appendChild(style);
+
+        // --- INITIALIZATION ---
+        function initDashboard() {
+            selectedGraphs = graphDefinitions.map(g => g.id);
+            fetchData();
+        }
+
+        // --- DATA FETCHING ---
+        async function fetchData() {
+            document.getElementById("mainChartContainer").innerHTML = "<h2 style='text-align:center;padding:40px;color:#666;'>Loading data...</h2>";
+            allData = [];
+            
+            try {
+                // For demo purposes, generate sample data
+                // In production, replace this with actual data fetch
+                generateSampleData();
+                
+                renderCharts();
+                
+            } catch(e) {
+                console.error("Data loading error:", e);
+                document.getElementById("mainChartContainer").innerHTML = 
+                    "<h2 style='text-align:center;padding:40px;color:#D24726;'>Failed to load data. Check console for details.</h2>";
+            }
+        }
+
+        // --- SAMPLE DATA GENERATION ---
+        function generateSampleData() {
+            allData = [];
+            const days = 7;
+            const sites = 200;
+            
+            for (let i = 0; i < days * 24; i++) {
+                const date = new Date(2026, 0, 1 + Math.floor(i/24), i % 24);
+                const timeStr = `${(date.getMonth()+1).toString().padStart(2,'0')}/${date.getDate().toString().padStart(2,'0')}/${date.getFullYear()} ${date.getHours().toString().padStart(2,'0')}:00:00`;
+                
+                const dataPoint = {
+                    Time: timeStr,
+                    // 4G LTE Metrics
+                    "L.Traffic.User.Max": Math.random() * 1000 + 500,
+                    "L.Traffic.User.Avg": Math.random() * 800 + 200,
+                    "LTE DL Data Total Volume(GB)": Math.random() * 5000 + 1000,
+                    "LTE UL Data Total Volume(GB)": Math.random() * 1000 + 200,
+                    "LTE DL Avg Throughput per User (Mbps)": Math.random() * 50 + 10,
+                    "LTE UL Avg Throughput per User (Mbps)": Math.random() * 20 + 5,
+                    "DL PRB Utilization(%)": Math.random() * 50 + 30,
+                    "UL PRB Utilization(%)": Math.random() * 40 + 20,
+                    
+                    // 5G NR Metrics
+                    "NR RRC User Avg": Math.random() * 300 + 100,
+                    "NR DL Traffic Volume (GB)": Math.random() * 3000 + 500,
+                    "NR UL Traffic Volume (GB)": Math.random() * 600 + 100,
+                    "NR DL User Throughput (Rmv LastTTI)": Math.random() * 200 + 50,
+                    "NR UL User Throughput": Math.random() * 100 + 20,
+                    "NR DL PRB Utilization": Math.random() * 40 + 20,
+                    "NR UL PRB Utilization": Math.random() * 30 + 10,
+                    
+                    // 5G Percentages
+                    "5G User Percentage (%)": Math.random() * 40 + 20,
+                    "5G DL Traffic Percentage (%)": Math.random() * 50 + 30,
+                    "5G UL Traffic Percentage (%)": Math.random() * 40 + 20,
+                    "5G DL User Experience %": Math.random() * 30 + 60,
+                    "5G UL User Experience %": Math.random() * 30 + 60,
+                    "5G DL PRB %": Math.random() * 60 + 30,
+                    "5G UL PRB %": Math.random() * 50 + 30
+                };
+                
+                allData.push(dataPoint);
+            }
+        }
+
+        // --- CHART RENDERING ---
+        function renderCharts() {
+            const container = document.getElementById("mainChartContainer");
+            container.innerHTML = "";
+            allCharts = {};
+            
+            if (allData.length === 0) {
+                container.innerHTML = "<h2 style='text-align:center;padding:40px;color:#666;'>No data available.</h2>";
+                return;
+            }
+
+            // Extract timeline
+            const timeline = [...new Set(allData.map(d => d.Time))];
+            timeline.sort((a,b) => {
+                const dateA = parseDateString(a);
+                const dateB = parseDateString(b);
+                return dateA - dateB;
+            });
+
+            // Format timeline labels
+            const timelineLabels = timeline.map(time => {
+                const date = parseDateString(time);
+                const hours = date.getHours();
+                const day = date.getDate();
+                const month = date.getMonth() + 1;
+                return `${month}/${day} ${hours}:00`;
+            });
+
+            // Render selected graphs
+            graphDefinitions
+                .filter(g => selectedGraphs.includes(g.id))
+                .forEach((graphDef, idx) => {
+                    createCombinedChart(container, graphDef, timeline, timelineLabels, idx);
+                });
+        }
+
+        function parseDateString(dateStr) {
+            // Parse format: "01/01/2026 00:00:00"
+            const [datePart, timePart] = dateStr.split(' ');
+            const [month, day, year] = datePart.split('/').map(Number);
+            const [hours, minutes, seconds] = timePart.split(':').map(Number);
+            return new Date(year, month - 1, day, hours, minutes, seconds);
+        }
+
+        function createCombinedChart(container, graphDef, timeline, timelineLabels, chartIndex) {
+            const card = document.createElement("div");
+            card.className = "chart-card";
+            
+            const title = document.createElement("div");
+            title.className = "chart-title";
+            title.textContent = graphDef.title;
+            title.style.fontSize = "16px";
+            title.style.fontWeight = "bold";
+            title.style.marginBottom = "10px";
+            title.style.color = "#333";
+            card.appendChild(title);
+            
+            const wrapper = document.createElement("div");
+            wrapper.className = "chart-container";
+            const canvas = document.createElement("canvas");
+            canvas.id = `chart_${chartIndex}`;
+            wrapper.appendChild(canvas);
+            card.appendChild(wrapper);
+            
+            // Create legend
+            const legendContainer = document.createElement("div");
+            legendContainer.className = "legend-container";
+            graphDef.datasets.forEach(dataset => {
+                const legendItem = document.createElement("div");
+                legendItem.className = "legend-item";
+                
+                const colorBox = document.createElement("div");
+                colorBox.className = "legend-color";
+                colorBox.style.backgroundColor = dataset.color;
+                
+                const text = document.createElement("span");
+                text.textContent = dataset.name;
+                text.style.fontSize = "12px";
+                
+                legendItem.appendChild(colorBox);
+                legendItem.appendChild(text);
+                legendContainer.appendChild(legendItem);
+            });
+            card.appendChild(legendContainer);
+            
+            container.appendChild(card);
+            
+            // Prepare data for chart
+            const datasets = graphDef.datasets.map(dataset => {
+                const data = timeline.map(time => {
+                    const dataPoint = allData.find(d => d.Time === time);
+                    return dataPoint ? dataPoint[dataset.name] : null;
+                });
+                
+                const baseConfig = {
+                    label: dataset.name,
+                    data: data,
+                    borderColor: dataset.borderColor,
+                    backgroundColor: dataset.backgroundColor,
+                    borderWidth: dataset.borderWidth || 2,
+                    pointRadius: dataset.pointRadius || 4,
+                    tension: dataset.tension || 0,
+                    fill: dataset.backgroundColor !== "transparent",
+                    yAxisID: dataset.yAxisID
+                };
+                
+                if (dataset.type === "bar") {
+                    return {
+                        ...baseConfig,
+                        type: 'bar',
+                        barPercentage: 0.6,
+                        categoryPercentage: 0.8
+                    };
+                } else {
+                    return {
+                        ...baseConfig,
+                        type: 'line'
+                    };
+                }
+            });
+            
+            // Chart configuration
+            const config = {
+                type: 'bar', // Base type
+                data: {
+                    labels: timelineLabels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45,
+                                font: {
+                                    size: 10
+                                }
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: graphDef.yAxisLabel,
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        y1: graphDef.y1AxisLabel ? {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: graphDef.y1AxisLabel,
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                }
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                            min: 0,
+                            max: 100
+                        } : undefined
+                    }
+                }
+            };
+            
+            // Create chart
+            try {
+                allCharts[graphDef.id] = new Chart(canvas, config);
+            } catch (e) {
+                console.error(`Error creating chart for ${graphDef.title}:`, e);
+                const errorMsg = document.createElement("div");
+                errorMsg.style.textAlign = "center";
+                errorMsg.style.padding = "20px";
+                errorMsg.style.color = "#D24726";
+                errorMsg.textContent = "Error creating chart";
+                card.appendChild(errorMsg);
+            }
+        }
+        
+        // --- KPI DRAWER FUNCTIONS ---
+        function toggleDrawer(){
+            const d = document.getElementById("kpiDrawer");
+            d.classList.toggle("open");
+            if(d.classList.contains("open")) populateGraphOptions();
+        }
+
+        function populateGraphOptions(){
+            const list = document.getElementById("kpiOptionsList");
+            list.innerHTML = "";
+            
+            graphDefinitions.forEach(graphDef => {
+                const checked = selectedGraphs.includes(graphDef.id) ? "checked" : "";
+                const d = document.createElement("label");
+                d.className = "kpi-option";
+                d.innerHTML = `<input type='checkbox' value='${graphDef.id}' class='graph-chk' ${checked}> ${graphDef.title}`;
+                d.onclick = (e) => {
+                    const chk = d.querySelector("input");
+                    if (e.target.tagName !== "INPUT") {
+                        chk.checked = !chk.checked;
+                    }
+                };
+                list.appendChild(d);
+            });
+        }
+        
+        function applyKpis() {
+            const list = document.getElementById("kpiOptionsList");
+            selectedGraphs = Array.from(list.querySelectorAll(".graph-chk:checked")).map(c => parseInt(c.value));
+            document.getElementById("kpiDrawer").classList.remove("open");
+            
+            renderCharts();
+        }
+
+        function selectVisibleKpis() {
+            selectedGraphs = graphDefinitions.map(g => g.id);
+            populateGraphOptions();
+        }
+        
+        function clearVisibleKpis() {
+            selectedGraphs = [];
+            populateGraphOptions();
+        }
+
+        // --- CHART STYLING FUNCTIONS ---
+        function toggleChartStyleDrawer(){
+            const d = document.getElementById("chartStyleDrawer");
+            d.classList.toggle("open");
+        }
+
+        function applyChartStyle(styleIndex){
+            // For combined charts, we might want to apply different styles
+            // Currently using predefined styles in graphDefinitions
+            document.querySelectorAll('.style-button').forEach((btn, idx) => {
+                if (idx === styleIndex) { 
+                    btn.classList.add('active'); 
+                } else { 
+                    btn.classList.remove('active'); 
+                }
+            });
+            
+            updateTechColorButtons();
+            
+            // Optional: Apply style to charts
+            // renderCharts();
+        }
+
+        function updateTechColorButtons() {
+            const lteBtn = document.querySelector('.tech-color-btn.lte');
+            const nrBtn = document.querySelector('.tech-color-btn.nr');
+            
+            if (lteBtn) lteBtn.style.background = techColors.LTE;
+            if (nrBtn) nrBtn.style.background = techColors.NR;
+        }
+
+        // --- COLOR PICKER FUNCTIONS ---
+        function openColorPicker(tech) {
+            selectedTechForColor = tech;
+            selectedColor = techColors[tech];
+            document.getElementById('colorPickerTitle').textContent = `Select Color for ${tech}`;
+            
+            const colorGrid = document.getElementById('colorPickerGrid');
+            colorGrid.innerHTML = '';
+            
+            colorPalette.forEach(color => {
+                const colorOption = document.createElement('div');
+                colorOption.className = 'color-option';
+                colorOption.style.backgroundColor = color;
+                colorOption.dataset.color = color;
+                
+                if (color === selectedColor) {
+                    colorOption.classList.add('selected');
+                }
+                
+                colorOption.onclick = () => {
+                    document.querySelectorAll('.color-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    colorOption.classList.add('selected');
+                    selectedColor = color;
+                };
+                
+                colorGrid.appendChild(colorOption);
+            });
+            
+            document.getElementById('colorPickerModal').style.display = 'flex';
+        }
+
+        function closeColorPicker() {
+            document.getElementById('colorPickerModal').style.display = 'none';
+        }
+
+        function applySelectedColor() {
+            if (selectedTechForColor && selectedColor) {
+                techColors[selectedTechForColor] = selectedColor;
+                
+                // Update graph definitions
+                graphDefinitions.forEach(graph => {
+                    graph.datasets.forEach(dataset => {
+                        if (dataset.name.includes('LTE') || dataset.name.includes('L.')) {
+                            if (selectedTechForColor === 'LTE') {
+                                dataset.color = selectedColor;
+                                dataset.borderColor = selectedColor;
+                                dataset.backgroundColor = selectedColor.replace(')', ', 0.7)').replace('rgb', 'rgba');
+                            }
+                        } else if (dataset.name.includes('NR') || dataset.name.includes('5G')) {
+                            if (selectedTechForColor === 'NR') {
+                                if (dataset.name.includes('5G') && dataset.name.includes('%')) {
+                                    // Don't change percentage line color
+                                    return;
+                                }
+                                dataset.color = selectedColor;
+                                dataset.borderColor = selectedColor;
+                                dataset.backgroundColor = selectedColor.replace(')', ', 0.7)').replace('rgb', 'rgba');
+                            }
+                        }
+                    });
+                });
+                
+                updateTechColorButtons();
+                renderCharts();
+                closeColorPicker();
+            }
+        }
+
+        // --- PPT EXPORT FUNCTIONS ---
+        function openPPTExport() {
+            const charts = document.querySelectorAll("canvas");
+            if (charts.length === 0) {
+                alert("No charts to export. Please select some graphs first.");
+                return;
+            }
+            
+            document.querySelectorAll('.graph-options button').forEach(btn => {
+                if (parseInt(btn.dataset.count) === pptLayout) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            updatePPTPreview(pptLayout);
+            document.getElementById('pptModal').style.display = 'flex';
+        }
+
+        function closePPTExport() {
+            document.getElementById('pptModal').style.display = 'none';
+        }
+
+        function updatePPTPreview(layoutCount) {
+            pptLayout = layoutCount;
+            
+            document.querySelectorAll('.graph-options button').forEach(btn => {
+                if (parseInt(btn.dataset.count) === layoutCount) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            // Get all charts
+            const allChartsForExport = [];
+            const chartElements = document.querySelectorAll("canvas");
+            
+            chartElements.forEach((canvas, index) => {
+                const chart = Chart.getChart(canvas.id);
+                if (chart) {
+                    // Get title from parent
+                    const title = canvas.parentElement.parentElement.querySelector('.chart-title').textContent;
+                    allChartsForExport.push({
+                        canvas: canvas,
+                        chart: chart,
+                        title: title
+                    });
+                }
+            });
+            
+            if (allChartsForExport.length === 0) {
+                document.getElementById('previewBody').innerHTML = 
+                    '<div style="text-align:center;padding:40px;color:#666;">No charts selected for export.</div>';
+                return;
+            }
+            
+            const previewBody = document.getElementById('previewBody');
+            previewBody.innerHTML = '';
+            
+            // Calculate grid layout based on selected layout
+            const layout = getLayoutConfig(layoutCount);
+            const gridTemplateCols = `repeat(${layout.cols}, 1fr)`;
+            const gridTemplateRows = `repeat(${layout.rows}, 1fr)`;
+            
+            for (let i = 0; i < allChartsForExport.length; i += layoutCount) {
+                const slideDiv = document.createElement('div');
+                slideDiv.className = 'preview-slide';
+                
+                const slideTitle = document.createElement('div');
+                slideTitle.className = 'preview-slide-title';
+                slideTitle.textContent = `Slide ${Math.floor(i/layoutCount) + 1}`;
+                slideDiv.appendChild(slideTitle);
+                
+                const grid = document.createElement('div');
+                grid.className = 'preview-grid';
+                grid.style.display = 'grid';
+                grid.style.gridTemplateColumns = gridTemplateCols;
+                grid.style.gridTemplateRows = gridTemplateRows;
+                grid.style.gap = '10px';
+                grid.style.height = '100%';
+                grid.style.paddingTop = '30px';
+                grid.style.alignContent = 'start';
+                
+                // Fill the grid
+                for (let j = 0; j < layoutCount; j++) {
+                    const cellIndex = i + j;
+                    if (cellIndex < allChartsForExport.length) {
+                        const chartData = allChartsForExport[cellIndex];
+                        const box = createPreviewBox(chartData.canvas, chartData.title);
+                        grid.appendChild(box);
+                    } else {
+                        // Empty cell
+                        const emptyBox = document.createElement('div');
+                        emptyBox.className = 'preview-img-box';
+                        emptyBox.style.border = '1px dashed #eee';
+                        emptyBox.style.background = '#f9f9f9';
+                        emptyBox.innerHTML = '<div style="color:#999;font-size:12px;"></div>';
+                        grid.appendChild(emptyBox);
+                    }
+                }
+                
+                slideDiv.appendChild(grid);
+                previewBody.appendChild(slideDiv);
+            }
+        }
+
+        function getLayoutConfig(count) {
+            let rows, cols;
+            switch(parseInt(count)) {
+                case 1: rows = 1; cols = 1; break;
+                case 2: rows = 1; cols = 2; break;
+                case 3: rows = 2; cols = 2; break;
+                case 4: rows = 2; cols = 2; break;
+                case 6: rows = 2; cols = 3; break;
+                default: rows = 2; cols = 3;
+            }
+            return { rows, cols };
+        }
+
+        function createPreviewBox(canvas, title) {
+            const box = document.createElement('div');
+            box.className = 'preview-img-box';
+            
+            try {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(canvas, 0, 0);
+                const imgData = tempCanvas.toDataURL("image/png");
+                
+                const img = document.createElement('img');
+                img.src = imgData;
+                img.style.maxHeight = '100%';
+                img.style.maxWidth = '100%';
+                img.style.objectFit = 'contain';
+                
+                const titleLabel = document.createElement('div');
+                titleLabel.textContent = title.length > 50 ? title.substring(0, 50) + '...' : title;
+                titleLabel.style.fontSize = '12px';
+                titleLabel.style.color = '#666';
+                titleLabel.style.marginTop = '5px';
+                titleLabel.style.textAlign = 'center';
+                
+                box.appendChild(img);
+                box.appendChild(titleLabel);
+            } catch (e) {
+                box.innerHTML = '<div style="color:#D24726;font-size:12px;">Preview Error</div>';
+            }
+            
+            return box;
+        }
+
+        async function downloadPPT() {
+            const pptx = new PptxGenJS();
+            pptx.layout = 'LAYOUT_16x9';
+            
+            // Title slide
+            const titleSlide = pptx.addSlide();
+            titleSlide.addText('5G/4G Combined KPI Dashboard Report', {
+                x: 0.5, y: 1, w: 9, h: 1,
+                fontSize: 36, bold: true, color: '2F80ED'
+            });
+            
+            const date = new Date().toLocaleDateString();
+            titleSlide.addText(`Generated: ${date}`, {
+                x: 0.5, y: 2, w: 9, h: 0.5,
+                fontSize: 16, color: '666666'
+            });
+            
+            titleSlide.addText(`Analysis for 200 Sites`, {
+                x: 0.5, y: 2.5, w: 9, h: 0.5,
+                fontSize: 14, color: '666666'
+            });
+            
+            // Get all charts
+            const allChartsForExport = [];
+            const chartElements = document.querySelectorAll("canvas");
+            
+            chartElements.forEach((canvas, index) => {
+                const chart = Chart.getChart(canvas.id);
+                if (chart) {
+                    const title = canvas.parentElement.parentElement.querySelector('.chart-title').textContent;
+                    allChartsForExport.push({
+                        canvas: canvas,
+                        chart: chart,
+                        title: title
+                    });
+                }
+            });
+            
+            if (allChartsForExport.length === 0) {
+                alert("No charts selected for export.");
+                return;
+            }
+            
+            // PPT layout calculations
+            const layout = getLayoutConfig(pptLayout);
+            const slideWidth = 10.0;
+            const slideHeight = 5.625;
+            const marginX = 0.5;
+            const marginTop = 0.8;
+            const marginBottom = 0.5;
+            const gap = 0.2;
+            
+            const usableW = slideWidth - (marginX * 2);
+            const usableH = slideHeight - marginTop - marginBottom;
+            const chartW = (usableW - ((layout.cols - 1) * gap)) / layout.cols;
+            const chartH = (usableH - ((layout.rows - 1) * gap)) / layout.rows;
+            
+            // Add chart slides
+            for (let i = 0; i < allChartsForExport.length; i += pptLayout) {
+                const slide = pptx.addSlide();
+                
+                // Add slide number
+                slide.addText(`Slide ${Math.floor(i/pptLayout) + 1}`, {
+                    x: 9.0, y: 0.1, w: 1, h: 0.3,
+                    fontSize: 10, color: '999999'
+                });
+                
+                for (let j = 0; j < pptLayout; j++) {
+                    const chartIndex = i + j;
+                    if (chartIndex < allChartsForExport.length) {
+                        const chartData = allChartsForExport[chartIndex];
+                        const rowIndex = Math.floor(j / layout.cols);
+                        const colIndex = j % layout.cols;
+                        
+                        const xPos = marginX + (colIndex * (chartW + gap));
+                        const yPos = marginTop + (rowIndex * (chartH + gap));
+                        
+                        try {
+                            slide.addImage({
+                                data: chartData.canvas.toDataURL("image/png"),
+                                x: xPos,
+                                y: yPos,
+                                w: chartW,
+                                h: chartH
+                            });
+                            
+                            // Add chart title
+                            const shortTitle = chartData.title.length > 40 ? 
+                                chartData.title.substring(0, 40) + '...' : chartData.title;
+                            slide.addText(shortTitle, {
+                                x: xPos,
+                                y: yPos - 0.25,
+                                w: chartW,
+                                h: 0.25,
+                                fontSize: 7,
+                                bold: true,
+                                color: '333333'
+                            });
+                        } catch (e) {
+                            console.error(`Error adding chart to PPT:`, e);
+                        }
+                    }
+                }
+            }
+            
+            // Summary slide
+            const summarySlide = pptx.addSlide();
+            summarySlide.addText('Summary', {
+                x: 0.5, y: 0.5, w: 9, h: 0.5,
+                fontSize: 28, bold: true, color: '2F80ED'
+            });
+            
+            let summaryText = `Total Charts: ${allChartsForExport.length}\n`;
+            summaryText += `Layout: ${layout.rows}x${layout.cols} (${pptLayout} per slide)\n`;
+            summaryText += `Total Slides: ${Math.ceil(allChartsForExport.length / pptLayout) + 2}\n`;
+            summaryText += `Analysis Period: 7 days of data\n`;
+            summaryText += `Number of Sites: 200\n\n`;
+            
+            // List all graphs
+            summaryText += "Graphs Included:\n";
+            allChartsForExport.forEach((chart, idx) => {
+                summaryText += `${idx + 1}. ${chart.title}\n`;
+            });
+            
+            summarySlide.addText(summaryText, {
+                x: 0.5, y: 1.5, w: 9, h: 3,
+                fontSize: 14, color: '333333'
+            });
+            
+            // Download
+            const timestamp = new Date().getTime();
+            try {
+                await pptx.writeFile({ fileName: `5G_4G_Combined_KPI_Report_${timestamp}.pptx` });
+                closePPTExport();
+            } catch (e) {
+                alert("Error generating PPT: " + e.message);
+            }
+        }
+    </script>
+</body>
+</html>
