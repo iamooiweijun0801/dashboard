@@ -18,7 +18,7 @@ body {
 }
 
 header {
-    background: #F37021; /* Cellcard Orange */
+    background: #FFA500; /* Custom Orange */
     color: #fff;
     padding: 20px 0;
     font-size: 26px;
@@ -65,14 +65,14 @@ header {
 }
 
 .card h3 {
-    margin: 0 0 15px 0;
+    margin: 0 0 10px 0;
     font-size: 18px;
     font-weight: 600;
-    color: #004C97; /* Darker Blue */
+    color: #004C97; 
     text-align: center; 
 }
 
-canvas { height: 320px !important; }
+canvas { height: 340px !important; }
 
 /* Modal Styles */
 #previewModal {
@@ -86,7 +86,7 @@ canvas { height: 320px !important; }
     background: #fff;
     margin: 2% auto;
     padding: 20px;
-    width: 70%;
+    width: 75%;
     border-radius: 10px;
     text-align: center;
 }
@@ -102,7 +102,7 @@ canvas { height: 320px !important; }
 <body>
 
 <header>
-    📊 4G–5G KPI Comparison Dashboard
+    📊 Cellcard 4G–5G KPI Comparison Dashboard
     <div class="btn-container">
         <button class="export-btn" onclick="takeScreenshot()">Export Dashboard</button>
     </div>
@@ -122,11 +122,11 @@ canvas { height: 320px !important; }
 <div id="previewModal">
     <div class="modal-content">
         <span class="close-modal" onclick="closeModal()">&times;</span>
-        <h3>Export Preview (Full Dashboard)</h3>
+        <h3>Export Preview (2x3 Grid)</h3>
         <img id="previewImg" src="">
         <div class="dl-group">
             <button class="action-btn" style="background:#004C97" onclick="downloadPNG()">Save as PNG</button>
-            <button class="action-btn" style="background:#F37021" onclick="downloadPPT()">Save as PPTX</button>
+            <button class="action-btn" style="background:#FFA500" onclick="downloadPPT()">Save as PPTX</button>
         </div>
     </div>
 </div>
@@ -135,7 +135,7 @@ canvas { height: 320px !important; }
 Chart.register(ChartDataLabels);
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
 
-const CC_ORANGE = "#F37021";
+const CC_ORANGE = "#FFA500";
 const CC_BLUE = "#004C97";
 const CC_RED = "#e15759";
 
@@ -165,14 +165,21 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
     const rightRange = paddedRange(ln, 0.1);
     new Chart(document.getElementById(id),{
         data:{labels, datasets:[
-            {type:"bar", label:l1, data:b1, backgroundColor: CC_BLUE, datalabels: {display: false}},
-            {type:"bar", label:l2, data:b2, backgroundColor: CC_ORANGE, datalabels: {display: false}},
-            {type:"line", label:ll, data:ln, yAxisID:"y1", borderColor: CC_RED, backgroundColor: CC_RED, tension:0.35, pointRadius:5, borderWidth:3,
-             datalabels: { display: true, align: 'top', color: CC_RED, formatter: v => v.toFixed(1) + '%', font: { size: 10, weight: 'bold' } }}
+            {type:"bar", label:l1, data:b1, backgroundColor: CC_BLUE, order: 2, datalabels: {display: false}},
+            {type:"bar", label:l2, data:b2, backgroundColor: CC_ORANGE, order: 2, datalabels: {display: false}},
+            {type:"line", label:ll, data:ln, yAxisID:"y1", borderColor: CC_RED, backgroundColor: CC_RED, tension: 0.35, pointRadius: 3, borderWidth: 2, order: 1,
+             datalabels: { display: true, align: 'top', color: CC_RED, formatter: v => v.toFixed(1) + '%', font: { size: 9, weight: 'bold' } }}
         ]},
         options: { 
             responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:true },
-            scales: { y:{beginAtZero: false}, y1:{position:"right", min:0, suggestedMax:rightRange.max, grid:{drawOnChartArea:false}} }
+            plugins: { 
+                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
+                datalabels: { clip: false }
+            },
+            scales: { 
+                y: { beginAtZero: false, title: { display: true, text: "Value" } }, 
+                y1: { position: "right", min: 0, suggestedMax: rightRange.max, grid: { drawOnChartArea: false }, ticks: { callback: v => v + "%" } } 
+            }
         }
     });
 }
@@ -180,11 +187,17 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
 function barOnly(id, labels, b1, b2, l1, l2){
     new Chart(document.getElementById(id),{
         type:"bar",
-        data:{labels,datasets:[
+        data:{labels, datasets:[
             {label:l1, data:b1, backgroundColor: CC_BLUE, datalabels: {display: false}},
             {label:l2, data:b2, backgroundColor: CC_ORANGE, datalabels: {display: false}}
         ]},
-        options: { responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:true }, scales: { y:{beginAtZero: false} } }
+        options: { 
+            responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:true },
+            plugins: { 
+                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } 
+            },
+            scales: { y: { beginAtZero: false, title: { display: true, text: "Mbps" } } } 
+        }
     });
 }
 
@@ -193,7 +206,7 @@ let screenshotData = "";
 
 function takeScreenshot() {
     const area = document.getElementById('capture-area');
-    html2canvas(area, { scale: 2, useCORS: true }).then(canvas => {
+    html2canvas(area, { scale: 2, useCORS: true, backgroundColor: "#eef2f7" }).then(canvas => {
         screenshotData = canvas.toDataURL("image/png");
         document.getElementById('previewImg').src = screenshotData;
         document.getElementById('previewModal').style.display = 'block';
@@ -205,8 +218,8 @@ function downloadPNG() { const link = document.createElement('a'); link.download
 function downloadPPT() {
     let pptx = new PptxGenJS();
     let slide = pptx.addSlide();
-    slide.addText("4G-5G KPI Comparison Dashboard", { x:0.5, y:0.3, fontSize:18, color: '004C97', bold:true });
-    slide.addImage({ data: screenshotData, x:0.2, y:0.8, w:9.6, h:4.8 });
+    slide.addText("Cellcard 4G-5G KPI Dashboard", { x:0.5, y:0.2, fontSize:18, color: '004C97', bold:true });
+    slide.addImage({ data: screenshotData, x:0.2, y:0.7, w:9.6, h:4.8 });
     pptx.writeFile({ fileName: "Cellcard_KPI_Report.pptx" });
 }
 </script>
