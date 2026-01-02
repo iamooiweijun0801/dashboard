@@ -3,19 +3,68 @@
 <head>
 <meta charset="UTF-8">
 <title>4G–5G KPI Dashboard</title>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
 <style>
-body { margin:0; font-family:"Segoe UI", Roboto, Arial, sans-serif; background:#eef2f7; }
-header { background:#0a2540; color:#fff; padding:25px 0; font-size:26px; font-weight:700; text-align:center; box-shadow:0 4px 10px rgba(0,0,0,0.15); }
-.container { padding:30px 50px; display:grid; grid-template-columns:repeat(2,1fr); gap:30px; }
-.card { background:#fff; border-radius:16px; padding:25px 20px 30px 20px; box-shadow:0 12px 25px rgba(0,0,0,0.07); transition: transform 0.2s, box-shadow 0.2s; position:relative; }
-.card:hover { transform: translateY(-3px); box-shadow: 0 16px 35px rgba(0,0,0,0.12); }
-.card h3 { margin:0 0 18px 0; font-size:18px; font-weight:600; color:#0a2540; text-align:center; }
-canvas { height:350px !important; }
-@media (max-width:1200px){ .container { grid-template-columns:1fr; } }
+body {
+    margin: 0;
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    background: #eef2f7;
+}
+
+header {
+    background: #0a2540;
+    color: #fff;
+    padding: 25px 0;
+    font-size: 26px;
+    font-weight: 700;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+.container {
+    padding: 30px 50px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 30px;
+}
+
+.card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 25px 20px 30px 20px;
+    box-shadow: 0 12px 25px rgba(0,0,0,0.07);
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 35px rgba(0,0,0,0.12);
+}
+
+.card h3 {
+    margin: 0 0 18px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #0a2540;
+    text-align: center; /* center the chart title */
+}
+
+canvas {
+    height: 350px !important;
+}
+
+@media (max-width: 1200px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 </head>
+
 <body>
 
 <header>📊 4G–5G Combined Performance Dashboard (200 Sites)</header>
@@ -30,119 +79,145 @@ canvas { height:350px !important; }
 </div>
 
 <script>
-const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
+const SHEET_URL =
+"https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
 
-let charts = {};
-let lastDataJSON = "";
-
-function num(v){ if(!v) return null; return parseFloat(v); }
-function percent(v){ if(!v) return null; return parseFloat(v.toString().replace("%","")); }
-
-// Compute step dynamically
-function computeStep(max){
-    if(max<=1) return 1;
-    if(max<=2) return 2;
-    if(max<=5) return 5;
-    if(max<=10) return 10;
-    let exp = Math.pow(10, Math.floor(Math.log10(max)));
-    let factor = max/exp;
-    if(factor<=1) return exp;
-    if(factor<=2) return 2*exp;
-    if(factor<=5) return 5*exp;
-    return 10*exp;
+/* ---------- Helpers ---------- */
+function num(v) { if (!v) return null; return parseFloat(v); }
+function percent(v) { if (!v) return null; return parseFloat(v.toString().replace("%","")); }
+function paddedRange(values, pad=0.1){ 
+    const clean = values.filter(v=>v!==null && !isNaN(v));
+    const min = Math.min(...clean);
+    const max = Math.max(...clean);
+    const range = max-min || max || 1;
+    return {min: min-range*pad, max: max+range*pad};
 }
 
-// Compute Ymax with "absolute <1" rule
-function niceYMax(maxValue){
-    if(maxValue==0) return 5;
-    const step = computeStep(maxValue);
-    let yMax = Math.ceil(maxValue/step)*step;
-    if((yMax - maxValue) < 1) yMax += step; // <1 absolute difference
-    return yMax;
-}
+/* ---------- 5G % Progressive animation ---------- */
+const progressiveAnimation = {
+    x: {
+        type: 'number',
+        easing: 'linear',
+        duration: 1200,
+        from: NaN,
+        delay(ctx){
+            if(ctx.type!=='data'||ctx.xStarted) return 0;
+            ctx.xStarted = true;
+            return ctx.dataset.type==='line'? ctx.index*60 : 0; // Only 5G % line
+        }
+    }
+};
 
-// Animation
-const progressiveAnimation = {x:{type:'number', easing:'linear', duration:1200, from:NaN, delay(ctx){if(ctx.type!=='data'||ctx.xStarted) return 0; ctx.xStarted=true; return ctx.index*50;}}}
+/* ---------- Load CSV ---------- */
+Papa.parse(SHEET_URL,{
+    download:true,
+    header:true,
+    complete: res=>{
+        const d = res.data.filter(r=>r.Time);
+        const t = d.map(r=>r.Time);
 
-// Load & render
-function loadAndRender(){
-    Papa.parse(SHEET_URL,{download:true, header:true, complete: res=>{
-        const d=res.data.filter(r=>r.Time);
-        const jsonData = JSON.stringify(d);
-        if(jsonData===lastDataJSON) return;
-        lastDataJSON = jsonData;
-
-        const t=d.map(r=>r.Time);
-
-        renderBarLine("dlTraffic", t,
+        barLine("dlTraffic", t,
             d.map(r=>num(r["LTE DL Data Total Volume(GB)"])),
             d.map(r=>num(r["NR DL Traffic Volume (GB)"])),
             d.map(r=>percent(r["5G DL Traffic Percentage (%)"])),
-            "LTE DL (GB)","NR DL (GB)","5G DL %");
+            "LTE DL (GB)", "NR DL (GB)", "5G DL %");
 
-        renderBarLine("ulTraffic", t,
+        barLine("ulTraffic", t,
             d.map(r=>num(r["LTE UL Data Total Volume(GB)"])),
             d.map(r=>num(r["NR UL Traffic Volume (GB)"])),
             d.map(r=>percent(r["5G UL Traffic Percentage (%)"])),
-            "LTE UL (GB)","NR UL (GB)","5G UL %");
+            "LTE UL (GB)", "NR UL (GB)", "5G UL %");
 
-        renderBarLine("rrcUser", t,
+        barLine("rrcUser", t,
             d.map(r=>num(r["L.Traffic.User.Avg"])),
             d.map(r=>num(r["NR RRC User Avg"])),
             d.map(r=>percent(r["5G User Percentage (%)"])),
-            "LTE Users","NR Users","5G User %");
+            "LTE Users", "NR Users", "5G User %");
 
-        renderBarLine("dlPrb", t,
+        barLine("dlPrb", t,
             d.map(r=>num(r["DL PRB Utilization(%)"])),
             d.map(r=>num(r["NR DL PRB Utilization"])),
             d.map(r=>percent(r["5G DL PRB %"])),
-            "LTE DL PRB %","NR DL PRB %","5G DL PRB %");
+            "LTE DL PRB %", "NR DL PRB %", "5G DL PRB %");
 
-        // Last 2 charts: only LTE & NR, hover shows both
-        renderBarLine("dlTp", t,
+        barOnly("dlTp", t,
             d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])),
             d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"])),
-            null, "LTE DL TP (Mbps)","NR DL TP (Mbps)",null);
+            "LTE DL TP (Mbps)", "NR DL TP (Mbps)");
 
-        renderBarLine("ulTp", t,
+        barOnly("ulTp", t,
             d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])),
             d.map(r=>num(r["NR UL User Throughput"])),
-            null, "LTE UL TP (Mbps)","NR UL TP (Mbps)",null);
-    }});
-}
+            "LTE UL TP (Mbps)", "NR UL TP (Mbps)");
+    }
+});
 
-// Bar+line renderer (supports last two charts too)
-function renderBarLine(id, labels,b1,b2,ln,l1,l2,ll){
-    const leftMax=Math.max(...[...b1,...b2].filter(v=>v!==null));
-    const rightMax = ln ? Math.max(...ln.filter(v=>v!==null)) : null;
-    const rightYMax = ln ? niceYMax(rightMax) : null;
+/* ---------- Charts ---------- */
+function barLine(id, labels, b1, b2, ln, l1, l2, ll){
+    const rightRange = paddedRange(ln,0.1); // ±10% only for 5G %
 
-    if(charts[id]) charts[id].destroy();
-    charts[id] = new Chart(document.getElementById(id),{
-        data:{labels,datasets:[
-            {type:"bar", label:l1, data:b1, backgroundColor:"#4e79a7", order:1},
-            {type:"bar", label:l2, data:b2, backgroundColor:"#f28e2c", order:1},
-            ...(ln?[{type:"line", label:ll, data:ln, yAxisID:"y1", borderColor:"#e15759", backgroundColor:"#e15759", tension:0.35, pointRadius:4, borderWidth:2, order:0, animation:progressiveAnimation}]:[])
-        ]},
+    new Chart(document.getElementById(id),{
+        data:{labels,
+            datasets:[
+                {type:"bar", label:l1, data:b1, order:1, backgroundColor:"#4e79a7"},
+                {type:"bar", label:l2, data:b2, order:1, backgroundColor:"#f28e2c"},
+                {type:"line", label:ll, data:ln, yAxisID:"y1", order:0,
+                 borderColor:"#e15759", backgroundColor:"#e15759",
+                 tension:0.35, pointRadius:4, borderWidth:2,
+                 animation:progressiveAnimation
+                }
+            ]
+        },
         options:{
-            responsive:true, maintainAspectRatio:false,
-            interaction:{mode:'index', intersect:false},
-            plugins:{
-                tooltip:{enabled:true, filter:ctx=>ctx.parsed.y!==null, callbacks:{label:ctx=>ctx.dataset.type==='line'?`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%`:`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}`}},
-                legend:{position:"top", labels:{boxWidth:18,padding:15}}
-            },
+            responsive:true,
+            maintainAspectRatio:false,
+            interaction:{mode:'index', intersect:false}, // shared tooltip
             scales:{
-                y:{min:0, max:niceYMax(leftMax), title:{display:true,text:ln? "Value":"Mbps"}},
-                ...(ln?{y1:{min:0, max:rightYMax, position:"right", title:{display:true,text:"%"}, grid:{drawOnChartArea:false}, ticks:{callback:v=>v+"%"}}}:{})
+                y:{title:{display:true,text:"Value"}},
+                y1:{
+                    position:"right",
+                    suggestedMin:rightRange.min,
+                    suggestedMax:rightRange.max,
+                    grid:{drawOnChartArea:false},
+                    title:{display:true,text:"%"},
+                    ticks:{callback:v=>v+"%"}
+                }
             },
-            animation:progressiveAnimation
+            plugins:{
+                tooltip:{
+                    callbacks:{
+                        label:ctx=>{
+                            const label=ctx.dataset.label||'';
+                            const value=ctx.parsed.y;
+                            return ctx.dataset.type==='line'? `${label}: ${value.toFixed(2)}%` : `${label}: ${value.toFixed(2)}`;
+                        }
+                    }
+                },
+                legend:{position:"top", labels:{boxWidth:18, padding:15}}
+            }
         }
     });
 }
 
-// Initial load & interval
-loadAndRender();
-setInterval(loadAndRender,60*1000);
+function barOnly(id, labels, b1, b2, l1, l2){
+    const r = paddedRange([...b1,...b2]);
+    new Chart(document.getElementById(id),{
+        type:"bar",
+        data:{labels,datasets:[
+            {label:l1,data:b1, backgroundColor:"#4e79a7"},
+            {label:l2,data:b2, backgroundColor:"#f28e2c"}
+        ]},
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            scales:{y:{suggestedMin:r.min, suggestedMax:r.max,title:{display:true,text:"Mbps"}}},
+            plugins:{
+                legend:{position:"top", labels:{boxWidth:18, padding:15}}
+            }
+        }
+    });
+}
 </script>
+
 </body>
 </html>
