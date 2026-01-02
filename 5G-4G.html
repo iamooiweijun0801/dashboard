@@ -52,14 +52,16 @@ header {
 
 .card h3 {
     margin: 0 0 15px 0;
-    font-size: 15px;
+    font-size: 14px;
     color: #004C97;
-    text-align: center; 
+    text-align: center;
 }
 
 canvas { height: 400px !important; }
 
-@media (max-width: 1000px) { .container { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) {
+    .container { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 
@@ -95,13 +97,14 @@ const CC_RED = "#e15759";
 function num(v){ if(!v) return null; return parseFloat(v); }
 function percent(v){ if(!v) return null; return parseFloat(v.toString().replace("%","")); }
 
-function paddedRange(values, pad=0.1){ 
-    const clean = values.filter(v=>v!==null && !isNaN(v));
+// EXACT original logic
+function paddedRange(values, pad = 0.1){
+    const clean = values.filter(v => v !== null && !isNaN(v));
     const max = Math.max(...clean) || 100;
-    return {min:0, max:max+(max*pad)}; 
+    return { min: 0, max: max + (max * pad) };
 }
 
-/* ================= AUTO REFRESH SUPPORT ================= */
+/* ================= AUTO REFRESH ================= */
 let lastCsvText = "";
 let charts = [];
 
@@ -114,7 +117,7 @@ function loadData(){
             if(csvText === lastCsvText) return;
             lastCsvText = csvText;
 
-            charts.forEach(c=>c.destroy());
+            charts.forEach(c => c.destroy());
             charts = [];
 
             const d = res.data.filter(r=>r.Time);
@@ -179,12 +182,12 @@ setInterval(loadData, 30000);
 /* ================= CHART FUNCTIONS ================= */
 
 function barLine(id, labels, b1, b2, ln, l1, l2, ll){
-    const rightRange = paddedRange(ln,0.1);
+    const rightRange = paddedRange(ln, 0.1);
 
     return new Chart(document.getElementById(id),{
         data:{labels,datasets:[
-            {type:"bar",label:l1,data:b1,backgroundColor:CC_BLUE,datalabels:{display:false}},
-            {type:"bar",label:l2,data:b2,backgroundColor:CC_ORANGE,datalabels:{display:false}},
+            { type:"bar", label:l1, data:b1, backgroundColor:CC_BLUE, order:2, datalabels:{display:false} },
+            { type:"bar", label:l2, data:b2, backgroundColor:CC_ORANGE, order:2, datalabels:{display:false} },
             {
                 type:"line",
                 label:ll,
@@ -195,32 +198,42 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
                 tension:0.3,
                 pointRadius:3,
                 borderWidth:2,
+                order:1,
                 datalabels:{
                     display:true,
                     color:CC_RED,
-                    font:{size:12,weight:'bold'},
+                    font:{ size:10, weight:'bold' },
                     align: ctx => ctx.dataIndex % 2 === 0 ? 'top' : 'bottom',
                     offset: ctx => {
                         const v = ctx.dataset.data[ctx.dataIndex];
-                        const p = ctx.dataset.data[ctx.dataIndex-1];
-                        return (p!==undefined && Math.abs(v-p)<2) ? 14 : 6;
+                        const p = ctx.dataset.data[ctx.dataIndex - 1];
+                        return (p !== undefined && Math.abs(v - p) < 2) ? 12 : 5;
                     },
-                    formatter:v=>v.toFixed(1)+'%'
+                    formatter: v => v.toFixed(1) + '%'
                 }
             }
         ]},
         options:{
             responsive:true,
             maintainAspectRatio:false,
-            plugins:{legend:{position:'bottom'},datalabels:{clip:false}},
+            plugins:{
+                legend:{ position:'bottom', labels:{ boxWidth:10, font:{ size:8 } } },
+                datalabels:{ clip:false }
+            },
             scales:{
-                y:{beginAtZero:true},
+                y:{
+                    beginAtZero:true,
+                    ticks:{ font:{ size:9 } }
+                },
                 y1:{
                     position:"right",
                     beginAtZero:true,
                     suggestedMax:rightRange.max,
-                    grid:{drawOnChartArea:false},
-                    ticks:{callback:v=>v+'%'}
+                    grid:{ drawOnChartArea:false },
+                    ticks:{
+                        callback:v=>v+'%',
+                        font:{ size:9 }
+                    }
                 }
             }
         }
@@ -231,14 +244,21 @@ function barOnly(id, labels, b1, b2, l1, l2){
     return new Chart(document.getElementById(id),{
         type:"bar",
         data:{labels,datasets:[
-            {label:l1,data:b1,backgroundColor:CC_BLUE,datalabels:{display:false}},
-            {label:l2,data:b2,backgroundColor:CC_ORANGE,datalabels:{display:false}}
+            { label:l1, data:b1, backgroundColor:CC_BLUE, datalabels:{display:false} },
+            { label:l2, data:b2, backgroundColor:CC_ORANGE, datalabels:{display:false} }
         ]},
         options:{
             responsive:true,
             maintainAspectRatio:false,
-            plugins:{legend:{position:'bottom'}},
-            scales:{y:{beginAtZero:true}}
+            plugins:{
+                legend:{ position:'bottom', labels:{ boxWidth:10, font:{ size:8 } } }
+            },
+            scales:{
+                y:{
+                    beginAtZero:true,
+                    ticks:{ font:{ size:9 } }
+                }
+            }
         }
     });
 }
