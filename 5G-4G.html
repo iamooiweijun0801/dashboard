@@ -35,37 +35,36 @@ const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zp
 let charts = {};
 let lastDataJSON = "";
 
-// Helpers
 function num(v){ if(!v) return null; return parseFloat(v); }
 function percent(v){ if(!v) return null; return parseFloat(v.toString().replace("%","")); }
 
-// Compute step dynamically: 1,2,5,10 etc
+// Compute step dynamically
 function computeStep(max){
     if(max<=1) return 1;
     if(max<=2) return 2;
     if(max<=5) return 5;
     if(max<=10) return 10;
-    let exp=Math.pow(10, Math.floor(Math.log10(max)));
-    if(max/exp <=1) return exp;
-    if(max/exp <=2) return 2*exp;
-    if(max/exp <=5) return 5*exp;
+    let exp = Math.pow(10, Math.floor(Math.log10(max)));
+    let factor = max/exp;
+    if(factor<=1) return exp;
+    if(factor<=2) return 2*exp;
+    if(factor<=5) return 5*exp;
     return 10*exp;
 }
 
-// Compute nice Y-max with your <1% rule
-function niceYMax(value){
-    if(value==0) return 5;
-    const step = computeStep(value);
-    const stepsCount = Math.ceil(value/step);
-    let yMax = stepsCount*step;
-    if(yMax - value < step*0.01) yMax += step; // if <1% left, move to next step
+// Compute Ymax with "absolute <1" rule
+function niceYMax(maxValue){
+    if(maxValue==0) return 5;
+    const step = computeStep(maxValue);
+    let yMax = Math.ceil(maxValue/step)*step;
+    if((yMax - maxValue) < 1) yMax += step; // <1 absolute difference
     return yMax;
 }
 
-// Progressive animation
+// Animation
 const progressiveAnimation = {x:{type:'number', easing:'linear', duration:1200, from:NaN, delay(ctx){if(ctx.type!=='data'||ctx.xStarted) return 0; ctx.xStarted=true; return ctx.index*50;}}}
 
-// Load and render charts
+// Load & render
 function loadAndRender(){
     Papa.parse(SHEET_URL,{download:true, header:true, complete: res=>{
         const d=res.data.filter(r=>r.Time);
@@ -99,77 +98,50 @@ function loadAndRender(){
             d.map(r=>percent(r["5G DL PRB %"])),
             "LTE DL PRB %","NR DL PRB %","5G DL PRB %");
 
-        // Last 2 charts: only LTE & NR
-        renderBarOnly("dlTp", t,
+        // Last 2 charts: only LTE & NR, hover shows both
+        renderBarLine("dlTp", t,
             d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])),
             d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"])),
-            "LTE DL TP (Mbps)","NR DL TP (Mbps)");
+            null, "LTE DL TP (Mbps)","NR DL TP (Mbps)",null);
 
-        renderBarOnly("ulTp", t,
+        renderBarLine("ulTp", t,
             d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])),
             d.map(r=>num(r["NR UL User Throughput"])),
-            "LTE UL TP (Mbps)","NR UL TP (Mbps)");
+            null, "LTE UL TP (Mbps)","NR UL TP (Mbps)",null);
     }});
 }
 
-// Render bar + line
-function renderBarLine(id, labels, b1,b2,ln,l1,l2,ll){
+// Bar+line renderer (supports last two charts too)
+function renderBarLine(id, labels,b1,b2,ln,l1,l2,ll){
     const leftMax=Math.max(...[...b1,...b2].filter(v=>v!==null));
-    const rightMax=Math.max(...ln.filter(v=>v!==null));
-    const rightYMax=niceYMax(rightMax);
+    const rightMax = ln ? Math.max(...ln.filter(v=>v!==null)) : null;
+    const rightYMax = ln ? niceYMax(rightMax) : null;
 
     if(charts[id]) charts[id].destroy();
-    charts[id]=new Chart(document.getElementById(id),{
+    charts[id] = new Chart(document.getElementById(id),{
         data:{labels,datasets:[
             {type:"bar", label:l1, data:b1, backgroundColor:"#4e79a7", order:1},
             {type:"bar", label:l2, data:b2, backgroundColor:"#f28e2c", order:1},
-            {type:"line", label:ll, data:ln, yAxisID:"y1", borderColor:"#e15759", backgroundColor:"#e15759", tension:0.35, pointRadius:4, borderWidth:2, order:0, animation:progressiveAnimation}
+            ...(ln?[{type:"line", label:ll, data:ln, yAxisID:"y1", borderColor:"#e15759", backgroundColor:"#e15759", tension:0.35, pointRadius:4, borderWidth:2, order:0, animation:progressiveAnimation}]:[])
         ]},
         options:{
             responsive:true, maintainAspectRatio:false,
             interaction:{mode:'index', intersect:false},
             plugins:{
-                tooltip:{
-                    enabled:true,
-                    filter:ctx=>ctx.parsed.y!==null, // show only when hovering bar/line
-                    callbacks:{label:ctx=>ctx.dataset.type==='line'? `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%`:`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}` }
-                },
+                tooltip:{enabled:true, filter:ctx=>ctx.parsed.y!==null, callbacks:{label:ctx=>ctx.dataset.type==='line'?`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%`:`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}`}},
                 legend:{position:"top", labels:{boxWidth:18,padding:15}}
             },
             scales:{
-                y:{min:0, title:{display:true,text:"Value"}},
-                y1:{min:0, max:rightYMax, position:"right", title:{display:true,text:"%"}, grid:{drawOnChartArea:false}, ticks:{callback:v=>v+"%"}}
-            }
+                y:{min:0, max:niceYMax(leftMax), title:{display:true,text:ln? "Value":"Mbps"}},
+                ...(ln?{y1:{min:0, max:rightYMax, position:"right", title:{display:true,text:"%"}, grid:{drawOnChartArea:false}, ticks:{callback:v=>v+"%"}}}:{})
+            },
+            animation:progressiveAnimation
         }
     });
 }
 
-// Render only bars
-function renderBarOnly(id, labels,b1,b2,l1,l2){
-    const maxVal=Math.max(...[...b1,...b2].filter(v=>v!==null));
-    const yMax=niceYMax(maxVal);
-    if(charts[id]) charts[id].destroy();
-    charts[id]=new Chart(document.getElementById(id),{
-        type:"bar",
-        data:{labels,datasets:[
-            {label:l1, data:b1, backgroundColor:"#4e79a7"},
-            {label:l2, data:b2, backgroundColor:"#f28e2c"}
-        ]},
-        options:{
-            responsive:true, maintainAspectRatio:false,
-            animation:progressiveAnimation,
-            scales:{y:{min:0,max:yMax,title:{display:true,text:"Mbps"}}},
-            plugins:{
-                legend:{position:"top", labels:{boxWidth:18,padding:15}},
-                tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}`}}
-            }
-        }
-    });
-}
-
-// Initial load
+// Initial load & interval
 loadAndRender();
-// Auto-refresh every 1 min
 setInterval(loadAndRender,60*1000);
 </script>
 </body>
