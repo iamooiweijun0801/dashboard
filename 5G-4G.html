@@ -12,89 +12,28 @@
 
 <style>
 body { margin: 0; font-family: "Segoe UI", sans-serif; background: #eef2f7; }
-
-header {
-    background: #FFA500;
-    color: #fff;
-    padding: 15px 0;
-    font-size: 24px;
-    font-weight: 700;
-    text-align: center;
-    position: relative;
-}
-
+header { background: #FFA500; color: #fff; padding: 15px 0; font-size: 24px; font-weight: 700; text-align: center; position: relative; }
 .btn-container { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); }
-
-.export-btn {
-    background: #004C97;
-    color: white;
-    border: 2px solid white;
-    padding: 10px 20px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: bold;
-}
-
+.export-btn { background: #004C97; color: white; border: 2px solid white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
 #capture-area { padding: 20px 40px; background: #eef2f7; }
-
-.container {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 25px;
-}
-
-.card {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.05);
-}
-
-.card h3 {
-    margin: 0 0 15px 0;
-    font-size: 15px;
-    color: #004C97;
-    text-align: center; 
-}
-
+.container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 25px; }
+.card { background: #ffffff; border-radius: 12px; padding: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.05); }
+.card h3 { margin: 0 0 15px 0; font-size: 15px; color: #004C97; text-align: center; }
 canvas { height: 400px !important; }
-
-#previewModal {
-    display: none;
-    position: fixed;
-    z-index: 10000;
-    left: 0; top: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.85);
-    padding: 20px;
-}
-
-.modal-content {
-    background: #fff;
-    margin: 0 auto;
-    padding: 20px;
-    width: 95%;
-    max-width: 1100px;
-    max-height: 90vh; 
-    overflow-y: auto;
-    border-radius: 12px;
-}
-
+#previewModal { display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); padding: 20px; }
+.modal-content { background: #fff; margin: 0 auto; padding: 20px; width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto; border-radius: 12px; }
 #previewImg { width: 100%; height: auto; border: 1px solid #ddd; margin: 15px 0; }
 .close-modal { float: right; font-size: 35px; cursor: pointer; color: #333; font-weight: bold; }
 .dl-group { margin-top: 10px; padding-bottom: 20px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; }
 .action-btn { padding: 14px 28px; margin: 5px; cursor: pointer; border: none; border-radius: 5px; color: #fff; font-weight: bold; }
-
 @media (max-width: 1000px) { .container { grid-template-columns: 1fr; } }
 </style>
 </head>
 
 <body>
-
 <header>
     📊 4G–5G KPI Dashboard
-    <div class="btn-container">
-        <button class="export-btn" onclick="takeScreenshot()">Export Dashboard</button>
-    </div>
+    <div class="btn-container"><button class="export-btn" onclick="takeScreenshot()">Export Dashboard</button></div>
 </header>
 
 <div id="capture-area">
@@ -123,37 +62,20 @@ canvas { height: 400px !important; }
 <script>
 Chart.register(ChartDataLabels);
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
-
-const CC_ORANGE = "#FFA500";
-const CC_BLUE = "#004C97";
-const CC_RED = "#e15759";
-
-let charts = {}; 
+const CC_ORANGE = "#FFA500", CC_BLUE = "#004C97", CC_RED = "#e15759";
+let charts = {};
 
 const timelineAnimation = {
-    x: {
-        type: 'number', easing: 'linear', duration: 1000, from: NaN, 
-        delay(ctx) { if (ctx.type !== 'data' || ctx.xStarted) return 0; ctx.xStarted = true; return ctx.index * 50; }
-    },
-    y: {
-        type: 'number', easing: 'easeOutQuart', duration: 1000,
-        from: (ctx) => ctx.chart.scales.y.getPixelForValue(0),
-        delay(ctx) { if (ctx.type !== 'data' || ctx.yStarted) return 0; ctx.yStarted = true; return ctx.index * 50; }
-    }
+    x: { type: 'number', easing: 'linear', duration: 1000, from: NaN, delay(ctx) { if (ctx.type !== 'data' || ctx.xStarted) return 0; ctx.xStarted = true; return ctx.index * 50; } },
+    y: { type: 'number', easing: 'easeOutQuart', duration: 1000, from: (ctx) => ctx.chart.scales.y.getPixelForValue(0), delay(ctx) { if (ctx.type !== 'data' || ctx.yStarted) return 0; ctx.yStarted = true; return ctx.index * 50; } }
 };
 
 function num(v) { if (!v) return null; return parseFloat(v); }
 function percent(v) { if (!v) return null; return parseFloat(v.toString().replace("%","")); }
 
-/**
- * CUSTOM SCALING LOGIC
- * If max is 29.33, step 5 -> 35
- * If max is 29.33, step 2 -> 32
- */
 function getCeiling(values, step = 5) {
     const clean = values.filter(v => v !== null && !isNaN(v));
     const maxVal = Math.max(...clean) || 0;
-    // Add 1% buffer check
     const bufferedMax = maxVal + (maxVal * 0.01); 
     return Math.ceil(bufferedMax / step) * step;
 }
@@ -178,47 +100,44 @@ function updateOrBuild(id, labels, dataSets, names, isLine) {
     if (charts[id]) {
         charts[id].data.labels = labels;
         dataSets.forEach((ds, i) => { charts[id].data.datasets[i].data = ds; });
-        if(isLine) {
-            charts[id].options.scales.y1.max = getCeiling(dataSets[2], 5); // Using 5 as default round-up step
-        }
+        if(isLine) charts[id].options.scales.y1.max = getCeiling(dataSets[2], 5);
         charts[id].update(); 
     } else {
-        if (isLine) {
-            charts[id] = barLine(id, labels, dataSets[0], dataSets[1], dataSets[2], names[0], names[1], names[2]);
-        } else {
-            charts[id] = barOnly(id, labels, dataSets[0], dataSets[1], names[0], names[1]);
-        }
+        charts[id] = isLine ? barLine(id, labels, dataSets[0], dataSets[1], dataSets[2], names[0], names[1], names[2]) : barOnly(id, labels, dataSets[0], dataSets[1], names[0], names[1]);
     }
 }
 
 function barLine(id, labels, b1, b2, ln, l1, l2, ll){
-    const ceiling = getCeiling(ln, 5);
     return new Chart(document.getElementById(id),{
         data:{labels, datasets:[
             {type:"bar", label:l1, data:b1, backgroundColor: CC_BLUE, order: 2, datalabels: {display: false}, animation: timelineAnimation},
             {type:"bar", label:l2, data:b2, backgroundColor: CC_ORANGE, order: 2, datalabels: {display: false}, animation: timelineAnimation},
-            {type:"line", label:ll, data:ln, yAxisID:"y1", borderColor: CC_RED, backgroundColor: CC_RED, tension: 0.3, pointRadius: 4, borderWidth: 2, order: 1,
-             animation: timelineAnimation,
+            {type:"line", label:ll, data:ln, yAxisID:"y1", borderColor: CC_RED, backgroundColor: CC_RED, tension: 0.3, pointRadius: 4, borderWidth: 2, order: 1, animation: timelineAnimation,
              datalabels: { 
-                display: true, color: CC_RED, formatter: v => v.toFixed(1) + '%', font: { size: 12, weight: 'bold' },
-                anchor: 'end', align: 'top', offset: 10, clamp: true, clip: false
+                display: true, color: CC_RED, font: { size: 12, weight: 'bold' }, formatter: v => v.toFixed(1) + '%',
+                // restored Zig-Zag / Non-overlapping logic
+                anchor: 'end',
+                align: (ctx) => {
+                    const curr = ctx.dataset.data[ctx.dataIndex];
+                    const prev = ctx.dataIndex > 0 ? ctx.dataset.data[ctx.dataIndex - 1] : null;
+                    return (prev !== null && curr < prev) ? 'bottom' : 'top';
+                },
+                offset: (ctx) => {
+                    const curr = ctx.dataset.data[ctx.dataIndex];
+                    const prev = ctx.dataIndex > 0 ? ctx.dataset.data[ctx.dataIndex - 1] : null;
+                    // If values are too close, increase offset to push them apart
+                    return (prev !== null && Math.abs(curr - prev) < 2) ? 15 : 8;
+                },
+                padding: 4, clamp: true
              }
             }
         ]},
         options: { 
-            responsive:true, maintainAspectRatio:false, layout: { padding: { top: 30 } },
-            plugins: { 
-                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } },
-                datalabels: { clip: false }
-            },
+            responsive:true, maintainAspectRatio:false, layout: { padding: { top: 35, bottom: 10 } },
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } }, datalabels: { clip: false } },
             scales: { 
                 y: { beginAtZero: true, min: 0, ticks: { font: { size: 10 } } }, 
-                y1: { 
-                    position: "right", beginAtZero: true, min: 0,
-                    max: ceiling, // Custom scaling applied here
-                    grid: { drawOnChartArea: false }, 
-                    ticks: { callback: v => v + "%", font: { size: 10 } } 
-                } 
+                y1: { position: "right", beginAtZero: true, min: 0, max: getCeiling(ln, 5), grid: { drawOnChartArea: false }, ticks: { callback: v => v + "%", font: { size: 10 } } } 
             }
         }
     });
@@ -227,36 +146,22 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
 function barOnly(id, labels, b1, b2, l1, l2){
     return new Chart(document.getElementById(id),{
         type:"bar",
-        data:{labels, datasets:[
-            {label:l1, data:b1, backgroundColor: CC_BLUE, datalabels: {display: false}, animation: timelineAnimation},
-            {label:l2, data:b2, backgroundColor: CC_ORANGE, datalabels: {display: false}, animation: timelineAnimation}
-        ]},
-        options: { 
-            responsive:true, maintainAspectRatio:false,
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } },
-            scales: { y: { beginAtZero: true, min: 0, ticks: { font: { size: 10 } } } }
-        }
+        data:{labels, datasets:[{label:l1, data:b1, backgroundColor: CC_BLUE, datalabels: {display: false}, animation: timelineAnimation},{label:l2, data:b2, backgroundColor: CC_ORANGE, datalabels: {display: false}, animation: timelineAnimation}]},
+        options: { responsive:true, maintainAspectRatio:false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, min: 0, ticks: { font: { size: 10 } } } } }
     });
 }
 
 fetchData();
 setInterval(fetchData, 30000); 
 
-function takeScreenshot() {
-    html2canvas(document.getElementById('capture-area'), { scale: 2 }).then(canvas => {
-        document.getElementById('previewImg').src = canvas.toDataURL("image/png");
-        document.getElementById('previewModal').style.display = 'block';
-    });
-}
+function takeScreenshot() { html2canvas(document.getElementById('capture-area'), { scale: 2 }).then(canvas => { document.getElementById('previewImg').src = canvas.toDataURL("image/png"); document.getElementById('previewModal').style.display = 'block'; }); }
 function closeModal() { document.getElementById('previewModal').style.display = 'none'; }
-function downloadPNG() { 
-    const l = document.createElement('a'); l.download = `Dashboard.png`; l.href = document.getElementById('previewImg').src; l.click(); 
-}
+function downloadPNG() { const l = document.createElement('a'); l.download = `Dashboard.png`; l.href = document.getElementById('previewImg').src; l.click(); }
 async function downloadPPT() {
     let pptx = new PptxGenJS(); pptx.layout = 'LAYOUT_WIDE'; let slide = pptx.addSlide();
     for (let i = 0; i < 6; i++) {
         const canvas = await html2canvas(document.getElementById(`card-${i}`), { scale: 2 });
-        let col = i % 2; let row = Math.floor(i / 2);
+        let col = i % 2, row = Math.floor(i / 2);
         slide.addImage({ data: canvas.toDataURL("image/png"), x: 0.2 + (col * 6.6), y: 0.2 + (row * 2.4), w: 6.3, h: 2.3 });
     }
     pptx.writeFile({ fileName: `KPI_Report.pptx` });
