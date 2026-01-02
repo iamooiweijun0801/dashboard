@@ -97,14 +97,14 @@
         .chart-card { 
             background:white; 
             border-radius:8px; 
-            padding:15px; 
+            padding: 18px 18px 10px; /* Increased top padding */
             box-shadow:0 2px 8px rgba(0,0,0,0.08); 
             display:flex; 
             flex-direction:column; 
         }
         .chart-container { 
             position: relative; 
-            height: 350px; 
+            height: 380px; /* Increased height for better spacing */
             width: 100%; 
         }
         
@@ -397,7 +397,8 @@
         .chart-title {
             font-size: 16px !important;
             font-weight: bold !important;
-            margin-bottom: 5px !important;
+            margin-bottom: 10px !important;
+            color: #333;
         }
         .chart-subtitle {
             font-size: 12px !important;
@@ -408,18 +409,18 @@
             display: flex;
             justify-content: center;
             gap: 20px;
-            margin-top: 10px;
+            margin-top: 15px;
             flex-wrap: wrap;
         }
         .legend-item {
             display: flex;
             align-items: center;
             gap: 5px;
-            font-size: 12px;
+            font-size: 11px;
         }
         .legend-color {
-            width: 15px;
-            height: 15px;
+            width: 12px;
+            height: 12px;
             border-radius: 3px;
         }
     </style>
@@ -539,6 +540,22 @@
     </div>
 
     <script>
+        // ========== GLOBAL CHART.JS STYLING ==========
+        Chart.defaults.font.family = "'Segoe UI', Tahoma, sans-serif";
+        Chart.defaults.font.size = 11;
+        Chart.defaults.color = "#444";
+
+        Chart.defaults.plugins.tooltip.backgroundColor = "rgba(0,0,0,0.75)";
+        Chart.defaults.plugins.tooltip.padding = 10;
+        Chart.defaults.plugins.tooltip.cornerRadius = 6;
+
+        Chart.defaults.elements.bar.borderRadius = 4;
+        Chart.defaults.elements.bar.borderSkipped = false;
+
+        Chart.defaults.elements.line.tension = 0.35;
+        Chart.defaults.elements.line.borderWidth = 2.5;
+        Chart.defaults.elements.line.pointRadius = 0;
+
         // --- CONFIG & STATE ---
         let allData = [];
         let allCharts = {};
@@ -560,7 +577,7 @@
                         yAxisID: 'y', 
                         color: "#27AE60",
                         borderColor: "#27AE60",
-                        backgroundColor: "rgba(39, 174, 96, 0.7)"
+                        backgroundColor: "rgba(39, 174, 96, 0.85)"
                     },
                     { 
                         name: "NR DL Traffic Volume(GB)", 
@@ -568,7 +585,7 @@
                         yAxisID: 'y', 
                         color: "#D24726",
                         borderColor: "#D24726",
-                        backgroundColor: "rgba(210, 71, 38, 0.7)"
+                        backgroundColor: "rgba(210, 71, 38, 0.85)"
                     },
                     { 
                         name: "5G DL Traffic Percentage (%)", 
@@ -595,7 +612,7 @@
                         yAxisID: 'y', 
                         color: "#27AE60",
                         borderColor: "#27AE60",
-                        backgroundColor: "rgba(39, 174, 96, 0.7)"
+                        backgroundColor: "rgba(39, 174, 96, 0.85)"
                     },
                     { 
                         name: "NR UL Traffic Volume(GB)", 
@@ -603,7 +620,7 @@
                         yAxisID: 'y', 
                         color: "#D24726",
                         borderColor: "#D24726",
-                        backgroundColor: "rgba(210, 71, 38, 0.7)"
+                        backgroundColor: "rgba(210, 71, 38, 0.85)"
                     },
                     { 
                         name: "5G UL Traffic Percentage (%)", 
@@ -630,7 +647,7 @@
                         yAxisID: 'y', 
                         color: "#27AE60",
                         borderColor: "#27AE60",
-                        backgroundColor: "rgba(39, 174, 96, 0.7)"
+                        backgroundColor: "rgba(39, 174, 96, 0.85)"
                     },
                     { 
                         name: "NR RRC User Avg", 
@@ -638,7 +655,7 @@
                         yAxisID: 'y', 
                         color: "#D24726",
                         borderColor: "#D24726",
-                        backgroundColor: "rgba(210, 71, 38, 0.7)"
+                        backgroundColor: "rgba(210, 71, 38, 0.85)"
                     },
                     { 
                         name: "5G User Percentage (%)", 
@@ -665,7 +682,7 @@
                         yAxisID: 'y', 
                         color: "#27AE60",
                         borderColor: "#27AE60",
-                        backgroundColor: "rgba(39, 174, 96, 0.7)"
+                        backgroundColor: "rgba(39, 174, 96, 0.85)"
                     },
                     { 
                         name: "NR DL PRB Utilization(%)", 
@@ -673,7 +690,7 @@
                         yAxisID: 'y', 
                         color: "#D24726",
                         borderColor: "#D24726",
-                        backgroundColor: "rgba(210, 71, 38, 0.7)"
+                        backgroundColor: "rgba(210, 71, 38, 0.85)"
                     },
                     { 
                         name: "5G DL PRB %", 
@@ -700,7 +717,7 @@
                         yAxisID: 'y', 
                         color: "#27AE60",
                         borderColor: "#27AE60",
-                        backgroundColor: "rgba(39, 174, 96, 0.7)"
+                        backgroundColor: "rgba(39, 174, 96, 0.85)"
                     },
                     { 
                         name: "NR DL User Throughput (Rmv LastTTI)", 
@@ -708,7 +725,7 @@
                         yAxisID: 'y', 
                         color: "#D24726",
                         borderColor: "#D24726",
-                        backgroundColor: "rgba(210, 71, 38, 0.7)"
+                        backgroundColor: "rgba(210, 71, 38, 0.85)"
                     }
                 ],
                 yAxisLabel: "Throughput (Mbps)",
@@ -724,7 +741,7 @@
                         yAxisID: 'y', 
                         color: "#27AE60",
                         borderColor: "#27AE60",
-                        backgroundColor: "rgba(39, 174, 96, 0.7)"
+                        backgroundColor: "rgba(39, 174, 96, 0.85)"
                     },
                     { 
                         name: "NR UL User Throughput", 
@@ -732,7 +749,7 @@
                         yAxisID: 'y', 
                         color: "#D24726",
                         borderColor: "#D24726",
-                        backgroundColor: "rgba(210, 71, 38, 0.7)"
+                        backgroundColor: "rgba(210, 71, 38, 0.85)"
                     }
                 ],
                 yAxisLabel: "Throughput (Mbps)",
@@ -932,7 +949,7 @@
                 
                 const text = document.createElement("span");
                 text.textContent = dataset.name;
-                text.style.fontSize = "12px";
+                text.style.fontSize = "11px";
                 
                 legendItem.appendChild(colorBox);
                 legendItem.appendChild(text);
@@ -955,18 +972,21 @@
                     borderColor: dataset.borderColor,
                     backgroundColor: dataset.backgroundColor,
                     borderWidth: dataset.borderWidth || 2,
-                    pointRadius: dataset.pointRadius || 4,
-                    tension: dataset.tension || 0,
+                    pointRadius: dataset.pointRadius || 0, // No points by default
+                    tension: dataset.tension || 0.35,
                     fill: dataset.backgroundColor !== "transparent",
                     yAxisID: dataset.yAxisID
                 };
                 
+                // SLIM BARS with professional spacing
                 if (dataset.type === "bar") {
                     return {
                         ...baseConfig,
                         type: 'bar',
-                        barPercentage: 0.6,
-                        categoryPercentage: 0.8
+                        barThickness: 12,
+                        maxBarThickness: 14,
+                        categoryPercentage: 0.7,
+                        barPercentage: 0.9
                     };
                 } else {
                     return {
@@ -976,7 +996,7 @@
                 }
             });
             
-            // Chart configuration
+            // Chart configuration with professional telecom NOC styling
             const config = {
                 type: 'bar', // Base type
                 data: {
@@ -996,7 +1016,20 @@
                         },
                         tooltip: {
                             mode: 'index',
-                            intersect: false
+                            intersect: false,
+                            callbacks: {
+                                label: ctx => {
+                                    const v = ctx.parsed.y;
+                                    if (ctx.dataset.yAxisID === 'y1') {
+                                        return `${ctx.dataset.label}: ${v.toFixed(1)}%`;
+                                    }
+                                    // Format numbers nicely
+                                    if (v >= 1000) {
+                                        return `${ctx.dataset.label}: ${(v/1000).toFixed(1)}k`;
+                                    }
+                                    return `${ctx.dataset.label}: ${v.toLocaleString()}`;
+                                }
+                            }
                         }
                     },
                     scales: {
@@ -1007,44 +1040,42 @@
                             ticks: {
                                 maxRotation: 45,
                                 minRotation: 45,
-                                font: {
-                                    size: 10
-                                }
+                                autoSkip: true,
+                                maxTicksLimit: 12
                             }
                         },
                         y: {
-                            type: 'linear',
-                            display: true,
                             position: 'left',
                             title: {
                                 display: true,
                                 text: graphDef.yAxisLabel,
-                                font: {
-                                    size: 12,
-                                    weight: 'bold'
+                                font: { 
+                                    weight: 'bold',
+                                    size: 12
                                 }
                             },
                             grid: {
-                                color: 'rgba(0,0,0,0.1)'
+                                color: 'rgba(0,0,0,0.08)'
                             }
                         },
                         y1: graphDef.y1AxisLabel ? {
-                            type: 'linear',
-                            display: true,
                             position: 'right',
+                            min: 0,
+                            max: 100,
                             title: {
                                 display: true,
                                 text: graphDef.y1AxisLabel,
-                                font: {
-                                    size: 12,
-                                    weight: 'bold'
+                                font: { 
+                                    weight: 'bold',
+                                    size: 12
                                 }
                             },
-                            grid: {
-                                drawOnChartArea: false,
+                            ticks: {
+                                callback: v => v + '%'
                             },
-                            min: 0,
-                            max: 100
+                            grid: {
+                                drawOnChartArea: false
+                            }
                         } : undefined
                     }
                 }
@@ -1187,7 +1218,7 @@
                             if (selectedTechForColor === 'LTE') {
                                 dataset.color = selectedColor;
                                 dataset.borderColor = selectedColor;
-                                dataset.backgroundColor = selectedColor.replace(')', ', 0.7)').replace('rgb', 'rgba');
+                                dataset.backgroundColor = selectedColor.replace(')', ', 0.85)').replace('rgb', 'rgba');
                             }
                         } else if (dataset.name.includes('NR') || dataset.name.includes('5G')) {
                             if (selectedTechForColor === 'NR') {
@@ -1197,7 +1228,7 @@
                                 }
                                 dataset.color = selectedColor;
                                 dataset.borderColor = selectedColor;
-                                dataset.backgroundColor = selectedColor.replace(')', ', 0.7)').replace('rgb', 'rgba');
+                                dataset.backgroundColor = selectedColor.replace(')', ', 0.85)').replace('rgb', 'rgba');
                             }
                         }
                     });
