@@ -8,188 +8,157 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 
 <style>
-body { margin: 0; font-family: "Segoe UI", sans-serif; background: #eef2f7; }
-header { background: #FFA500; color: #fff; padding: 15px 0; font-size: 24px; font-weight: 700; text-align: center; position: relative; }
-.btn-container { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); }
-.export-btn { background: #004C97; color: white; border: 2px solid white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-#capture-area { padding: 20px 40px; background: #eef2f7; }
-.container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 25px; }
-.card { background: #ffffff; border-radius: 12px; padding: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.05); }
-.card h3 { margin: 0 0 15px 0; font-size: 15px; color: #004C97; text-align: center; }
-canvas { height: 400px !important; }
-#previewModal { display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); padding: 20px; }
-.modal-content { background: #fff; margin: 0 auto; padding: 20px; width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto; border-radius: 12px; }
-#previewImg { width: 100%; height: auto; border: 1px solid #ddd; margin: 15px 0; }
-.close-modal { float: right; font-size: 35px; cursor: pointer; color: #333; font-weight: bold; }
-.dl-group { margin-top: 10px; padding-bottom: 20px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; }
-.action-btn { padding: 14px 28px; margin: 5px; cursor: pointer; border: none; border-radius: 5px; color: #fff; font-weight: bold; }
-@media (max-width: 1000px) { .container { grid-template-columns: 1fr; } }
+body{margin:0;font-family:"Segoe UI",sans-serif;background:#eef2f7}
+header{background:#FFA500;color:#fff;padding:15px 0;font-size:24px;font-weight:700;text-align:center;position:relative}
+.btn-container{position:absolute;right:20px;top:50%;transform:translateY(-50%)}
+.export-btn{background:#004C97;color:white;border:2px solid white;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:bold}
+#capture-area{padding:20px 40px}
+.container{display:grid;grid-template-columns:repeat(2,1fr);gap:25px}
+.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 8px 20px rgba(0,0,0,.05)}
+.card h3{margin:0 0 15px 0;font-size:15px;color:#004C97;text-align:center}
+canvas{height:400px!important}
+@media(max-width:1000px){.container{grid-template-columns:1fr}}
 </style>
 </head>
 
 <body>
 <header>
-    📊 4G–5G KPI Dashboard
-    <div class="btn-container">
-        <button class="export-btn" onclick="takeScreenshot()">Export Dashboard</button>
-    </div>
+📊 4G–5G KPI Dashboard
+<div class="btn-container">
+<button class="export-btn" onclick="takeScreenshot()">Export Dashboard</button>
+</div>
 </header>
 
 <div id="capture-area">
-    <div class="container">
-        <div class="card" id="card-0"><h3>% of DL Traffic Volume 5G_4G</h3><canvas id="dlTraffic"></canvas></div>
-        <div class="card" id="card-1"><h3>% of UL Traffic Volume 5G_4G</h3><canvas id="ulTraffic"></canvas></div>
-        <div class="card" id="card-2"><h3>% of RRC User 5G_4G</h3><canvas id="rrcUser"></canvas></div>
-        <div class="card" id="card-3"><h3>% of DL PRB Utilization 5G_4G</h3><canvas id="dlPrb"></canvas></div>
-        <div class="card" id="card-4"><h3>DL User Throughput Comparison</h3><canvas id="dlTp"></canvas></div>
-        <div class="card" id="card-5"><h3>UL User Throughput Comparison</h3><canvas id="ulTp"></canvas></div>
-    </div>
+<div class="container">
+<div class="card" id="card-0"><h3 id="title-dlTraffic"></h3><canvas id="dlTraffic"></canvas></div>
+<div class="card" id="card-1"><h3 id="title-ulTraffic"></h3><canvas id="ulTraffic"></canvas></div>
+<div class="card" id="card-2"><h3 id="title-rrcUser"></h3><canvas id="rrcUser"></canvas></div>
+<div class="card" id="card-3"><h3 id="title-dlPrb"></h3><canvas id="dlPrb"></canvas></div>
+<div class="card" id="card-4"><h3 id="title-dlTp"></h3><canvas id="dlTp"></canvas></div>
+<div class="card" id="card-5"><h3 id="title-ulTp"></h3><canvas id="ulTp"></canvas></div>
 </div>
-
-<div id="previewModal">
-    <div class="modal-content">
-        <span class="close-modal" onclick="closeModal()">&times;</span>
-        <h2 style="color:#004C97;">Export Preview</h2>
-        <img id="previewImg">
-        <div class="dl-group">
-            <button class="action-btn" style="background:#004C97" onclick="downloadPNG()">Save as PNG</button>
-            <button class="action-btn" style="background:#FFA500" onclick="downloadPPT()">Save as PPTX (6 Images)</button>
-        </div>
-    </div>
 </div>
 
 <script>
 Chart.register(ChartDataLabels);
-const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
-const CC_ORANGE="#FFA500", CC_BLUE="#004C97", CC_RED="#e15759";
 
-let charts = {};
-let lastCSVHash = "";
+const SHEET_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zpdFja0b3h2kodVsUrjD_PSHOkF93MkecZF04gWDoMXVq-q0REU-RvFQbjVggJVDLpUi/pub?gid=297655221&single=true&output=csv";
+const CC_BLUE="#004C97",CC_ORANGE="#FFA500",CC_RED="#e15759";
 
-function getTimestamp(){
-    const d = new Date();
-    const p = n => n.toString().padStart(2,'0');
-    return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
-}
+let charts={},lastHash="";
 
-function hashCSV(text){ return text.length + ":" + text.slice(0,100); }
+const num=v=>v?parseFloat(v):null;
+const pct=v=>v?parseFloat(v.replace("%","")):null;
 
-function num(v){ if(!v) return null; return parseFloat(v); }
-function percent(v){ if(!v) return null; return parseFloat(v.toString().replace("%","")); }
-
-function getCeiling(values, step=5){
-    const clean = values.filter(v=>v!==null && !isNaN(v));
-    const max = Math.max(...clean) || 0;
-    return Math.ceil((max * 1.01) / step) * step;
-}
+const ceilMax=(arr,step=5)=>{
+const m=Math.max(...arr.filter(v=>v!=null))||0;
+return Math.ceil(m/step)*step;
+};
 
 function fetchData(){
-    fetch(SHEET_URL).then(r=>r.text()).then(text=>{
-        const hash = hashCSV(text);
-        if(hash === lastCSVHash) return;
-        lastCSVHash = hash;
+fetch(SHEET_URL).then(r=>r.text()).then(t=>{
+if(t===lastHash)return; lastHash=t;
+Papa.parse(t,{header:true,complete:r=>{
+const d=r.data.filter(x=>x.Time);
 
-        Papa.parse(text,{
-            header:true,
-            complete: res=>{
-                const d=res.data.filter(r=>r.Time);
-                const t=d.map(r=>r.Time);
+// get number of unique sites dynamically
+const sites = [...new Set(d.map(x=>x["Site Name"]))].length;
 
-                updateOrBuild("dlTraffic",t,[d.map(r=>num(r["LTE DL Data Total Volume(GB)"])),d.map(r=>num(r["NR DL Traffic Volume (GB)"])),d.map(r=>percent(r["5G DL Traffic Percentage (%)"]))],["LTE DL","NR DL","5G DL %"],true);
-                updateOrBuild("ulTraffic",t,[d.map(r=>num(r["LTE UL Data Total Volume(GB)"])),d.map(r=>num(r["NR UL Traffic Volume (GB)"])),d.map(r=>percent(r["5G UL Traffic Percentage (%)"]))],["LTE UL","NR UL","5G UL %"],true);
-                updateOrBuild("rrcUser",t,[d.map(r=>num(r["L.Traffic.User.Avg"])),d.map(r=>num(r["NR RRC User Avg"])),d.map(r=>percent(r["5G User Percentage (%)"]))],["LTE Users","NR Users","5G User %"],true);
-                updateOrBuild("dlPrb",t,[d.map(r=>num(r["DL PRB Utilization(%)"])),d.map(r=>num(r["NR DL PRB Utilization"])),d.map(r=>percent(r["5G DL PRB %"]))],["LTE DL PRB %","NR DL PRB %","5G DL PRB %"],true);
-                updateOrBuild("dlTp",t,[d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])),d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"]))],["LTE DL Mbps","NR DL Mbps"],false);
-                updateOrBuild("ulTp",t,[d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])),d.map(r=>num(r["NR UL User Throughput"]))],["LTE UL Mbps","NR UL Mbps"],false);
-            }
-        });
-    });
+// update titles with dynamic site count
+document.getElementById("title-dlTraffic").innerText = `1. % of DL Traffic Volume 5G_4G for ${sites} sites`;
+document.getElementById("title-ulTraffic").innerText = `2. % of UL Traffic Volume 5G_4G for ${sites} sites`;
+document.getElementById("title-rrcUser").innerText = `3. % of RRC User 5G_4G for ${sites} sites`;
+document.getElementById("title-dlPrb").innerText = `4. % of DL PRB Utilizaition 5G_4G for ${sites} sites`;
+document.getElementById("title-dlTp").innerText = `5. DL User Throughput Comparison 5G_4G for ${sites} sites`;
+document.getElementById("title-ulTp").innerText = `6. UL User Throughput Comparison 5G_4G for ${sites} sites`;
+
+const l=d.map(x=>x.Time);
+
+build("dlTraffic",l,
+[d.map(x=>num(x["LTE DL Data Total Volume(GB)"])),
+ d.map(x=>num(x["NR DL Traffic Volume (GB)"])),
+ d.map(x=>pct(x["5G DL Traffic Percentage (%)"]))],
+["LTE DL Data Total Volume(GB)","NR DL Traffic Volume(GB)","5G DL Traffic Percentage (%)"],true);
+
+build("ulTraffic",l,
+[d.map(x=>num(x["LTE UL Data Total Volume(GB)"])),
+ d.map(x=>num(x["NR UL Traffic Volume (GB)"])),
+ d.map(x=>pct(x["5G UL Traffic Percentage (%)"]))],
+["LTE UL Data Total Volume(GB)","NR UL Traffic Volume(GB)","5G UL Traffic Percentage (%)"],true);
+
+build("rrcUser",l,
+[d.map(x=>num(x["L.Traffic.User.Avg"])),
+ d.map(x=>num(x["NR RRC User Avg"])),
+ d.map(x=>pct(x["5G User Percentage (%)"]))],
+["L.Traffic.User.Avg","NR RRC User Avg","5G User Percentage (%)"],true);
+
+build("dlPrb",l,
+[d.map(x=>num(x["DL PRB Utilization(%)"])),
+ d.map(x=>num(x["NR DL PRB Utilization"])),
+ d.map(x=>pct(x["5G DL PRB %"]))],
+["DL PRB Utilization(%)","NR DL PRB Utilization(%)","5G DL PRB %"],true);
+
+build("dlTp",l,
+[d.map(x=>num(x["LTE DL Avg Throughput per User (Mbps)"])),
+ d.map(x=>num(x["NR DL User Throughput (Rmv LastTTI)"]))],
+["LTE DL Avg Throughput per User (Mbps)","NR DL User Throughput (Rmv LastTTI)"],false);
+
+build("ulTp",l,
+[d.map(x=>num(x["LTE UL Avg Throughput per User (Mbps)"])),
+ d.map(x=>num(x["NR UL User Throughput"]))],
+["LTE UL Avg Throughput per User (Mbps)","NR UL User Throughput"],false);
+
+}});
 }
 
-function updateOrBuild(id,labels,dataSets,names,isLine){
-    if(charts[id]){
-        charts[id].data.labels=labels;
-        dataSets.forEach((ds,i)=>charts[id].data.datasets[i].data=ds);
-        if(isLine) charts[id].options.scales.y1.max=getCeiling(dataSets[2]);
-        charts[id].update('none');
-    }else{
-        charts[id]=isLine?barLine(id,labels,dataSets[0],dataSets[1],dataSets[2],names[0],names[1],names[2])
-                          :barOnly(id,labels,dataSets[0],dataSets[1],names[0],names[1]);
-    }
+function build(id,l,d,n,isLine){
+if(charts[id]){
+charts[id].data.labels=l;
+d.forEach((x,i)=>charts[id].data.datasets[i].data=x);
+if(isLine)charts[id].options.scales.y1.max=ceilMax(d[2]);
+charts[id].update("none");
+return;
 }
-
-function barLine(id,labels,b1,b2,ln,l1,l2,ll){
-    return new Chart(document.getElementById(id),{
-        data:{labels,datasets:[
-            {type:"bar",label:l1,data:b1,backgroundColor:CC_BLUE,datalabels:{display:false}},
-            {type:"bar",label:l2,data:b2,backgroundColor:CC_ORANGE,datalabels:{display:false}},
-            {type:"line",label:ll,data:ln,yAxisID:"y1",borderColor:CC_RED,backgroundColor:CC_RED,pointRadius:4,borderWidth:2,
-             datalabels:{
-                display:true,
-                color:CC_RED,
-                font:{ size:10, weight:'bold' },
-                formatter:v=>v.toFixed(1)+'%',
-                anchor:'end',
-                align:ctx=>ctx.dataIndex%2===0?'top':'bottom',
-                offset:ctx=>{
-                    const v=ctx.dataset.data[ctx.dataIndex];
-                    const p=ctx.dataset.data[ctx.dataIndex-1];
-                    return (p!==undefined && Math.abs(v-p)<2)?14:6;
-                }
-             }}
-        ]},
-        options:{
-            responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{position:'bottom'},datalabels:{clip:false}},
-            scales:{
-                y:{beginAtZero:true},
-                y1:{position:"right",beginAtZero:true,max:getCeiling(ln),grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%'}}
-            }
-        }
-    });
-}
-
-function barOnly(id,labels,b1,b2,l1,l2){
-    return new Chart(document.getElementById(id),{
-        type:"bar",
-        data:{labels,datasets:[
-            {label:l1,data:b1,backgroundColor:CC_BLUE,datalabels:{display:false}},
-            {label:l2,data:b2,backgroundColor:CC_ORANGE,datalabels:{display:false}}
-        ]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}
-    });
+charts[id]=new Chart(document.getElementById(id),{
+data:{labels:l,datasets:[
+{type:"bar",label:n[0],data:d[0],backgroundColor:CC_BLUE,datalabels:{display:false}},
+{type:"bar",label:n[1],data:d[1],backgroundColor:CC_ORANGE,datalabels:{display:false}},
+...(isLine?[{type:"line",label:n[2],data:d[2],yAxisID:"y1",
+borderColor:CC_RED,backgroundColor:CC_RED,pointRadius:4,borderWidth:2,
+datalabels:{
+display:true,color:CC_RED,font:{size:10,weight:"bold"},
+formatter:v=>v.toFixed(1)+"%",
+anchor:"end",
+align:c=>c.dataIndex%2?"bottom":"top",
+offset:c=>Math.abs((d[2][c.dataIndex]-d[2][c.dataIndex-1])||0)<2?14:6
+}}]:[])
+]},
+options:{
+responsive:true,maintainAspectRatio:false,
+plugins:{legend:{position:"bottom"}},
+scales:{
+y:{beginAtZero:true},
+y1:isLine?{position:"right",beginAtZero:true,max:ceilMax(d[2]),
+ticks:{callback:v=>v+"%"},grid:{drawOnChartArea:false}}:{}
+}}
+});
 }
 
 fetchData();
 setInterval(fetchData,30000);
 
-/* EXPORT */
+/* export */
 function takeScreenshot(){
-    html2canvas(document.getElementById('capture-area'),{scale:2}).then(c=>{
-        previewImg.src=c.toDataURL("image/png");
-        previewModal.style.display='block';
-    });
-}
-function closeModal(){ previewModal.style.display='none'; }
-function downloadPNG(){
-    const a=document.createElement('a');
-    a.download=`Dashboard_${getTimestamp()}.png`;
-    a.href=previewImg.src;
-    a.click();
-}
-async function downloadPPT(){
-    let pptx=new PptxGenJS();
-    pptx.layout='LAYOUT_WIDE';
-    let slide=pptx.addSlide();
-    for(let i=0;i<6;i++){
-        const c=await html2canvas(document.getElementById(`card-${i}`),{scale:2});
-        let col=i%2,row=Math.floor(i/2);
-        slide.addImage({data:c.toDataURL(),x:0.2+(col*6.6),y:0.2+(row*2.4),w:6.3,h:2.3});
-    }
-    pptx.writeFile({fileName:`KPI_Report_${getTimestamp()}.pptx`});
+html2canvas(document.getElementById('capture-area'),{scale:2}).then(c=>{
+const a=document.createElement("a");
+const now=new Date();
+const ts=`${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}${now.getSeconds().toString().padStart(2,'0')}`;
+a.download=`Dashboard_${ts}.png`;
+a.href=c.toDataURL();a.click();
+});
 }
 </script>
 </body>
