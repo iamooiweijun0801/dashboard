@@ -127,8 +127,8 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
     new Chart(document.getElementById(id),{
         data:{labels,
             datasets:[
-                {type:"bar", label:l1, data:b1, order:1, backgroundColor:"rgba(78, 121, 167, 0.8)", datalabels: {display: false}},
-                {type:"bar", label:l2, data:b2, order:1, backgroundColor:"rgba(242, 142, 44, 0.8)", datalabels: {display: false}},
+                {type:"bar", label:l1, data:b1, order:1, backgroundColor:"rgba(78, 121, 167, 0.7)", datalabels: {display: false}},
+                {type:"bar", label:l2, data:b2, order:1, backgroundColor:"rgba(242, 142, 44, 0.7)", datalabels: {display: false}},
                 {type:"line", label:ll, data:ln, yAxisID:"y1", order:0,
                  borderColor:"#e15759", backgroundColor:"#e15759", tension:0.35, pointRadius:5, borderWidth:3,
                  animation:progressiveAnimation,
@@ -146,17 +146,17 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
         options:{
             responsive:true, maintainAspectRatio:false,
             interaction:{
-                mode:'nearest', 
-                intersect:true // Tooltip ONLY shows when touching the element
+                mode:'index', // Shows all details for the time slot
+                intersect:true // Only triggers when mouse is actually on a bar/dot
             },
             scales:{
                 y:{ 
-                    beginAtZero: false, // Left axis auto-scales
+                    beginAtZero: false, 
                     title:{display:true,text:"Value"} 
                 },
                 y1:{ 
                     position:"right", 
-                    min: 0, // Right axis locked at 0
+                    min: 0, 
                     suggestedMax:rightRange.max, 
                     grid:{drawOnChartArea:false}, 
                     title:{display:true,text:"%"}, 
@@ -183,18 +183,18 @@ function barOnly(id, labels, b1, b2, l1, l2){
     new Chart(document.getElementById(id),{
         type:"bar",
         data:{labels,datasets:[
-            {label:l1, data:b1, backgroundColor:"rgba(78, 121, 167, 0.8)", datalabels: {display: false}},
-            {label:l2, data:b2, backgroundColor:"rgba(242, 142, 44, 0.8)", datalabels: {display: false}}
+            {label:l1, data:b1, backgroundColor:"rgba(78, 121, 167, 0.7)", datalabels: {display: false}},
+            {label:l2, data:b2, backgroundColor:"rgba(242, 142, 44, 0.7)", datalabels: {display: false}}
         ]},
         options:{
             responsive:true, maintainAspectRatio:false,
             interaction:{
-                mode:'nearest', 
+                mode:'index', 
                 intersect:true 
             },
             scales:{ 
                 y:{ 
-                    beginAtZero: false, // Left axis auto-scales
+                    beginAtZero: false, 
                     title:{display:true,text:"Mbps"} 
                 } 
             },
