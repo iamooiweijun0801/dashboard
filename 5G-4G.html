@@ -81,7 +81,9 @@ const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIeWBt5CB8zp
 
 function num(v) { if (!v) return null; return parseFloat(v); }
 function percent(v) { if (!v) return null; return parseFloat(v.toString().replace("%","")); }
-function paddedRange(values, pad=0.15){ 
+
+// Helper for Right Axis (5G %) logic
+function paddedRange(values, pad=0.25){ 
     const clean = values.filter(v=>v!==null && !isNaN(v));
     const max = Math.max(...clean) || 100;
     return {min: 0, max: max + (max * pad)}; 
@@ -113,11 +115,9 @@ Papa.parse(SHEET_URL,{
         barLine("rrcUser", t, d.map(r=>num(r["L.Traffic.User.Avg"])), d.map(r=>num(r["NR RRC User Avg"])), d.map(r=>percent(r["5G User Percentage (%)"])), "LTE Users", "NR Users", "5G User %");
         barLine("dlPrb", t, d.map(r=>num(r["DL PRB Utilization(%)"])), d.map(r=>num(r["NR DL PRB Utilization"])), d.map(r=>percent(r["5G DL PRB %"])), "LTE DL PRB %", "NR DL PRB %", "5G DL PRB %");
         
-        // Fifth Graph: DL TP - Auto-scaled
-        barOnly("dlTp", t, d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"])), "LTE DL TP (Mbps)", "NR DL TP (Mbps)", true);
-        
-        // Sixth Graph: UL TP - Locked to 0
-        barOnly("ulTp", t, d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR UL User Throughput"])), "LTE UL TP (Mbps)", "NR UL TP (Mbps)", false);
+        // Throughput Graphs (Bar only) also use auto-scaling on Y
+        barOnly("dlTp", t, d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"])), "LTE DL TP (Mbps)", "NR DL TP (Mbps)");
+        barOnly("ulTp", t, d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR UL User Throughput"])), "LTE UL TP (Mbps)", "NR UL TP (Mbps)");
     }
 });
 
@@ -146,8 +146,18 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
             responsive:true, maintainAspectRatio:false,
             interaction:{mode:'index', intersect:false},
             scales:{
-                y:{ min: 0, title:{display:true,text:"Value"} },
-                y1:{ position:"right", min: 0, suggestedMax:rightRange.max, grid:{drawOnChartArea:false}, title:{display:true,text:"%"}, ticks:{callback:v=>v+"%"} }
+                y:{ 
+                    beginAtZero: false, // Enables Auto-scaling for left axis
+                    title:{display:true,text:"Value"} 
+                },
+                y1:{ 
+                    position:"right", 
+                    min: 0, // Keeps 5G% logic locked at 0
+                    suggestedMax:rightRange.max, 
+                    grid:{drawOnChartArea:false}, 
+                    title:{display:true,text:"%"}, 
+                    ticks:{callback:v=>v+"%"} 
+                }
             },
             plugins:{
                 datalabels: { clip: false },
@@ -165,7 +175,7 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
     });
 }
 
-function barOnly(id, labels, b1, b2, l1, l2, autoScale){
+function barOnly(id, labels, b1, b2, l1, l2){
     new Chart(document.getElementById(id),{
         type:"bar",
         data:{labels,datasets:[
@@ -177,7 +187,7 @@ function barOnly(id, labels, b1, b2, l1, l2, autoScale){
             interaction:{mode:'index', intersect:false},
             scales:{ 
                 y:{ 
-                    min: autoScale ? undefined : 0, // Auto-scale if true, else lock to 0
+                    beginAtZero: false, // Auto-scaling for Throughput graphs
                     title:{display:true,text:"Mbps"} 
                 } 
             },
