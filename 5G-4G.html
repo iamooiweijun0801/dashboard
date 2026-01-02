@@ -66,78 +66,78 @@ const CC_ORANGE = "#FFA500", CC_BLUE = "#004C97", CC_RED = "#e15759";
 let charts = {};
 
 const timelineAnimation = {
-    x: { type: 'number', easing: 'linear', duration: 1000, from: NaN, delay(ctx) { if (ctx.type !== 'data' || ctx.xStarted) return 0; ctx.xStarted = true; return ctx.index * 50; } },
-    y: { type: 'number', easing: 'easeOutQuart', duration: 1000, from: (ctx) => ctx.chart.scales.y.getPixelForValue(0), delay(ctx) { if (ctx.type !== 'data' || ctx.yStarted) return 0; ctx.yStarted = true; return ctx.index * 50; } }
+    x: { type: 'number', easing: 'linear', duration: 1000, from: NaN, delay(ctx){ if(ctx.type!=='data'||ctx.xStarted) return 0; ctx.xStarted=true; return ctx.index*50; } },
+    y: { type: 'number', easing: 'easeOutQuart', duration: 1000, from:(ctx)=>ctx.chart.scales.y.getPixelForValue(0), delay(ctx){ if(ctx.type!=='data'||ctx.yStarted) return 0; ctx.yStarted=true; return ctx.index*50; } }
 };
 
-function num(v) { if (!v) return null; return parseFloat(v); }
-function percent(v) { if (!v) return null; return parseFloat(v.toString().replace("%","")); }
+function num(v){ if(!v) return null; return parseFloat(v); }
+function percent(v){ if(!v) return null; return parseFloat(v.toString().replace("%","")); }
 
-function getCeiling(values, step = 5) {
-    const clean = values.filter(v => v !== null && !isNaN(v));
+function getCeiling(values, step = 5){
+    const clean = values.filter(v=>v!==null && !isNaN(v));
     const maxVal = Math.max(...clean) || 0;
-    const bufferedMax = maxVal + (maxVal * 0.01); 
+    const bufferedMax = maxVal + (maxVal * 0.01);
     return Math.ceil(bufferedMax / step) * step;
 }
 
-function fetchData() {
-    Papa.parse(SHEET_URL, {
-        download: true, header: true,
-        complete: res => {
-            const d = res.data.filter(r => r.Time);
-            const t = d.map(r => r.Time);
-            updateOrBuild("dlTraffic", t, [d.map(r=>num(r["LTE DL Data Total Volume(GB)"])), d.map(r=>num(r["NR DL Traffic Volume (GB)"])), d.map(r=>percent(r["5G DL Traffic Percentage (%)"]))], ["LTE DL", "NR DL", "5G DL %"], true);
-            updateOrBuild("ulTraffic", t, [d.map(r=>num(r["LTE UL Data Total Volume(GB)"])), d.map(r=>num(r["NR UL Traffic Volume (GB)"])), d.map(r=>percent(r["5G UL Traffic Percentage (%)"]))], ["LTE UL", "NR UL", "5G UL %"], true);
-            updateOrBuild("rrcUser", t, [d.map(r=>num(r["L.Traffic.User.Avg"])), d.map(r=>num(r["NR RRC User Avg"])), d.map(r=>percent(r["5G User Percentage (%)"]))], ["LTE Users", "NR Users", "5G User %"], true);
-            updateOrBuild("dlPrb", t, [d.map(r=>num(r["DL PRB Utilization(%)"])), d.map(r=>num(r["NR DL PRB Utilization"])), d.map(r=>percent(r["5G DL PRB %"]))], ["LTE DL PRB %", "NR DL PRB %", "5G DL PRB %"], true);
-            updateOrBuild("dlTp", t, [d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"]))], ["LTE DL Mbps", "NR DL Mbps"], false);
-            updateOrBuild("ulTp", t, [d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR UL User Throughput"]))], ["LTE UL Mbps", "NR UL Mbps"], false);
+function fetchData(){
+    Papa.parse(SHEET_URL,{
+        download:true, header:true,
+        complete: res=>{
+            const d = res.data.filter(r=>r.Time);
+            const t = d.map(r=>r.Time);
+            updateOrBuild("dlTraffic", t, [d.map(r=>num(r["LTE DL Data Total Volume(GB)"])), d.map(r=>num(r["NR DL Traffic Volume (GB)"])), d.map(r=>percent(r["5G DL Traffic Percentage (%)"]))], ["LTE DL","NR DL","5G DL %"], true);
+            updateOrBuild("ulTraffic", t, [d.map(r=>num(r["LTE UL Data Total Volume(GB)"])), d.map(r=>num(r["NR UL Traffic Volume (GB)"])), d.map(r=>percent(r["5G UL Traffic Percentage (%)"]))], ["LTE UL","NR UL","5G UL %"], true);
+            updateOrBuild("rrcUser", t, [d.map(r=>num(r["L.Traffic.User.Avg"])), d.map(r=>num(r["NR RRC User Avg"])), d.map(r=>percent(r["5G User Percentage (%)"]))], ["LTE Users","NR Users","5G User %"], true);
+            updateOrBuild("dlPrb", t, [d.map(r=>num(r["DL PRB Utilization(%)"])), d.map(r=>num(r["NR DL PRB Utilization"])), d.map(r=>percent(r["5G DL PRB %"]))], ["LTE DL PRB %","NR DL PRB %","5G DL PRB %"], true);
+            updateOrBuild("dlTp", t, [d.map(r=>num(r["LTE DL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR DL User Throughput (Rmv LastTTI)"]))], ["LTE DL Mbps","NR DL Mbps"], false);
+            updateOrBuild("ulTp", t, [d.map(r=>num(r["LTE UL Avg Throughput per User (Mbps)"])), d.map(r=>num(r["NR UL User Throughput"]))], ["LTE UL Mbps","NR UL Mbps"], false);
         }
     });
 }
 
-function updateOrBuild(id, labels, dataSets, names, isLine) {
-    if (charts[id]) {
+function updateOrBuild(id, labels, dataSets, names, isLine){
+    if(charts[id]){
         charts[id].data.labels = labels;
-        dataSets.forEach((ds, i) => { charts[id].data.datasets[i].data = ds; });
-        if(isLine) charts[id].options.scales.y1.max = getCeiling(dataSets[2], 5);
-        charts[id].update(); 
+        dataSets.forEach((ds,i)=>charts[id].data.datasets[i].data = ds);
+        if(isLine) charts[id].options.scales.y1.max = getCeiling(dataSets[2],5);
+        charts[id].update();
     } else {
-        charts[id] = isLine ? barLine(id, labels, dataSets[0], dataSets[1], dataSets[2], names[0], names[1], names[2]) : barOnly(id, labels, dataSets[0], dataSets[1], names[0], names[1]);
+        charts[id] = isLine
+            ? barLine(id, labels, dataSets[0], dataSets[1], dataSets[2], names[0], names[1], names[2])
+            : barOnly(id, labels, dataSets[0], dataSets[1], names[0], names[1]);
     }
 }
 
 function barLine(id, labels, b1, b2, ln, l1, l2, ll){
     return new Chart(document.getElementById(id),{
-        data:{labels, datasets:[
-            {type:"bar", label:l1, data:b1, backgroundColor: CC_BLUE, order: 2, datalabels: {display: false}, animation: timelineAnimation},
-            {type:"bar", label:l2, data:b2, backgroundColor: CC_ORANGE, order: 2, datalabels: {display: false}, animation: timelineAnimation},
-            {type:"line", label:ll, data:ln, yAxisID:"y1", borderColor: CC_RED, backgroundColor: CC_RED, tension: 0.3, pointRadius: 4, borderWidth: 2, order: 1, animation: timelineAnimation,
-             datalabels: { 
-                display: true, color: CC_RED, font: { size: 12, weight: 'bold' }, formatter: v => v.toFixed(1) + '%',
-                // restored Zig-Zag / Non-overlapping logic
-                anchor: 'end',
-                align: (ctx) => {
-                    const curr = ctx.dataset.data[ctx.dataIndex];
-                    const prev = ctx.dataIndex > 0 ? ctx.dataset.data[ctx.dataIndex - 1] : null;
-                    return (prev !== null && curr < prev) ? 'bottom' : 'top';
+        data:{labels,datasets:[
+            {type:"bar",label:l1,data:b1,backgroundColor:CC_BLUE,order:2,datalabels:{display:false},animation:timelineAnimation},
+            {type:"bar",label:l2,data:b2,backgroundColor:CC_ORANGE,order:2,datalabels:{display:false},animation:timelineAnimation},
+            {type:"line",label:ll,data:ln,yAxisID:"y1",borderColor:CC_RED,backgroundColor:CC_RED,tension:0.3,pointRadius:4,borderWidth:2,order:1,animation:timelineAnimation,
+             datalabels:{
+                display:true,
+                color:CC_RED,
+                font:{ size:12, weight:'bold' },
+                formatter:v=>v.toFixed(1)+'%',
+                anchor:'end',
+                align: ctx => ctx.dataIndex % 2 === 0 ? 'top' : 'bottom',
+                offset: ctx => {
+                    const v = ctx.dataset.data[ctx.dataIndex];
+                    const p = ctx.dataset.data[ctx.dataIndex - 1];
+                    return (p !== undefined && Math.abs(v - p) < 2) ? 16 : 8;
                 },
-                offset: (ctx) => {
-                    const curr = ctx.dataset.data[ctx.dataIndex];
-                    const prev = ctx.dataIndex > 0 ? ctx.dataset.data[ctx.dataIndex - 1] : null;
-                    // If values are too close, increase offset to push them apart
-                    return (prev !== null && Math.abs(curr - prev) < 2) ? 15 : 8;
-                },
-                padding: 4, clamp: true
+                padding:4,
+                clamp:true
              }
             }
         ]},
-        options: { 
-            responsive:true, maintainAspectRatio:false, layout: { padding: { top: 35, bottom: 10 } },
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } }, datalabels: { clip: false } },
-            scales: { 
-                y: { beginAtZero: true, min: 0, ticks: { font: { size: 10 } } }, 
-                y1: { position: "right", beginAtZero: true, min: 0, max: getCeiling(ln, 5), grid: { drawOnChartArea: false }, ticks: { callback: v => v + "%", font: { size: 10 } } } 
+        options:{
+            responsive:true, maintainAspectRatio:false, layout:{ padding:{ top:35, bottom:10 }},
+            plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, font:{ size:9 }}}, datalabels:{ clip:false }},
+            scales:{
+                y:{ beginAtZero:true, min:0, ticks:{ font:{ size:10 }}},
+                y1:{ position:"right", beginAtZero:true, min:0, max:getCeiling(ln,5), grid:{ drawOnChartArea:false }, ticks:{ callback:v=>v+'%', font:{ size:10 }}}
             }
         }
     });
@@ -146,25 +146,28 @@ function barLine(id, labels, b1, b2, ln, l1, l2, ll){
 function barOnly(id, labels, b1, b2, l1, l2){
     return new Chart(document.getElementById(id),{
         type:"bar",
-        data:{labels, datasets:[{label:l1, data:b1, backgroundColor: CC_BLUE, datalabels: {display: false}, animation: timelineAnimation},{label:l2, data:b2, backgroundColor: CC_ORANGE, datalabels: {display: false}, animation: timelineAnimation}]},
-        options: { responsive:true, maintainAspectRatio:false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, min: 0, ticks: { font: { size: 10 } } } } }
+        data:{labels,datasets:[
+            {label:l1,data:b1,backgroundColor:CC_BLUE,datalabels:{display:false},animation:timelineAnimation},
+            {label:l2,data:b2,backgroundColor:CC_ORANGE,datalabels:{display:false},animation:timelineAnimation}
+        ]},
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, font:{ size:9 }}}}, scales:{ y:{ beginAtZero:true, min:0, ticks:{ font:{ size:10 }}}}}
     });
 }
 
 fetchData();
-setInterval(fetchData, 30000); 
+setInterval(fetchData,30000);
 
-function takeScreenshot() { html2canvas(document.getElementById('capture-area'), { scale: 2 }).then(canvas => { document.getElementById('previewImg').src = canvas.toDataURL("image/png"); document.getElementById('previewModal').style.display = 'block'; }); }
-function closeModal() { document.getElementById('previewModal').style.display = 'none'; }
-function downloadPNG() { const l = document.createElement('a'); l.download = `Dashboard.png`; l.href = document.getElementById('previewImg').src; l.click(); }
-async function downloadPPT() {
-    let pptx = new PptxGenJS(); pptx.layout = 'LAYOUT_WIDE'; let slide = pptx.addSlide();
-    for (let i = 0; i < 6; i++) {
-        const canvas = await html2canvas(document.getElementById(`card-${i}`), { scale: 2 });
-        let col = i % 2, row = Math.floor(i / 2);
-        slide.addImage({ data: canvas.toDataURL("image/png"), x: 0.2 + (col * 6.6), y: 0.2 + (row * 2.4), w: 6.3, h: 2.3 });
+function takeScreenshot(){ html2canvas(document.getElementById('capture-area'),{scale:2}).then(c=>{document.getElementById('previewImg').src=c.toDataURL("image/png");document.getElementById('previewModal').style.display='block';});}
+function closeModal(){ document.getElementById('previewModal').style.display='none'; }
+function downloadPNG(){ const l=document.createElement('a'); l.download='Dashboard.png'; l.href=document.getElementById('previewImg').src; l.click(); }
+async function downloadPPT(){
+    let pptx=new PptxGenJS(); pptx.layout='LAYOUT_WIDE'; let slide=pptx.addSlide();
+    for(let i=0;i<6;i++){
+        const c=await html2canvas(document.getElementById(`card-${i}`),{scale:2});
+        let col=i%2,row=Math.floor(i/2);
+        slide.addImage({data:c.toDataURL("image/png"),x:0.2+(col*6.6),y:0.2+(row*2.4),w:6.3,h:2.3});
     }
-    pptx.writeFile({ fileName: `KPI_Report.pptx` });
+    pptx.writeFile({fileName:'KPI_Report.pptx'});
 }
 </script>
 </body>
