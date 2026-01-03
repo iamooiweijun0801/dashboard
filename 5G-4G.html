@@ -106,9 +106,9 @@ function build(id, l, d, n, isLine) {
                         formatter: v => v.toFixed(1) + "%",
                         anchor: 'end',
                         align: (c) => {
-                            const val = d[2][c.dataIndex];
-                            const prev = c.dataIndex > 0 ? d[2][c.dataIndex - 1] : val;
-                            return val >= prev ? 'top' : 'bottom';
+                        return c.dataIndex % 2 === 0 ? 'top' : 'bottom';
+                        },
+
                         },
                         offset: 5, padding: 1,
                         textStrokeColor: 'rgba(255,255,255,0.8)', textStrokeWidth: 2
