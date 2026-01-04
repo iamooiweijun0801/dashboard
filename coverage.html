@@ -2,214 +2,127 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Interactive Sites Map — Coverage</title>
+<title>Site Coverage Map</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-:root{
-  --bg:#e0eaff;
-  --card:#ffffff80;
-  --accent:#2F80ED;
-  --radius:12px;
-  --shadow:0 8px 30px rgba(0,0,0,0.12);
-}
-
-html, body {
-  margin:0; height:100%;
-  font-family: 'Inter', system-ui, Arial;
-  background: #f4f7f9;
-}
-.app{
-  display:grid;
-  grid-template-columns:350px 1fr;
-  gap:15px;
-  height:100vh;
-  padding:15px;
-  box-sizing:border-box;
-}
-.panel{
-  background:white;
-  border-radius:var(--radius);
-  padding:20px;
-  box-shadow:var(--shadow);
-  display:flex;
-  flex-direction:column;
-  overflow:auto;
-}
-#map{
-  height:100%;
-  border-radius:var(--radius);
-  box-shadow:var(--shadow);
-  background: #cbd5e0;
-}
-h2{margin:0 0 15px 0; font-size:1.2em; color:#333;}
-.stat-grid{display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;}
-.stat-card{background:#f8fafc; padding:10px; border-radius:8px; text-align:center; border:1px solid #edf2f7;}
-.stat-val{font-size:18px; font-weight:bold; color:var(--accent);}
-.stat-lbl{font-size:11px; color:#718096; text-transform:uppercase;}
-
-.legend{font-size:12px; margin-bottom:20px; display:flex; flex-direction:column; gap:5px;}
-.legend-item{display:flex; align-items:center; gap:8px;}
-.sw{width:12px; height:12px; border-radius:50%; border:1px solid #fff; box-shadow:0 0 2px rgba(0,0,0,0.2);}
-
-input{width:100%; padding:10px; border-radius:8px; border:1px solid #ddd; margin-bottom:10px; box-sizing:border-box;}
-.btn{width:100%; padding:10px; background:var(--accent); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:600;}
-#details{margin-top:20px; font-size:13px; padding:10px; background:#fffaf0; border-left:4px solid #ed8936; border-radius:4px;}
-
-@media(max-width:800px){.app{grid-template-columns:1fr;}}
+  body { margin:0; height:100vh; font-family: sans-serif; display: flex; flex-direction: column; }
+  #controls { padding: 15px; background: #2c3e50; color: white; display: flex; gap: 20px; align-items: center; }
+  #map { flex-grow: 1; }
+  .legend { display: flex; gap: 15px; font-size: 13px; }
+  .swatch { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 1px solid white; }
+  #search { padding: 8px; border-radius: 4px; border: none; width: 250px; }
+  .btn { padding: 8px 15px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; }
 </style>
 </head>
 <body>
 
-<div class="app">
-  <div class="panel">
-    <h2>Network Coverage</h2>
-    
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-val" id="totalCount">0</div>
-        <div class="stat-lbl">Total Sites</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="donePct">0%</div>
-        <div class="stat-lbl">Completed</div>
-      </div>
-    </div>
-
-    <div class="legend">
-      <div class="legend-item"><span class="sw" style="background:#8a2be2"></span> IBS (Indoor)</div>
-      <div class="legend-item"><span class="sw" style="background:#ff8c00"></span> iMacro</div>
-      <div class="legend-item"><span class="sw" style="background:#1f6fff"></span> Cutover Done</div>
-      <div class="legend-item"><span class="sw" style="background:#1F4E79"></span> Pending / NA</div>
-    </div>
-
-    <input id="searchInput" type="text" placeholder="Search SRAN_ID or Name..."/>
-    <button id="searchBtn" class="btn">Locate Site</button>
-
-    <div id="details">Click or hover a site to see data.</div>
+<div id="controls">
+  <strong>Coverage Viewer</strong>
+  <div class="legend">
+    <div><span class="swatch" style="background:#8a2be2"></span> IBS (50m Circle)</div>
+    <div><span class="swatch" style="background:#ff8c00"></span> iMacro (150m Sector)</div>
+    <div><span class="swatch" style="background:#ffd700"></span> Other (100m Circle)</div>
   </div>
-
-  <div id="map"></div>
+  <input id="search" type="text" placeholder="Search SRAN_ID...">
+  <button id="searchBtn" class="btn">Find</button>
 </div>
+
+<div id="map"></div>
 
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-// Colors Configuration
-const COLORS = {
-    ibs: '#8a2be2',
-    imacro: '#ff8c00',
-    done: '#1f6fff',
-    pending: '#1F4E79'
-};
-
-const map = L.map('map').setView([11.5, 104.9], 10);
+const map = L.map('map').setView([11.5, 104.9], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 const markersLayer = L.layerGroup().addTo(map);
 const coverageLayer = L.layerGroup().addTo(map);
 
-let allData = [];
-let markerRegistry = {};
+let registry = {};
 
-function getStatusColor(r) {
-    const status = (r['Cutover Status'] || '').toLowerCase();
-    const type = (r['SiteType'] || '').toLowerCase();
-    
-    if (status.includes('done') || status.includes('live')) return COLORS.done;
-    if (type.includes('ibs')) return COLORS.ibs;
-    if (type.includes('imacro')) return COLORS.imacro;
-    return COLORS.pending;
+// --- Logic for drawing the Coverage Sector (for iMacro) ---
+function createSector(lat, lon, azimuth, color) {
+    const pts = [];
+    const radius = 150; // 150 meters
+    const beamWidth = 60; // 60 degree wide slice
+    const steps = 20;
+
+    for (let i = 0; i <= steps; i++) {
+        const angle = (azimuth - beamWidth / 2 + (i / steps) * beamWidth) * (Math.PI / 180);
+        const dx = radius * Math.sin(angle);
+        const dy = radius * Math.cos(angle);
+        // Approximation for lat/lon conversion
+        pts.push([lat + (dy / 111320), lon + (dx / (111320 * Math.cos(lat * Math.PI / 180)))]);
+    }
+    pts.unshift([lat, lon]);
+    return L.polygon(pts, { color: color, weight: 1, fillOpacity: 0.5 });
 }
 
-function loadMap() {
+async function loadData() {
     const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=1868990124&single=true&output=csv';
-
+    
     Papa.parse(CSV_URL, {
         download: true,
         header: true,
         skipEmptyLines: true,
         complete: function(results) {
-            allData = results.data;
-            renderMarkers();
+            const bounds = L.latLngBounds();
+            
+            results.data.forEach(row => {
+                const lat = parseFloat(row.Latitude);
+                const lon = parseFloat(row.Longitude);
+                const type = (row.SiteType || '').toUpperCase();
+                const az = parseFloat(row.Azimuth) || 0;
+
+                if (isNaN(lat) || isNaN(lon)) return;
+
+                let color, shape;
+
+                // --- Coverage Logic ---
+                if (type === 'IBS') {
+                    color = '#8a2be2'; // Purple
+                    shape = L.circle([lat, lon], { radius: 50, color: color, fillOpacity: 0.4 });
+                } else if (type.includes('IMACRO')) {
+                    color = '#ff8c00'; // Orange
+                    shape = createSector(lat, lon, az, color);
+                } else {
+                    color = '#ffd700'; // Yellow
+                    shape = L.circle([lat, lon], { radius: 100, color: color, fillOpacity: 0.4 });
+                }
+
+                shape.addTo(coverageLayer);
+
+                // --- Marker Dot ---
+                const marker = L.circleMarker([lat, lon], {
+                    radius: 4,
+                    color: '#fff',
+                    weight: 2,
+                    fillColor: color,
+                    fillOpacity: 1
+                }).addTo(markersLayer);
+
+                marker.bindPopup(`<b>${row['Site Name']}</b><br>ID: ${row.SRAN_ID}<br>Type: ${type}<br>Azimuth: ${az}°`);
+                
+                registry[row.SRAN_ID] = marker;
+                bounds.extend([lat, lon]);
+            });
+
+            if (bounds.isValid()) map.fitBounds(bounds);
         }
     });
 }
 
-function renderMarkers() {
-    markersLayer.clearLayers();
-    coverageLayer.clearLayers();
-    markerRegistry = {};
-
-    let doneCount = 0;
-    const bounds = L.latLngBounds();
-
-    allData.forEach(row => {
-        const lat = parseFloat(row.Latitude);
-        const lon = parseFloat(row.Longitude);
-        
-        if (isNaN(lat) || isNaN(lon)) return;
-
-        const color = getStatusColor(row);
-        if (color === COLORS.done) doneCount++;
-
-        // 1. Create Coverage Circle
-        const circle = L.circle([lat, lon], {
-            radius: row.SiteType === 'IBS' ? 50 : 150,
-            color: color,
-            fillOpacity: 0.3,
-            weight: 1
-        }).addTo(coverageLayer);
-
-        // 2. Create Dot Marker
-        const icon = L.divIcon({
-            className: 'custom-dot',
-            html: `<div style="background:${color}; width:8px; height:8px; border-radius:50%; border:2px solid white;"></div>`,
-            iconSize: [12, 12]
-        });
-
-        const marker = L.marker([lat, lon], {icon: icon});
-        
-        const popupContent = `
-            <strong>${row['Site Name']}</strong><br>
-            ID: ${row.SRAN_ID}<br>
-            Type: ${row.SiteType}<br>
-            Status: ${row['Cutover Status']}
-        `;
-
-        marker.bindPopup(popupContent);
-        marker.on('mouseover', function() {
-            document.getElementById('details').innerHTML = popupContent;
-        });
-
-        marker.addTo(markersLayer);
-        markerRegistry[row.SRAN_ID] = marker;
-        bounds.extend([lat, lon]);
-    });
-
-    // Stats Update
-    document.getElementById('totalCount').innerText = allData.length;
-    document.getElementById('donePct').innerText = Math.round((doneCount/allData.length)*100) + '%';
-
-    if (bounds.isValid()) {
-        map.fitBounds(bounds, {padding: [50, 50]});
-    }
-}
-
-// Search Function
 document.getElementById('searchBtn').onclick = () => {
-    const term = document.getElementById('searchInput').value.trim();
-    const marker = markerRegistry[term];
-    if (marker) {
-        map.setView(marker.getLatLng(), 17);
-        marker.openPopup();
-    } else {
-        alert("Site ID not found. Try searching a SRAN_ID like '4894'");
+    const id = document.getElementById('search').value;
+    if (registry[id]) {
+        map.setView(registry[id].getLatLng(), 17);
+        registry[id].openPopup();
     }
 };
 
-loadMap();
+loadData();
 </script>
 </body>
 </html>
