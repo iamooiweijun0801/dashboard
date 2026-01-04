@@ -2,234 +2,272 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Site Map Dashboard with Coverage</title>
+<title>Interactive Sites Map — Coverage</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-
 <style>
+:root{
+  --bg:#e0eaff;
+  --card:#ffffff80;
+  --accent:#2F80ED;
+  --accent-hover:#1C60B3;
+  --pending:#1F4E79;
+  --done:#66ff00;
+  --radius:12px;
+  --shadow:0 8px 30px rgba(0,0,0,0.12);
+
+  --cov-other:#ffd700;   /* yellow */
+  --cov-imacro:#ff8c00;  /* orange */
+  --cov-ibs:#8a2be2;     /* purple */
+  --cov-done:#1f6fff;    /* blue */
+}
+
 html, body {
-  margin:0;
-  height:100%;
-  font-family: Inter, system-ui, Arial;
+  margin:0; height:100%;
+  font-family: 'Inter', system-ui, Arial;
+  background: linear-gradient(to bottom right, #e0eaff, #ffffff);
+  color:#222; font-size:14px; line-height:1.5;
 }
-
-#map {
-  width:100%;
+.app{
+  display:grid;
+  grid-template-columns:380px 1fr;
+  gap:16px;
   height:100vh;
+  padding:16px;
+  box-sizing:border-box;
 }
-
-.coverage-legend {
-  background: rgba(255,255,255,0.95);
-  padding: 10px 12px;
-  border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-  font-size: 13px;
+.panel{
+  background:var(--card);
+  backdrop-filter: blur(12px);
+  border-radius:var(--radius);
+  padding:16px;
+  box-shadow:var(--shadow);
+  display:flex;
+  flex-direction:column;
+  overflow:auto;
+  border:1px solid rgba(255,255,255,0.3);
 }
-
-.coverage-legend .item {
-  display: flex;
-  align-items: center;
-  margin-top: 6px;
+#map{
+  height:100%;
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  border:2px solid rgba(255,255,255,0.3);
 }
-
-.coverage-legend .swatch {
-  width: 18px;
-  height: 18px;
-  margin-right: 8px;
-  border-radius: 50%;
-  border: 1px solid #555;
-}
+h2{margin-bottom:12px;font-weight:700;font-size:1.4em;color:#1a1a1a;}
+label{font-weight:600;color:#333;}
+.controls{display:flex;flex-direction:column;gap:12px;}
+.row{display:flex;gap:12px;align-items:center;}
+select,input[type=text]{padding:8px 10px;border-radius:var(--radius);border:1px solid #ccc;transition:0.2s;}
+select:focus, input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 8px rgba(47,128,237,0.3);}
+.btn{padding:10px 16px;border-radius:var(--radius);border:none;font-weight:600;cursor:pointer;color:#fff;background: linear-gradient(135deg,var(--accent),#1e5fc1);transition:0.3s;box-shadow:0 4px 12px rgba(0,0,0,0.2);}
+.btn:hover{background:var(--accent-hover);transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,0.25);}
+.stat{background:rgba(255,255,255,0.85);flex:1;padding:12px;border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,0.08);text-align:center;transition:0.2s;}
+.stat:hover{box-shadow:0 6px 18px rgba(0,0,0,0.15);transform:translateY(-2px);}
+.stat .small{font-weight:500;color:#555;margin-bottom:4px;}
+.stat div[id]{font-weight:700;font-size:20px;margin-top:4px;}
+.legend .sw{width:16px;height:16px;border-radius:50%;display:inline-block;margin-right:8px;border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,0.25);}
+#details{font-size:14px;color:#222;margin-top:8px;padding:8px;border-radius:var(--radius);background:rgba(255,255,255,0.7);box-shadow:0 4px 12px rgba(0,0,0,0.08);min-height:64px;}
+.search-wrap{display:flex;gap:8px;}
+.map-sniper-btn{position:absolute;bottom:20px;right:20px;z-index:9999;width:50px;height:50px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #444;box-shadow:0 2px 8px rgba(0,0,0,0.25);}
+.map-sniper-btn img{width:28px;height:28px;}
+.map-sniper-btn:hover{transform:translateY(-4px);box-shadow:0 6px 18px rgba(0,0,0,0.28);}
+hr{border:none;border-top:1px solid #eee;margin:12px 0;}
+@media(max-width:950px){.app{grid-template-columns:1fr;grid-template-rows:320px 1fr;}}
 </style>
 </head>
-
 <body>
-<div id="map"></div>
+<div class="app">
+<div class="panel">
+  <h2>Site Map Dashboard</h2>
+  <div class="controls">
+    <div class="row">
+      <label for="viewSelect">View</label>
+      <select id="viewSelect"><option value="all">All Sites</option></select>
+    </div>
+    <div class="row">
+      <div class="stat">
+        <div class="small">Done / Total</div>
+        <div id="doneTotal">0 / 0</div>
+        <div class="small" id="donePct">0%</div>
+      </div>
+      <div class="stat">
+        <div class="small">Pending</div>
+        <div id="pendingCount">0</div>
+        <div class="small" id="totalCount">Total: 0</div>
+      </div>
+    </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <div class="row legend small">
+      <span class="sw" style="background:var(--cov-done)"></span>Cutover Done
+      <span class="sw" style="background:var(--cov-imacro)"></span>iMacro
+      <span class="sw" style="background:var(--cov-ibs)"></span>IBS
+      <span class="sw" style="background:var(--cov-other)"></span>Others
+    </div>
+
+    <hr/>
+
+    <div class="row search-wrap">
+      <input id="searchInput" type="text" placeholder="Search Site Name / SRAN_ID"/>
+      <button id="searchBtn" class="btn">Find</button>
+    </div>
+
+    <div id="details">Hover a marker or search to see details here.</div>
+  </div>
+</div>
+
+<div class="panel" style="padding:0;">
+  <div id="map">
+    <div id="sniperBtn" class="map-sniper-btn" title="Reset view to current filter bounds">
+      <img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" alt="sniper">
+    </div>
+  </div>
+</div>
+</div>
+
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
-
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-/* ===================== MAP INIT ===================== */
-const map = L.map('map').setView([3.0, 101.5], 6);
+// --------------------- Map setup ---------------------
+const map = L.map('map',{preferCanvas:true}).setView([3.0,101.5],6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+const markersLayer=L.layerGroup().addTo(map);
+const coverageLayer=L.layerGroup().addTo(map);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19
-}).addTo(map);
+// --------------------- Icons ---------------------
+function dotIcon(color){ return L.divIcon({className:'',html:`<div style="width:10px;height:10px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.25);"></div>`,iconSize:[14,14],iconAnchor:[7,7],popupAnchor:[0,-10]}); }
+const ICON_PENDING = dotIcon('#1F4E79'); 
+const ICON_DONE = dotIcon('#66ff00');
 
-const markerLayer = L.layerGroup().addTo(map);
-const coverageLayer = L.layerGroup().addTo(map);
+// --------------------- State ---------------------
+let allRows=[], visibleMarkers={}, pinnedMarker=null;
 
-/* ===================== COLORS ===================== */
-const COLOR_DONE   = '#1f6fff'; // BLUE
-const COLOR_IMACRO = '#ff8c00'; // ORANGE
-const COLOR_IBS    = '#8a2be2'; // PURPLE
-const COLOR_OTHER  = '#ffd700'; // YELLOW
+// --------------------- Helpers ---------------------
+function isDoneStatus(s){ if(!s) return false; s=s.toString().toLowerCase(); return /done|live|active|on\s*-?\s*air|onair/.test(s); }
+function escapeHtml(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
-const COVERAGE_OPACITY = 0.6;
-
-/* ===================== UTIL ===================== */
-function isDone(status){
-  return /done|on\s*air|live|active/i.test(status || '');
+// --------------------- Coverage ---------------------
+function coverageColor(siteType, done){
+  if(done) return getComputedStyle(document.documentElement).getPropertyValue('--cov-done').trim();
+  siteType = (siteType||'').toLowerCase();
+  if(siteType.includes('imacro')) return getComputedStyle(document.documentElement).getPropertyValue('--cov-imacro').trim();
+  if(siteType.includes('ibs')) return getComputedStyle(document.documentElement).getPropertyValue('--cov-ibs').trim();
+  return getComputedStyle(document.documentElement).getPropertyValue('--cov-other').trim();
 }
 
-/* ===================== MARKER ICON ===================== */
-function dotIcon(color){
-  return L.divIcon({
-    className:'',
-    html:`<div style="
-      width:10px;height:10px;
-      background:${color};
-      border-radius:50%;
-      border:2px solid white;
-      box-shadow:0 0 4px rgba(0,0,0,0.3);
-    "></div>`,
-    iconSize:[14,14],
-    iconAnchor:[7,7]
-  });
-}
-
-/* ===================== SECTOR (CONE) ===================== */
-function createSector(lat, lon, azimuth, radius, style){
-  const pts = [];
-  const steps = 30;
-  const width = 60;
-
-  const start = azimuth - width/2;
-  const end   = azimuth + width/2;
-
+function sector(lat,lon,azimuth,radius,color){
+  const pts=[], width=60, steps=30;
   for(let i=0;i<=steps;i++){
-    const ang = (start + (i/steps)*(end-start)) * Math.PI/180;
-    const dx = radius * Math.sin(ang);
-    const dy = radius * Math.cos(ang);
-    const latO = dy / 111320;
-    const lonO = dx / (111320 * Math.cos(lat*Math.PI/180));
-    pts.push([lat+latO, lon+lonO]);
+    const a=(azimuth-width/2+(i/steps)*width)*Math.PI/180;
+    const dx=radius*Math.sin(a), dy=radius*Math.cos(a);
+    pts.push([lat+dy/111320, lon+dx/(111320*Math.cos(lat*Math.PI/180))]);
   }
-
   pts.unshift([lat,lon]);
-  return L.polygon(pts, style);
+  return L.polygon(pts,{color,fillColor:color,fillOpacity:0.5,weight:1});
 }
 
-/* ===================== COVERAGE COLOR LOGIC ===================== */
-function getCoverageColor(siteType, cutoverStatus){
-  if (isDone(cutoverStatus)) return COLOR_DONE;
-
-  siteType = (siteType || '').toLowerCase();
-
-  if (siteType.includes('imacro')) return COLOR_IMACRO;
-  if (siteType.includes('ibs'))    return COLOR_IBS;
-
-  return COLOR_OTHER;
-}
-
-/* ===================== COVERAGE CREATOR ===================== */
-function createCoverage(row){
-  if(!Number.isFinite(row.lat) || !Number.isFinite(row.lon)) return null;
-
-  const color = getCoverageColor(row.site_type, row.cutover_status);
-
-  const style = {
-    color,
-    fillColor: color,
-    fillOpacity: COVERAGE_OPACITY,
-    weight: 1
-  };
-
+function createCoverage(r){
+  const color=coverageColor(r.SiteType,r.done);
   let shape;
-  const type = row.site_type.toLowerCase();
-
-  if(type.includes('imacro')){
-    shape = createSector(row.lat, row.lon, Number(row.azimuth)||0, 150, style);
+  if((r.SiteType||'').toLowerCase().includes('imacro')){
+    shape = sector(r.Latitude,r.Longitude,r.Azimuth||0,150,color);
+  } else if((r.SiteType||'').toLowerCase().includes('ibs')){
+    shape = L.circle([r.Latitude,r.Longitude],{radius:50,color,fillColor:color,fillOpacity:0.5});
+  } else {
+    shape = L.circle([r.Latitude,r.Longitude],{radius:150,color,fillColor:color,fillOpacity:0.5});
   }
-  else if(type.includes('ibs')){
-    shape = L.circle([row.lat,row.lon], { radius:50, ...style });
-  }
-  else{
-    shape = L.circle([row.lat,row.lon], { radius:150, ...style });
-  }
-
-  shape.on('mouseover', ()=>{
-    shape.setStyle({ fillOpacity: 0.9, weight: 2 });
-  });
-
-  shape.on('mouseout', ()=>{
-    shape.setStyle({ fillOpacity: COVERAGE_OPACITY, weight: 1 });
-  });
-
+  shape.on('mouseover',()=>shape.setStyle({fillOpacity:0.9,weight:2}));
+  shape.on('mouseout',()=>shape.setStyle({fillOpacity:0.5,weight:1}));
   return shape;
 }
 
-/* ===================== LOAD CSV ===================== */
-async function loadCsv(){
-  const CSV_URL =
-  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=1868990124&single=true&output=csv';
-
-  const res = await fetch(CSV_URL);
-  const text = await res.text();
-
+// --------------------- CSV Load ---------------------
+function loadCsvText(text){
   const parsed = Papa.parse(text,{header:true,skipEmptyLines:true});
-  render(parsed.data);
+  if(!parsed.data){ alert('No data'); return; }
+  allRows=[];
+  parsed.data.forEach((r,i)=>{
+    const lat=parseFloat(r.Latitude), lon=parseFloat(r.Longitude);
+    const done=isDoneStatus(r['Cutover Status']);
+    allRows.push({...r,_rowIndex:i,Latitude:lat,Longitude:lon,done});
+  });
+  render();
 }
 
-/* ===================== RENDER ===================== */
-function render(rows){
-  markerLayer.clearLayers();
+// --------------------- Render ---------------------
+function render(){
+  markersLayer.clearLayers();
   coverageLayer.clearLayers();
+  visibleMarkers={};
 
-  const bounds = [];
+  let doneCount=0,pendingCount=0;
 
-  rows.forEach(r=>{
-    const lat = parseFloat(r.Latitude);
-    const lon = parseFloat(r.Longitude);
-    if(!Number.isFinite(lat)||!Number.isFinite(lon)) return;
+  allRows.forEach(r=>{
+    if(!Number.isFinite(r.Latitude)||!Number.isFinite(r.Longitude)) return;
+    if(r.done) doneCount++; else pendingCount++;
 
-    const color = getCoverageColor(r.SiteType, r['Cutover Status']);
-    const icon = dotIcon(color);
+    const icon=r.done?ICON_DONE:ICON_PENDING;
+    const popupHtml=`<div><strong>${escapeHtml(r['Site Name'])}</strong><br/>
+      <em>SRAN_ID:</em> ${escapeHtml(r.SRAN_ID)}<br/>
+      <em>Site Type:</em> ${escapeHtml(r.SiteType)}<br/>
+      <em>Cutover Status:</em> ${escapeHtml(r['Cutover Status'])}</div>`;
 
-    const marker = L.marker([lat,lon],{icon}).addTo(markerLayer);
+    const m=L.marker([r.Latitude,r.Longitude],{icon});
+    m.bindPopup(popupHtml,{autoClose:false,closeOnClick:false});
+    m.on('mouseover',()=>{ m.openPopup(); document.getElementById('details').innerHTML=popupHtml; });
+    m.on('mouseout',()=>{ if(pinnedMarker!==m) m.closePopup(); });
+    m.on('click',()=>{ if(pinnedMarker&&pinnedMarker!==m) pinnedMarker.closePopup(); pinnedMarker=m; m.openPopup(); map.setView(m.getLatLng(),16); document.getElementById('details').innerHTML=popupHtml; });
+    m.addTo(markersLayer);
+    visibleMarkers[r.SRAN_ID||('row'+r._rowIndex)]=m;
 
-    marker.bindPopup(`
-      <b>${r['Site Name']}</b><br>
-      Site Type: ${r.SiteType}<br>
-      Cutover: ${r['Cutover Status']}<br>
-      Azimuth: ${r.Azimuth || '-'}
-    `);
-
-    const coverage = createCoverage({
-      lat, lon,
-      site_type: r.SiteType || '',
-      azimuth: r.Azimuth || 0,
-      cutover_status: r['Cutover Status'] || ''
-    });
-
-    if(coverage) coverage.addTo(coverageLayer);
-    bounds.push([lat,lon]);
+    // add coverage
+    const cov=createCoverage(r);
+    if(cov) cov.addTo(coverageLayer);
   });
 
-  if(bounds.length){
-    map.fitBounds(bounds,{padding:[40,40]});
+  document.getElementById('doneTotal').textContent=`${doneCount} / ${allRows.length}`;
+  document.getElementById('pendingCount').textContent=pendingCount;
+  document.getElementById('donePct').textContent=allRows.length?Math.round(doneCount/allRows.length*100)+'%':'0%';
+  document.getElementById('totalCount').textContent=`Total: ${allRows.length}`;
+
+  if(allRows.length){
+    const bounds=L.latLngBounds(allRows.filter(r=>Number.isFinite(r.Latitude)&&Number.isFinite(r.Longitude)).map(r=>[r.Latitude,r.Longitude]));
+    if(bounds.isValid()) map.fitBounds(bounds.pad(0.2));
   }
 }
 
-/* ===================== LEGEND ===================== */
-const legend = L.control({position:'bottomleft'});
-legend.onAdd = function(){
-  const d = L.DomUtil.create('div','coverage-legend');
-  d.innerHTML = `
-    <b>Coverage Legend</b>
-    <div class="item"><div class="swatch" style="background:${COLOR_DONE}"></div>Cutover Done</div>
-    <div class="item"><div class="swatch" style="background:${COLOR_IMACRO}"></div>iMacro</div>
-    <div class="item"><div class="swatch" style="background:${COLOR_IBS}"></div>IBS</div>
-    <div class="item"><div class="swatch" style="background:${COLOR_OTHER}"></div>Others</div>
-  `;
-  return d;
-};
-legend.addTo(map);
+// --------------------- Search ---------------------
+function searchAndZoom(term){
+  if(!term||!term.toString().trim()){ alert('Enter a Site Name or SRAN_ID'); return; }
+  term=term.toString().trim();
+  let found=allRows.find(r=>r.SRAN_ID===term || (r['Site Name']&&r['Site Name'].toLowerCase().includes(term.toLowerCase())));
+  if(!found){ alert('Site not found'); return; }
+  if(Number.isFinite(found.Latitude)&&Number.isFinite(found.Longitude)){
+    const key=found.SRAN_ID||('row'+found._rowIndex);
+    if(visibleMarkers[key]){
+      const m=visibleMarkers[key];
+      m.openPopup(); pinnedMarker=m;
+      map.setView(m.getLatLng(),16);
+      document.getElementById('details').innerHTML=m.getPopup().getContent();
+    }
+  }
+}
 
-/* ===================== AUTO REFRESH ===================== */
-loadCsv();
-setInterval(loadCsv, 30000);
+// --------------------- Events ---------------------
+document.getElementById('searchBtn').addEventListener('click',()=>searchAndZoom(document.getElementById('searchInput').value));
+document.getElementById('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchAndZoom(e.target.value);}});
+document.getElementById('sniperBtn').addEventListener('click',()=>render());
+
+// --------------------- Fetch CSV ---------------------
+const CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=1868990124&single=true&output=csv'; // replace with Google Sheets CSV or local CSV
+async function fetchCsv(){
+  try{
+    const r=await fetch(CSV_URL);
+    const t=await r.text();
+    loadCsvText(t);
+  }catch(err){console.error(err);}
+}
+fetchCsv();
+setInterval(fetchCsv,30*1000); // refresh every 30s
 </script>
 </body>
 </html>
