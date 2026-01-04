@@ -11,14 +11,22 @@
   #progress-bar { width: 0%; height: 100%; background: #2ecc71; transition: width 0.2s; }
   #header { padding: 10px 20px; background: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); z-index: 1000; }
   #map { flex-grow: 1; z-index: 1; }
-  #info-panel { position: absolute; bottom: 30px; left: 20px; background: rgba(255,255,255,0.95); padding: 12px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); z-index: 1000; min-width: 250px; backdrop-filter: blur(4px); border-left: 5px solid #3498db; pointer-events: none; }
+  
+  /* Floating Hover Panel */
+  #info-panel { position: absolute; bottom: 30px; left: 20px; background: rgba(255,255,255,0.95); padding: 12px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); z-index: 1000; min-width: 260px; backdrop-filter: blur(4px); border-left: 5px solid #3498db; pointer-events: none; }
+  
   .legend { position: absolute; top: 70px; right: 20px; background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); z-index: 1000; font-size: 12px; }
   .swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+  
   .controls { display: flex; gap: 8px; align-items: center; }
   input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 180px; font-size: 13px; }
-  .btn { padding: 8px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
-  .btn-gps { background: white; color: #333; border: 1px solid #ccc; width: 35px; height: 35px; padding: 0; }
-  .btn-gps img { width: 20px; height: 20px; }
+  .btn { padding: 8px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .btn-gps { background: white; color: #333; border: 1px solid #ccc; width: 35px; height: 35px; padding: 0; display: flex; align-items: center; justify-content: center; }
+  
+  /* Custom Popup Styling */
+  .leaflet-popup-content-wrapper { border-radius: 8px; padding: 5px; }
+  .site-popup-table { width: 100%; font-size: 11px; border-collapse: collapse; }
+  .site-popup-table td { padding: 3px 0; border-bottom: 1px solid #eee; }
 </style>
 </head>
 <body>
@@ -29,7 +37,7 @@
   <div style="font-weight: 700; color: #2c3e50;">Coverage Map <span id="counter" style="color: #3498db; font-weight: 700; font-size: 14px; margin-left:10px;"></span></div>
   <div class="controls">
     <button id="resetBtn" class="btn btn-gps" title="Reset View">
-      <img src="https://cdn-icons-png.flaticon.com/512/854/854878.png" alt="GPS">
+      <img src="https://cdn-icons-png.flaticon.com/512/854/854878.png" width="18" height="18">
     </button>
     <input id="search" type="text" placeholder="Search SRAN_ID...">
     <button id="searchBtn" class="btn">Find</button>
@@ -38,93 +46,58 @@
 
 <div class="legend">
   <div style="margin-bottom:6px; font-weight:bold;">Legend</div>
-  <div style="margin-bottom:4px;"><span class="swatch" style="background:#ffd700"></span> Other</div>
-  <div style="margin-bottom:4px;"><span class="swatch" style="background:#ff8c00"></span> iMacro</div>
-  <div style="margin-bottom:4px;"><span class="swatch" style="background:#1e90ff"></span> Done</div>
-  <div style="margin-bottom:4px;"><span class="swatch" style="background:#8a2be2"></span> IBS</div>
+  <div><span class="swatch" style="background:#ffd700"></span> Other</div>
+  <div><span class="swatch" style="background:#ff8c00"></span> iMacro</div>
+  <div><span class="swatch" style="background:#1e90ff"></span> Done</div>
+  <div><span class="swatch" style="background:#8a2be2"></span> IBS</div>
 </div>
 
-<div id="info-panel">
-  <div id="info-content" style="font-size: 13px; color: #2c3e50;">Hover over a site or coverage area</div>
-</div>
-
+<div id="info-panel"><div id="info-content">Hover over a site</div></div>
 <div id="map"></div>
 
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-// --- Map Settings ---
 const DEFAULT_CENTER = [11.56603, 104.9194];
-const DEFAULT_ZOOM = 16; // Zoomed in "a bit bit" more than 15
-
-const map = L.map('map', { 
-    preferCanvas: true // Still use canvas for speed, but logic is fixed below
-}).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-
+const map = L.map('map', { preferCanvas: true }).setView(DEFAULT_CENTER, 17);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// Panes for stacking order
-map.createPane('coveragePane');
-map.getPane('coveragePane').style.zIndex = 400;
+map.createPane('yellowPane').style.zIndex = 450;
+map.createPane('markerPane').style.zIndex = 600;
 
-map.createPane('yellowCoveragePane');
-map.getPane('yellowCoveragePane').style.zIndex = 450; // Yellow coverage above other coverage
-
-map.createPane('markerPane');
-map.getPane('markerPane').style.zIndex = 600; // All markers above all coverage
-
-const coverageLayer = L.featureGroup().addTo(map);
+const coverageLayer = L.layerGroup().addTo(map);
 const markersLayer = L.layerGroup().addTo(map);
 
 let registry = {};
 let uniqueCoords = new Set();
+let uniqueSiteNames = new Set();
 
 const COLORS = { DONE: '#1e90ff', IBS: '#8a2be2', IMACRO: '#ff8c00', OTHER: '#ffd700' };
-const OPACITY = { DONE: 0.3, IBS: 0.15, IMACRO: 0.5, OTHER: 0.45 };
+const OPACITY = { DONE: 0.3, IBS: 0.15, IMACRO: 0.5, OTHER: 0.35 };
 
-// --- Simplified Detail Panel (Per Request) ---
-function updateInfo(data) {
-    document.getElementById('info-content').innerHTML = `
-        <div style="font-weight:700; border-bottom:1px solid #eee; margin-bottom:8px; padding-bottom:5px; font-size:14px; color:#1a73e8;">
+// Function to generate content for both Hover and Click
+function getSiteHTML(data, titleSize = "14px") {
+    return `
+        <div style="font-weight:700; border-bottom:1px solid #3498db; margin-bottom:8px; padding-bottom:5px; font-size:${titleSize}; color:#1a73e8;">
             ${data['Site Name'] || 'N/A'}
         </div>
-        <table style="width:100%; font-size:12px; border-collapse: collapse;">
-            <tr><td style="color:#666; padding:2px 0;">SRAN Name:</td><td style="font-weight:600;">${data['SRAN Name'] || 'N/A'}</td></tr>
-            <tr><td style="color:#666; padding:2px 0;">Site Code:</td><td style="font-weight:600;">${data['Site Code'] || 'N/A'}</td></tr>
-            <tr><td style="color:#666; padding:2px 0;">SRAN ID:</td><td style="font-weight:600;">${data.SRAN_ID || 'N/A'}</td></tr>
-            <tr><td style="color:#666; padding:2px 0;">Site Type:</td><td style="font-weight:600;">${data.SiteType || 'N/A'}</td></tr>
-        </table>
-    `;
+        <table class="site-popup-table">
+            <tr><td style="color:#666;">SRAN Name:</td><td style="font-weight:600; text-align:right;">${data['SRAN Name'] || 'N/A'}</td></tr>
+            <tr><td style="color:#666;">Site Code:</td><td style="font-weight:600; text-align:right;">${data['Site Code'] || 'N/A'}</td></tr>
+            <tr><td style="color:#666;">SRAN ID:</td><td style="font-weight:600; text-align:right;">${data.SRAN_ID || 'N/A'}</td></tr>
+            <tr><td style="color:#666;">Site Type:</td><td style="font-weight:600; text-align:right;">${data.SiteType || 'N/A'}</td></tr>
+        </table>`;
 }
 
-function createCone(lat, lon, azimuth, color, row, isYellow) {
-    const pts = [];
-    const radius = 150; 
-    const beamWidth = 60;
-    const steps = 12; 
-
+function createCone(lat, lon, azimuth, color, isYellow) {
+    const pts = [[lat, lon]];
+    const radius = 150, beam = 60, steps = 12;
     for (let i = 0; i <= steps; i++) {
-        const angle = (azimuth - beamWidth / 2 + (i / steps) * beamWidth) * (Math.PI / 180);
-        const dx = radius * Math.sin(angle);
-        const dy = radius * Math.cos(angle);
-        pts.push([lat + (dy / 111320), lon + (dx / (111320 * Math.cos(lat * Math.PI / 180)))]);
+        const angle = (azimuth - beam / 2 + (i / steps) * beam) * (Math.PI / 180);
+        pts.push([lat + (radius * Math.cos(angle) / 111320), lon + (radius * Math.sin(angle) / (111320 * Math.cos(lat * Math.PI / 180)))]);
     }
-    pts.unshift([lat, lon]);
-    
-    const poly = L.polygon(pts, { 
-        stroke: false, 
-        fillColor: color, 
-        fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.IMACRO,
-        interactive: true,
-        pane: isYellow ? 'yellowCoveragePane' : 'coveragePane'
-    });
-    
-    poly.on('mouseover', (e) => {
-        L.DomEvent.stopPropagation(e); // Prevent background events
-        updateInfo(row);
-    });
-    return poly;
+    return L.polygon(pts, { stroke: false, fillColor: color, fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.IMACRO, pane: isYellow ? 'yellowPane' : 'overlayPane', interactive: false });
 }
 
 async function loadData() {
@@ -141,70 +114,45 @@ function processData(data) {
         const end = Math.min(current + batchSize, total);
         for (let i = current; i < end; i++) {
             const r = data[i];
-            const lat = parseFloat(r.Latitude);
-            const lon = parseFloat(r.Longitude);
+            const lat = parseFloat(r.Latitude), lon = parseFloat(r.Longitude);
             if (isNaN(lat) || isNaN(lon)) continue;
+
+            if (r['Site Name']) uniqueSiteNames.add(r['Site Name'].trim());
 
             const status = (r['Cutover Status'] || '').toLowerCase();
             const type = (r.SiteType || '').toUpperCase();
+            let color = COLORS.OTHER, isYellow = false;
             
-            let color = COLORS.OTHER;
-            let opacity = OPACITY.OTHER;
-            let isYellow = false;
-            
-            if (status.includes('done') || status.includes('live')) { color = COLORS.DONE; opacity = OPACITY.DONE; }
-            else if (type === 'IBS') { color = COLORS.IBS; opacity = OPACITY.IBS; }
-            else if (type.includes('IMACRO')) { color = COLORS.IMACRO; opacity = OPACITY.IMACRO; }
-            else { isYellow = true; }
+            if (status.includes('done') || status.includes('live')) color = COLORS.DONE;
+            else if (type === 'IBS') color = COLORS.IBS;
+            else if (type.includes('IMACRO')) color = COLORS.IMACRO;
+            else isYellow = true;
 
             const coordKey = `${lat.toFixed(5)}|${lon.toFixed(5)}`;
-            const isIBS = type === 'IBS';
-
-            // Coverage Shape
-            if (isIBS || !uniqueCoords.has(coordKey)) {
-                let shape;
-                const pane = isYellow ? 'yellowCoveragePane' : 'coveragePane';
-                
-                if (isIBS) {
-                    shape = L.circle([lat, lon], { radius: 50, stroke: false, fillColor: color, fillOpacity: opacity, pane: pane });
-                } else if (type.includes('IMACRO')) {
-                    shape = createCone(lat, lon, parseFloat(r.Azimuth) || 0, color, r, isYellow);
-                } else {
-                    shape = L.circle([lat, lon], { radius: 150, stroke: false, fillColor: color, fillOpacity: opacity, pane: pane });
-                }
-                
-                shape.on('mouseover', (e) => {
-                    L.DomEvent.stopPropagation(e);
-                    updateInfo(r);
-                });
-                shape.addTo(coverageLayer);
-                if (!isIBS) uniqueCoords.add(coordKey);
+            if (type === 'IBS' || !uniqueCoords.has(coordKey)) {
+                if (type === 'IBS') L.circle([lat, lon], { radius: 50, stroke: false, fillColor: color, fillOpacity: OPACITY.IBS, interactive: false }).addTo(coverageLayer);
+                else if (type.includes('IMACRO')) createCone(lat, lon, parseFloat(r.Azimuth) || 0, color, isYellow).addTo(coverageLayer);
+                else L.circle([lat, lon], { radius: 150, stroke: false, fillColor: color, fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.DONE, pane: isYellow ? 'yellowPane' : 'overlayPane', interactive: false }).addTo(coverageLayer);
+                if (type !== 'IBS') uniqueCoords.add(coordKey);
             }
 
-            // Dot Marker (On the top-most pane)
-            const marker = L.circleMarker([lat, lon], {
-                radius: 3, 
-                stroke: false, 
-                fillColor: color, 
-                fillOpacity: 1, 
-                pane: 'markerPane',
-                interactive: true 
-            }).addTo(markersLayer);
+            // Visible Dot
+            const dot = L.circleMarker([lat, lon], { radius: 3, stroke: false, fillColor: color, fillOpacity: 1, pane: 'markerPane', interactive: false }).addTo(markersLayer);
 
-            marker.on('mouseover', (e) => { 
-                L.DomEvent.stopPropagation(e);
-                updateInfo(r); 
-                marker.setRadius(6); 
-            });
-            marker.on('mouseout', () => marker.setRadius(3));
+            // Interaction Zone (The Clickable part)
+            const zone = L.circleMarker([lat, lon], { radius: 12, stroke: false, fillColor: 'transparent', pane: 'markerPane', interactive: true }).addTo(markersLayer);
+            
+            zone.on('mouseover', () => { document.getElementById('info-content').innerHTML = getSiteHTML(r); dot.setRadius(7); });
+            zone.on('mouseout', () => dot.setRadius(3));
+            
+            // CLICK ACTION: Open a Sticky Popup
+            zone.bindPopup(getSiteHTML(r, "12px"), { closeButton: true, offset: [0, -5] });
 
-            registry[r.SRAN_ID] = marker;
+            registry[r.SRAN_ID] = zone;
         }
-
         current = end;
         document.getElementById('progress-bar').style.width = (current / total * 100) + '%';
-        document.getElementById('counter').innerText = `${current.toLocaleString()} sites`;
-
+        document.getElementById('counter').innerText = `${uniqueSiteNames.size.toLocaleString()} Unique Sites`;
         if (current < total) requestAnimationFrame(renderBatch);
         else document.getElementById('progress-container').style.display = 'none';
     }
@@ -212,16 +160,14 @@ function processData(data) {
 }
 
 document.getElementById('searchBtn').onclick = () => {
-    const val = document.getElementById('search').value.trim();
-    const m = registry[val];
-    if (m) { map.setView(m.getLatLng(), 18); m.fire('mouseover'); }
-    else alert("Site ID not found.");
+    const m = registry[document.getElementById('search').value.trim()];
+    if (m) { 
+        map.setView(m.getLatLng(), 18); 
+        m.openPopup(); // Auto-opens the window on search
+    } else alert("Site ID not found.");
 };
 
-document.getElementById('resetBtn').onclick = () => {
-    map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-};
-
+document.getElementById('resetBtn').onclick = () => map.setView(DEFAULT_CENTER, 17);
 loadData();
 </script>
 </body>
