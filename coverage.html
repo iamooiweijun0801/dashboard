@@ -145,7 +145,7 @@ function processData(data) {
             if (isIBS || !uniqueCoords.has(coordKey)) {
                 let shape;
                 if (isIBS) {
-                    shape = L.circle([lat, lon], { radius: 100, stroke: false, fillColor: color, fillOpacity: opacity });
+                    shape = L.circle([lat, lon], { radius: 50, stroke: false, fillColor: color, fillOpacity: opacity });
                 } else if (type.includes('IMACRO')) {
                     shape = createCone(lat, lon, parseFloat(r.Azimuth) || 0, color, r);
                 } else {
