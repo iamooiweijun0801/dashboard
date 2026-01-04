@@ -2,31 +2,44 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Site Coverage Map</title>
+<title>Pro Site Map (30k Rows)</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-  body { margin:0; height:100vh; font-family: sans-serif; display: flex; flex-direction: column; }
-  #controls { padding: 15px; background: #2c3e50; color: white; display: flex; gap: 20px; align-items: center; }
-  #map { flex-grow: 1; }
-  .legend { display: flex; gap: 15px; font-size: 13px; }
-  .swatch { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 1px solid white; }
-  #search { padding: 8px; border-radius: 4px; border: none; width: 250px; }
-  .btn { padding: 8px 15px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; }
+  body { margin:0; height:100vh; font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; background: #f4f4f9; }
+  
+  /* Progress Bar Styles */
+  #progress-container { width: 100%; background: #ddd; height: 10px; position: fixed; top: 0; left: 0; z-index: 10000; display: none; }
+  #progress-bar { width: 0%; height: 100%; background: #27ae60; transition: width 0.1s; }
+  
+  #header { padding: 15px; background: #1a2a3a; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+  #map { flex-grow: 1; z-index: 1; }
+  
+  .stats-box { font-size: 12px; background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 4px; }
+  .controls { display: flex; gap: 10px; }
+  input { padding: 8px; border-radius: 4px; border: 1px solid #ccc; width: 200px; }
+  .btn { padding: 8px 15px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+  
+  .loading-msg { position: fixed; top: 20px; right: 20px; background: white; padding: 10px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 9999; display: none; font-weight: bold; }
 </style>
 </head>
 <body>
 
-<div id="controls">
-  <strong>Coverage Viewer</strong>
-  <div class="legend">
-    <div><span class="swatch" style="background:#8a2be2"></span> IBS (50m Circle)</div>
-    <div><span class="swatch" style="background:#ff8c00"></span> iMacro (150m Sector)</div>
-    <div><span class="swatch" style="background:#ffd700"></span> Other (100m Circle)</div>
+<div id="progress-container"><div id="progress-bar"></div></div>
+
+<div id="header">
+  <div>
+    <strong>Coverage Dashboard</strong>
+    <span id="load-status" style="margin-left:15px; font-size: 0.8em; color: #bdc3c7;">Waiting for data...</span>
   </div>
-  <input id="search" type="text" placeholder="Search SRAN_ID...">
-  <button id="searchBtn" class="btn">Find</button>
+  
+  <div class="controls">
+    <input id="search" type="text" placeholder="Search SRAN_ID...">
+    <button id="searchBtn" class="btn">Find</button>
+  </div>
 </div>
+
+<div id="loading-toast" class="loading-msg">Rendering Sites: <span id="render-count">0</span></div>
 
 <div id="map"></div>
 
@@ -34,91 +47,135 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-const map = L.map('map').setView([11.5, 104.9], 12);
+// Configuration
+const BATCH_SIZE = 500; // How many sites to draw per frame
+const COLORS = { IBS: '#8a2be2', IMACRO: '#ff8c00', OTHER: '#ffd700' };
+
+const map = L.map('map', { preferCanvas: true }).setView([11.5, 104.9], 10);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
+const coverageLayer = L.featureGroup().addTo(map);
 const markersLayer = L.layerGroup().addTo(map);
-const coverageLayer = L.layerGroup().addTo(map);
 
 let registry = {};
-
-// --- Logic for drawing the Coverage Sector (for iMacro) ---
-function createSector(lat, lon, azimuth, color) {
-    const pts = [];
-    const radius = 150; // 150 meters
-    const beamWidth = 60; // 60 degree wide slice
-    const steps = 20;
-
-    for (let i = 0; i <= steps; i++) {
-        const angle = (azimuth - beamWidth / 2 + (i / steps) * beamWidth) * (Math.PI / 180);
-        const dx = radius * Math.sin(angle);
-        const dy = radius * Math.cos(angle);
-        // Approximation for lat/lon conversion
-        pts.push([lat + (dy / 111320), lon + (dx / (111320 * Math.cos(lat * Math.PI / 180)))]);
-    }
-    pts.unshift([lat, lon]);
-    return L.polygon(pts, { color: color, weight: 1, fillOpacity: 0.5 });
-}
+let uniqueCoords = new Set();
 
 async function loadData() {
     const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=1868990124&single=true&output=csv';
+    
+    document.getElementById('load-status').innerText = "Downloading CSV...";
     
     Papa.parse(CSV_URL, {
         download: true,
         header: true,
         skipEmptyLines: true,
         complete: function(results) {
-            const bounds = L.latLngBounds();
-            
-            results.data.forEach(row => {
-                const lat = parseFloat(row.Latitude);
-                const lon = parseFloat(row.Longitude);
-                const type = (row.SiteType || '').toUpperCase();
-                const az = parseFloat(row.Azimuth) || 0;
-
-                if (isNaN(lat) || isNaN(lon)) return;
-
-                let color, shape;
-
-                // --- Coverage Logic ---
-                if (type === 'IBS') {
-                    color = '#8a2be2'; // Purple
-                    shape = L.circle([lat, lon], { radius: 50, color: color, fillOpacity: 0.4 });
-                } else if (type.includes('IMACRO')) {
-                    color = '#ff8c00'; // Orange
-                    shape = createSector(lat, lon, az, color);
-                } else {
-                    color = '#ffd700'; // Yellow
-                    shape = L.circle([lat, lon], { radius: 100, color: color, fillOpacity: 0.4 });
-                }
-
-                shape.addTo(coverageLayer);
-
-                // --- Marker Dot ---
-                const marker = L.circleMarker([lat, lon], {
-                    radius: 4,
-                    color: '#fff',
-                    weight: 2,
-                    fillColor: color,
-                    fillOpacity: 1
-                }).addTo(markersLayer);
-
-                marker.bindPopup(`<b>${row['Site Name']}</b><br>ID: ${row.SRAN_ID}<br>Type: ${type}<br>Azimuth: ${az}°`);
-                
-                registry[row.SRAN_ID] = marker;
-                bounds.extend([lat, lon]);
-            });
-
-            if (bounds.isValid()) map.fitBounds(bounds);
+            processInBatches(results.data);
         }
     });
 }
 
+function createSector(lat, lon, azimuth, color) {
+    const pts = [];
+    const radius = 150; 
+    const beamWidth = 60;
+    const steps = 12; // Lowered steps for performance
+
+    for (let i = 0; i <= steps; i++) {
+        const angle = (azimuth - beamWidth / 2 + (i / steps) * beamWidth) * (Math.PI / 180);
+        const dx = radius * Math.sin(angle);
+        const dy = radius * Math.cos(angle);
+        pts.push([lat + (dy / 111320), lon + (dx / (111320 * Math.cos(lat * Math.PI / 180)))]);
+    }
+    pts.unshift([lat, lon]);
+    return L.polygon(pts, { color: color, weight: 1, fillOpacity: 0.3, interactive: false });
+}
+
+function processInBatches(data) {
+    const total = data.length;
+    let current = 0;
+    
+    document.getElementById('progress-container').style.display = 'block';
+    document.getElementById('loading-toast').style.display = 'block';
+    document.getElementById('load-status').innerText = `Total Rows: ${total.toLocaleString()}`;
+
+    function renderNextBatch() {
+        const end = Math.min(current + BATCH_SIZE, total);
+        
+        for (let i = current; i < end; i++) {
+            const row = data[i];
+            const lat = parseFloat(row.Latitude);
+            const lon = parseFloat(row.Longitude);
+            const type = (row.SiteType || '').toUpperCase();
+            const sranId = row.SRAN_ID;
+
+            if (isNaN(lat) || isNaN(lon)) continue;
+
+            // --- DE-DUPLICATION LOGIC ---
+            const coordKey = `${lat.toFixed(5)}|${lon.toFixed(5)}`;
+            const isIBS = type === 'IBS';
+            
+            // Draw coverage ONLY if it's IBS OR it's a new coordinate we haven't seen
+            if (isIBS || !uniqueCoords.has(coordKey)) {
+                let shape;
+                if (isIBS) {
+                    shape = L.circle([lat, lon], { radius: 50, color: COLORS.IBS, fillOpacity: 0.3, weight: 1, interactive: false });
+                } else if (type.includes('IMACRO')) {
+                    shape = createSector(lat, lon, parseFloat(row.Azimuth) || 0, COLORS.IMACRO);
+                } else {
+                    shape = L.circle([lat, lon], { radius: 100, color: COLORS.OTHER, fillOpacity: 0.3, weight: 1, interactive: false });
+                }
+                shape.addTo(coverageLayer);
+                if (!isIBS) uniqueCoords.add(coordKey);
+            }
+
+            // --- MARKER LOGIC ---
+            // Only add clickable markers to the registry for searching
+            const marker = L.circleMarker([lat, lon], {
+                radius: 3,
+                color: 'white',
+                weight: 1,
+                fillColor: isIBS ? COLORS.IBS : (type.includes('IMACRO') ? COLORS.IMACRO : COLORS.OTHER),
+                fillOpacity: 0.8
+            });
+            
+            marker.bindPopup(`<b>${row['Site Name']}</b><br>ID: ${sranId}`);
+            marker.addTo(markersLayer);
+            registry[sranId] = marker;
+        }
+
+        current = end;
+        
+        // Update Progress UI
+        const percent = (current / total) * 100;
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('render-count').innerText = `${current.toLocaleString()} / ${total.toLocaleString()}`;
+
+        if (current < total) {
+            requestAnimationFrame(renderNextBatch); // Schedule next batch
+        } else {
+            // Loading Finished
+            document.getElementById('progress-container').style.display = 'none';
+            document.getElementById('loading-toast').style.display = 'none';
+            document.getElementById('load-status').innerText += " (Render Complete)";
+            
+            // Auto-zoom once
+            const bounds = coverageLayer.getBounds();
+            if (bounds.isValid()) map.fitBounds(bounds);
+        }
+    }
+
+    renderNextBatch();
+}
+
 document.getElementById('searchBtn').onclick = () => {
     const id = document.getElementById('search').value;
-    if (registry[id]) {
-        map.setView(registry[id].getLatLng(), 17);
-        registry[id].openPopup();
+    const m = registry[id];
+    if (m) {
+        map.setView(m.getLatLng(), 17);
+        m.openPopup();
+    } else {
+        alert("SRAN_ID not found in the 30k records.");
     }
 };
 
