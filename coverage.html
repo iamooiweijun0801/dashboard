@@ -43,10 +43,10 @@
 
 <div class="legend">
   <div style="margin-bottom:6px; font-weight:bold;">Legend</div>
-  <span class="swatch" style="background:#ffd700"></span> Other (Yellow - Top)<br>
-  <span class="swatch" style="background:#ff8c00"></span> iMacro (Orange)<br>
-  <span class="swatch" style="background:#1e90ff"></span> Done (Blue)<br>
-  <span class="swatch" style="background:#8a2be2"></span> IBS (Purple)
+  <div style="margin-bottom:4px;"><span class="swatch" style="background:#ffd700"></span> Other</div>
+  <div style="margin-bottom:4px;"><span class="swatch" style="background:#ff8c00"></span> iMacro</div>
+  <div style="margin-bottom:4px;"><span class="swatch" style="background:#1e90ff"></span> Done</div>
+  <div style="margin-bottom:4px;"><span class="swatch" style="background:#8a2be2"></span> IBS</div>
 </div>
 
 <div id="info-panel">
@@ -65,7 +65,7 @@ const DEFAULT_ZOOM = 15;
 const map = L.map('map', { preferCanvas: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// Create a special pane for Yellow "Other" sites to ensure they are on top
+// Keep topPane for yellow priority
 map.createPane('topPane');
 map.getPane('topPane').style.zIndex = 650; 
 
@@ -74,11 +74,10 @@ const markersLayer = L.layerGroup().addTo(map);
 
 let registry = {};
 let uniqueCoords = new Set();
-let uniqueSiteNames = new Set();
 
 const COLORS = { DONE: '#1e90ff', IBS: '#8a2be2', IMACRO: '#ff8c00', OTHER: '#ffd700' };
-// Updated Opacity: Yellow is now much more solid (0.7)
-const OPACITY = { DONE: 0.3, IBS: 0.15, IMACRO: 0.5, OTHER: 0.7 };
+// Transparency: Yellow set to 0.45 (visible but transparent)
+const OPACITY = { DONE: 0.3, IBS: 0.15, IMACRO: 0.5, OTHER: 0.45 };
 
 function updateInfo(data) {
     document.getElementById('info-content').innerHTML = `
@@ -133,9 +132,6 @@ function processData(data) {
             const lon = parseFloat(r.Longitude);
             if (isNaN(lat) || isNaN(lon)) continue;
 
-            // Track Unique Site Names for the counter
-            if (r['Site Name']) uniqueSiteNames.add(r['Site Name'].trim());
-
             const status = (r['Cutover Status'] || '').toLowerCase();
             const type = (r.SiteType || '').toUpperCase();
             
@@ -146,52 +142,30 @@ function processData(data) {
             if (status.includes('done') || status.includes('live')) { color = COLORS.DONE; opacity = OPACITY.DONE; }
             else if (type === 'IBS') { color = COLORS.IBS; opacity = OPACITY.IBS; }
             else if (type.includes('IMACRO')) { color = COLORS.IMACRO; opacity = OPACITY.IMACRO; }
-            else { isYellow = true; } // Default is Other/Yellow
+            else { isYellow = true; }
 
             const coordKey = `${lat.toFixed(5)}|${lon.toFixed(5)}`;
             const isIBS = type === 'IBS';
 
-            // Coverage Render
             if (isIBS || !uniqueCoords.has(coordKey)) {
                 let shape;
                 if (isIBS) {
-                    shape = L.circle([lat, lon], { 
-                        radius: 50, // Reduced to 50m
-                        stroke: false, 
-                        fillColor: color, 
-                        fillOpacity: opacity,
-                        pane: isYellow ? 'topPane' : 'overlayPane'
-                    });
+                    shape = L.circle([lat, lon], { radius: 50, stroke: false, fillColor: color, fillOpacity: opacity, pane: isYellow ? 'topPane' : 'overlayPane' });
                 } else if (type.includes('IMACRO')) {
                     shape = createCone(lat, lon, parseFloat(r.Azimuth) || 0, color, r, isYellow);
                 } else {
-                    shape = L.circle([lat, lon], { 
-                        radius: 150, 
-                        stroke: false, 
-                        fillColor: color, 
-                        fillOpacity: opacity,
-                        pane: isYellow ? 'topPane' : 'overlayPane'
-                    });
+                    shape = L.circle([lat, lon], { radius: 150, stroke: false, fillColor: color, fillOpacity: opacity, pane: isYellow ? 'topPane' : 'overlayPane' });
                 }
-                
                 shape.on('mouseover', () => updateInfo(r));
                 shape.addTo(coverageLayer);
                 if (!isIBS) uniqueCoords.add(coordKey);
             }
 
-            // Dot Marker
             const marker = L.circleMarker([lat, lon], {
-                radius: 3, 
-                stroke: false,
-                fillColor: color,
-                fillOpacity: 1,
-                pane: isYellow ? 'topPane' : 'markerPane' // Yellow dots also on top
+                radius: 3, stroke: false, fillColor: color, fillOpacity: 1, pane: isYellow ? 'topPane' : 'markerPane'
             }).addTo(markersLayer);
 
-            marker.on('mouseover', () => {
-                updateInfo(r);
-                marker.setRadius(6);
-            });
+            marker.on('mouseover', () => { updateInfo(r); marker.setRadius(6); });
             marker.on('mouseout', () => marker.setRadius(3));
 
             registry[r.SRAN_ID] = marker;
@@ -199,7 +173,7 @@ function processData(data) {
 
         current = end;
         document.getElementById('progress-bar').style.width = (current / total * 100) + '%';
-        document.getElementById('counter').innerText = `(${uniqueSiteNames.size.toLocaleString()} Unique Sites)`;
+        document.getElementById('counter').innerText = `(${current.toLocaleString()} sites)`;
 
         if (current < total) requestAnimationFrame(renderBatch);
         else document.getElementById('progress-container').style.display = 'none';
