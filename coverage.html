@@ -10,249 +10,206 @@
   --bg:#e0eaff;
   --card:#ffffff80;
   --accent:#2F80ED;
-  --accent-hover:#1C60B3;
-  --pending:#1F4E79;
-  --done:#66ff00;
   --radius:12px;
   --shadow:0 8px 30px rgba(0,0,0,0.12);
-
-  --cov-other:#ffd700;   /* yellow */
-  --cov-imacro:#ff8c00;  /* orange */
-  --cov-ibs:#8a2be2;      /* purple */
-  --cov-done:#1f6fff;     /* blue */
 }
 
 html, body {
   margin:0; height:100%;
   font-family: 'Inter', system-ui, Arial;
-  background: linear-gradient(to bottom right, #e0eaff, #ffffff);
-  color:#222; font-size:14px; line-height:1.5;
+  background: #f4f7f9;
 }
 .app{
   display:grid;
-  grid-template-columns:380px 1fr;
-  gap:16px;
+  grid-template-columns:350px 1fr;
+  gap:15px;
   height:100vh;
-  padding:16px;
+  padding:15px;
   box-sizing:border-box;
 }
 .panel{
-  background:var(--card);
-  backdrop-filter: blur(12px);
+  background:white;
   border-radius:var(--radius);
-  padding:16px;
+  padding:20px;
   box-shadow:var(--shadow);
   display:flex;
   flex-direction:column;
   overflow:auto;
-  border:1px solid rgba(255,255,255,0.3);
 }
 #map{
   height:100%;
   border-radius:var(--radius);
   box-shadow:var(--shadow);
-  border:2px solid rgba(255,255,255,0.3);
-  background: #f0f0f0;
+  background: #cbd5e0;
 }
-h2{margin-bottom:12px;font-weight:700;font-size:1.4em;color:#1a1a1a;}
-label{font-weight:600;color:#333;}
-.controls{display:flex;flex-direction:column;gap:12px;}
-.row{display:flex;gap:12px;align-items:center;}
-select,input[type=text]{padding:8px 10px;border-radius:var(--radius);border:1px solid #ccc;transition:0.2s;width: 100%;}
-select:focus, input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 8px rgba(47,128,237,0.3);}
-.btn{padding:10px 16px;border-radius:var(--radius);border:none;font-weight:600;cursor:pointer;color:#fff;background: linear-gradient(135deg,var(--accent),#1e5fc1);transition:0.3s;box-shadow:0 4px 12px rgba(0,0,0,0.2);}
-.btn:hover{background:var(--accent-hover);transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,0.25);}
-.stat{background:rgba(255,255,255,0.85);flex:1;padding:12px;border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,0.08);text-align:center;transition:0.2s;}
-.stat:hover{box-shadow:0 6px 18px rgba(0,0,0,0.15);transform:translateY(-2px);}
-.stat .small{font-weight:500;color:#555;margin-bottom:4px;}
-.stat div[id]{font-weight:700;font-size:20px;margin-top:4px;}
-.legend{display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px;}
-.legend-item{display: flex; align-items: center; gap: 4px;}
-.sw{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid #fff;box-shadow:0 0 2px rgba(0,0,0,0.25);}
-#details{font-size:14px;color:#222;margin-top:8px;padding:8px;border-radius:var(--radius);background:rgba(255,255,255,0.7);box-shadow:0 4px 12px rgba(0,0,0,0.08);min-height:64px;}
-.search-wrap{display:flex;gap:8px;}
-.map-sniper-btn{position:absolute;bottom:20px;right:20px;z-index:9999;width:50px;height:50px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #444;box-shadow:0 2px 8px rgba(0,0,0,0.25);}
-.map-sniper-btn img{width:28px;height:28px;}
-hr{border:none;border-top:1px solid #eee;margin:12px 0;}
-@media(max-width:950px){.app{grid-template-columns:1fr;grid-template-rows:320px 1fr;}}
+h2{margin:0 0 15px 0; font-size:1.2em; color:#333;}
+.stat-grid{display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;}
+.stat-card{background:#f8fafc; padding:10px; border-radius:8px; text-align:center; border:1px solid #edf2f7;}
+.stat-val{font-size:18px; font-weight:bold; color:var(--accent);}
+.stat-lbl{font-size:11px; color:#718096; text-transform:uppercase;}
+
+.legend{font-size:12px; margin-bottom:20px; display:flex; flex-direction:column; gap:5px;}
+.legend-item{display:flex; align-items:center; gap:8px;}
+.sw{width:12px; height:12px; border-radius:50%; border:1px solid #fff; box-shadow:0 0 2px rgba(0,0,0,0.2);}
+
+input{width:100%; padding:10px; border-radius:8px; border:1px solid #ddd; margin-bottom:10px; box-sizing:border-box;}
+.btn{width:100%; padding:10px; background:var(--accent); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:600;}
+#details{margin-top:20px; font-size:13px; padding:10px; background:#fffaf0; border-left:4px solid #ed8936; border-radius:4px;}
+
+@media(max-width:800px){.app{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
+
 <div class="app">
-<div class="panel">
-  <h2>Site Map Dashboard</h2>
-  <div class="controls">
-    <div class="row">
-      <div class="stat">
-        <div class="small">Done / Total</div>
-        <div id="doneTotal">0 / 0</div>
-        <div class="small" id="donePct">0%</div>
+  <div class="panel">
+    <h2>Network Coverage</h2>
+    
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-val" id="totalCount">0</div>
+        <div class="stat-lbl">Total Sites</div>
       </div>
-      <div class="stat">
-        <div class="small">Pending</div>
-        <div id="pendingCount">0</div>
-        <div class="small" id="totalCount">Total: 0</div>
+      <div class="stat-card">
+        <div class="stat-val" id="donePct">0%</div>
+        <div class="stat-lbl">Completed</div>
       </div>
     </div>
 
     <div class="legend">
-      <div class="legend-item"><span class="sw" style="background:#1f6fff"></span>Done</div>
-      <div class="legend-item"><span class="sw" style="background:#ff8c00"></span>iMacro</div>
-      <div class="legend-item"><span class="sw" style="background:#8a2be2"></span>IBS</div>
-      <div class="legend-item"><span class="sw" style="background:#ffd700"></span>Others</div>
+      <div class="legend-item"><span class="sw" style="background:#8a2be2"></span> IBS (Indoor)</div>
+      <div class="legend-item"><span class="sw" style="background:#ff8c00"></span> iMacro</div>
+      <div class="legend-item"><span class="sw" style="background:#1f6fff"></span> Cutover Done</div>
+      <div class="legend-item"><span class="sw" style="background:#1F4E79"></span> Pending / NA</div>
     </div>
 
-    <hr/>
-    <div class="row search-wrap">
-      <input id="searchInput" type="text" placeholder="Search Site Name / SRAN_ID"/>
-      <button id="searchBtn" class="btn">Find</button>
-    </div>
-    <div id="details">Hover a marker to see details.</div>
+    <input id="searchInput" type="text" placeholder="Search SRAN_ID or Name..."/>
+    <button id="searchBtn" class="btn">Locate Site</button>
+
+    <div id="details">Click or hover a site to see data.</div>
   </div>
-</div>
 
-<div class="panel" style="padding:0; position: relative;">
   <div id="map"></div>
-  <div id="sniperBtn" class="map-sniper-btn" title="Reset View">
-    <img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" alt="sniper">
-  </div>
-</div>
 </div>
 
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <script>
-// --------------------- Map setup ---------------------
-const map = L.map('map',{preferCanvas:true}).setView([3.0,101.5],6);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
-const coverageLayer = L.layerGroup().addTo(map);
-const markersLayer = L.layerGroup().addTo(map);
-
-// --------------------- Config & Colors ---------------------
-const COLORS = { done: '#1f6fff', imacro: '#ff8c00', ibs: '#8a2be2', other: '#ffd700', pending: '#1F4E79', live: '#66ff00' };
-
-function dotIcon(color){ 
-    return L.divIcon({
-        className:'',
-        html:`<div style="width:10px;height:10px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>`,
-        iconSize:[14,14], iconAnchor:[7,7]
-    }); 
-}
-
-// --------------------- Helpers ---------------------
-function isDoneStatus(s){ 
-    if(!s) return false; 
-    const val = s.toString().toLowerCase();
-    return /done|live|active|on\s*-?\s*air|onair/.test(val); 
-}
-
-function getCovColor(r){
-    if(r.done) return COLORS.done;
-    const type = (r.SiteType || '').toLowerCase();
-    if(type.includes('imacro')) return COLORS.imacro;
-    if(type.includes('ibs')) return COLORS.ibs;
-    return COLORS.other;
-}
-
-// --------------------- Components ---------------------
-function createSector(lat, lon, azimuth, color){
-    const pts = [], width = 60, steps = 20, radius = 180;
-    for(let i=0; i<=steps; i++){
-        const a = (azimuth - width/2 + (i/steps)*width) * Math.PI/180;
-        const dx = radius * Math.sin(a), dy = radius * Math.cos(a);
-        pts.push([lat + dy/111320, lon + dx/(111320 * Math.cos(lat * Math.PI/180))]);
-    }
-    pts.unshift([lat, lon]);
-    return L.polygon(pts, {color: color, weight: 1, fillOpacity: 0.4});
-}
-
-// --------------------- Main Logic ---------------------
-let allRows = [], visibleMarkers = {};
-
-async function fetchCsv(){
-    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=1868990124&single=true&output=csv';
-    try {
-        const response = await fetch(CSV_URL);
-        const data = await response.text();
-        Papa.parse(data, {
-            header: true,
-            skipEmptyLines: true,
-            complete: (results) => {
-                allRows = results.data.map((r, i) => {
-                    // Normalizing column names to handle Google Sheets quirks
-                    return {
-                        ...r,
-                        Latitude: parseFloat(r.Latitude || r.LATITUDE || r.lat),
-                        Longitude: parseFloat(r.Longitude || r.LONGITUDE || r.lon || r.long),
-                        SiteType: r.SiteType || r.Site_Type || r['Site Type'] || '',
-                        SRAN_ID: r.SRAN_ID || r.Site_ID || '',
-                        done: isDoneStatus(r['Cutover Status'] || r.Status),
-                        _id: i
-                    };
-                });
-                render();
-            }
-        });
-    } catch(e) { console.error("Fetch error:", e); }
-}
-
-function render(){
-    markersLayer.clearLayers();
-    coverageLayer.clearLayers();
-    let doneCount = 0;
-
-    allRows.forEach(r => {
-        if(isNaN(r.Latitude) || isNaN(r.Longitude)) return;
-        if(r.done) doneCount++;
-
-        const color = getCovColor(r);
-        const icon = r.done ? dotIcon(COLORS.live) : dotIcon(COLORS.pending);
-        
-        // 1. Add Coverage Shape
-        let shape;
-        if(r.SiteType.toLowerCase().includes('imacro')){
-            shape = createSector(r.Latitude, r.Longitude, parseInt(r.Azimuth || 0), color);
-        } else {
-            shape = L.circle([r.Latitude, r.Longitude], {radius: 60, color: color, fillOpacity: 0.4});
-        }
-        shape.addTo(coverageLayer);
-
-        // 2. Add Marker
-        const m = L.marker([r.Latitude, r.Longitude], {icon});
-        const tip = `<b>${r['Site Name'] || 'Unknown'}</b><br>ID: ${r.SRAN_ID}<br>Status: ${r['Cutover Status']}`;
-        m.bindPopup(tip);
-        m.on('mouseover', () => {
-            document.getElementById('details').innerHTML = tip;
-        });
-        m.addTo(markersLayer);
-        visibleMarkers[r.SRAN_ID] = m;
-    });
-
-    // Update Stats
-    document.getElementById('doneTotal').textContent = `${doneCount} / ${allRows.length}`;
-    document.getElementById('pendingCount').textContent = allRows.length - doneCount;
-    document.getElementById('donePct').textContent = allRows.length ? Math.round((doneCount/allRows.length)*100)+'%' : '0%';
-    document.getElementById('totalCount').textContent = `Total: ${allRows.length}`;
-
-    // Auto-zoom to fit markers
-    const group = new L.featureGroup(markersLayer.getLayers());
-    if(group.getBounds().isValid()) map.fitBounds(group.getBounds().pad(0.1));
-}
-
-// --------------------- Events ---------------------
-document.getElementById('searchBtn').onclick = () => {
-    const val = document.getElementById('searchInput').value.trim();
-    const m = visibleMarkers[val];
-    if(m) {
-        map.setView(m.getLatLng(), 16);
-        m.openPopup();
-    } else { alert("Site ID not found"); }
+// Colors Configuration
+const COLORS = {
+    ibs: '#8a2be2',
+    imacro: '#ff8c00',
+    done: '#1f6fff',
+    pending: '#1F4E79'
 };
 
-document.getElementById('sniperBtn').onclick = () => render();
+const map = L.map('map').setView([11.5, 104.9], 10);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-fetchCsv();
-setInterval(fetchCsv, 60000); // Refresh every minute
+const markersLayer = L.layerGroup().addTo(map);
+const coverageLayer = L.layerGroup().addTo(map);
+
+let allData = [];
+let markerRegistry = {};
+
+function getStatusColor(r) {
+    const status = (r['Cutover Status'] || '').toLowerCase();
+    const type = (r['SiteType'] || '').toLowerCase();
+    
+    if (status.includes('done') || status.includes('live')) return COLORS.done;
+    if (type.includes('ibs')) return COLORS.ibs;
+    if (type.includes('imacro')) return COLORS.imacro;
+    return COLORS.pending;
+}
+
+function loadMap() {
+    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=1868990124&single=true&output=csv';
+
+    Papa.parse(CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+            allData = results.data;
+            renderMarkers();
+        }
+    });
+}
+
+function renderMarkers() {
+    markersLayer.clearLayers();
+    coverageLayer.clearLayers();
+    markerRegistry = {};
+
+    let doneCount = 0;
+    const bounds = L.latLngBounds();
+
+    allData.forEach(row => {
+        const lat = parseFloat(row.Latitude);
+        const lon = parseFloat(row.Longitude);
+        
+        if (isNaN(lat) || isNaN(lon)) return;
+
+        const color = getStatusColor(row);
+        if (color === COLORS.done) doneCount++;
+
+        // 1. Create Coverage Circle
+        const circle = L.circle([lat, lon], {
+            radius: row.SiteType === 'IBS' ? 50 : 150,
+            color: color,
+            fillOpacity: 0.3,
+            weight: 1
+        }).addTo(coverageLayer);
+
+        // 2. Create Dot Marker
+        const icon = L.divIcon({
+            className: 'custom-dot',
+            html: `<div style="background:${color}; width:8px; height:8px; border-radius:50%; border:2px solid white;"></div>`,
+            iconSize: [12, 12]
+        });
+
+        const marker = L.marker([lat, lon], {icon: icon});
+        
+        const popupContent = `
+            <strong>${row['Site Name']}</strong><br>
+            ID: ${row.SRAN_ID}<br>
+            Type: ${row.SiteType}<br>
+            Status: ${row['Cutover Status']}
+        `;
+
+        marker.bindPopup(popupContent);
+        marker.on('mouseover', function() {
+            document.getElementById('details').innerHTML = popupContent;
+        });
+
+        marker.addTo(markersLayer);
+        markerRegistry[row.SRAN_ID] = marker;
+        bounds.extend([lat, lon]);
+    });
+
+    // Stats Update
+    document.getElementById('totalCount').innerText = allData.length;
+    document.getElementById('donePct').innerText = Math.round((doneCount/allData.length)*100) + '%';
+
+    if (bounds.isValid()) {
+        map.fitBounds(bounds, {padding: [50, 50]});
+    }
+}
+
+// Search Function
+document.getElementById('searchBtn').onclick = () => {
+    const term = document.getElementById('searchInput').value.trim();
+    const marker = markerRegistry[term];
+    if (marker) {
+        map.setView(marker.getLatLng(), 17);
+        marker.openPopup();
+    } else {
+        alert("Site ID not found. Try searching a SRAN_ID like '4894'");
+    }
+};
+
+loadMap();
 </script>
 </body>
 </html>
