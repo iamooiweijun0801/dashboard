@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Site Map Dashboard with Coverage</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+html, body {
+  margin:0;
+  height:100%;
+  font-family: Inter, system-ui, Arial;
+}
+
+#map {
+  width:100%;
+  height:100vh;
+}
+
+.coverage-legend {
+  background: rgba(255,255,255,0.95);
+  padding: 10px 12px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  font-size: 13px;
+}
+
+.coverage-legend .item {
+  display: flex;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.coverage-legend .swatch {
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  border-radius: 50%;
+  border: 1px solid #555;
+}
+</style>
+</head>
+
+<body>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+
+<script>
+/* ===================== MAP INIT ===================== */
+const map = L.map('map').setView([3.0, 101.5], 6);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19
+}).addTo(map);
+
+const markerLayer = L.layerGroup().addTo(map);
+const coverageLayer = L.layerGroup().addTo(map);
+
+/* ===================== COLORS ===================== */
+const COLOR_DONE   = '#1f6fff'; // BLUE
+const COLOR_IMACRO = '#ff8c00'; // ORANGE
+const COLOR_IBS    = '#8a2be2'; // PURPLE
+const COLOR_OTHER  = '#ffd700'; // YELLOW
+
+const COVERAGE_OPACITY = 0.6;
+
+/* ===================== UTIL ===================== */
+function isDone(status){
+  return /done|on\s*air|live|active/i.test(status || '');
+}
+
+/* ===================== MARKER ICON ===================== */
+function dotIcon(color){
+  return L.divIcon({
+    className:'',
+    html:`<div style="
+      width:10px;height:10px;
+      background:${color};
+      border-radius:50%;
+      border:2px solid white;
+      box-shadow:0 0 4px rgba(0,0,0,0.3);
+    "></div>`,
+    iconSize:[14,14],
+    iconAnchor:[7,7]
+  });
+}
+
+/* ===================== SECTOR (CONE) ===================== */
+function createSector(lat, lon, azimuth, radius, style){
+  const pts = [];
+  const steps = 30;
+  const width = 60;
+
+  const start = azimuth - width/2;
+  const end   = azimuth + width/2;
+
+  for(let i=0;i<=steps;i++){
+    const ang = (start + (i/steps)*(end-start)) * Math.PI/180;
+    const dx = radius * Math.sin(ang);
+    const dy = radius * Math.cos(ang);
+    const latO = dy / 111320;
+    const lonO = dx / (111320 * Math.cos(lat*Math.PI/180));
+    pts.push([lat+latO, lon+lonO]);
+  }
+
+  pts.unshift([lat,lon]);
+  return L.polygon(pts, style);
+}
+
+/* ===================== COVERAGE COLOR LOGIC ===================== */
+function getCoverageColor(siteType, cutoverStatus){
+  if (isDone(cutoverStatus)) return COLOR_DONE;
+
+  siteType = (siteType || '').toLowerCase();
+
+  if (siteType.includes('imacro')) return COLOR_IMACRO;
+  if (siteType.includes('ibs'))    return COLOR_IBS;
+
+  return COLOR_OTHER;
+}
+
+/* ===================== COVERAGE CREATOR ===================== */
+function createCoverage(row){
+  if(!Number.isFinite(row.lat) || !Number.isFinite(row.lon)) return null;
+
+  const color = getCoverageColor(row.site_type, row.cutover_status);
+
+  const style = {
+    color,
+    fillColor: color,
+    fillOpacity: COVERAGE_OPACITY,
+    weight: 1
+  };
+
+  let shape;
+  const type = row.site_type.toLowerCase();
+
+  if(type.includes('imacro')){
+    shape = createSector(row.lat, row.lon, Number(row.azimuth)||0, 150, style);
+  }
+  else if(type.includes('ibs')){
+    shape = L.circle([row.lat,row.lon], { radius:50, ...style });
+  }
+  else{
+    shape = L.circle([row.lat,row.lon], { radius:150, ...style });
+  }
+
+  shape.on('mouseover', ()=>{
+    shape.setStyle({ fillOpacity: 0.9, weight: 2 });
+  });
+
+  shape.on('mouseout', ()=>{
+    shape.setStyle({ fillOpacity: COVERAGE_OPACITY, weight: 1 });
+  });
+
+  return shape;
+}
+
+/* ===================== LOAD CSV ===================== */
+async function loadCsv(){
+  const CSV_URL =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=1868990124&single=true&output=csv';
+
+  const res = await fetch(CSV_URL);
+  const text = await res.text();
+
+  const parsed = Papa.parse(text,{header:true,skipEmptyLines:true});
+  render(parsed.data);
+}
+
+/* ===================== RENDER ===================== */
+function render(rows){
+  markerLayer.clearLayers();
+  coverageLayer.clearLayers();
+
+  const bounds = [];
+
+  rows.forEach(r=>{
+    const lat = parseFloat(r.Latitude);
+    const lon = parseFloat(r.Longitude);
+    if(!Number.isFinite(lat)||!Number.isFinite(lon)) return;
+
+    const color = getCoverageColor(r.SiteType, r['Cutover Status']);
+    const icon = dotIcon(color);
+
+    const marker = L.marker([lat,lon],{icon}).addTo(markerLayer);
+
+    marker.bindPopup(`
+      <b>${r['Site Name']}</b><br>
+      Site Type: ${r.SiteType}<br>
+      Cutover: ${r['Cutover Status']}<br>
+      Azimuth: ${r.Azimuth || '-'}
+    `);
+
+    const coverage = createCoverage({
+      lat, lon,
+      site_type: r.SiteType || '',
+      azimuth: r.Azimuth || 0,
+      cutover_status: r['Cutover Status'] || ''
+    });
+
+    if(coverage) coverage.addTo(coverageLayer);
+    bounds.push([lat,lon]);
+  });
+
+  if(bounds.length){
+    map.fitBounds(bounds,{padding:[40,40]});
+  }
+}
+
+/* ===================== LEGEND ===================== */
+const legend = L.control({position:'bottomleft'});
+legend.onAdd = function(){
+  const d = L.DomUtil.create('div','coverage-legend');
+  d.innerHTML = `
+    <b>Coverage Legend</b>
+    <div class="item"><div class="swatch" style="background:${COLOR_DONE}"></div>Cutover Done</div>
+    <div class="item"><div class="swatch" style="background:${COLOR_IMACRO}"></div>iMacro</div>
+    <div class="item"><div class="swatch" style="background:${COLOR_IBS}"></div>IBS</div>
+    <div class="item"><div class="swatch" style="background:${COLOR_OTHER}"></div>Others</div>
+  `;
+  return d;
+};
+legend.addTo(map);
+
+/* ===================== AUTO REFRESH ===================== */
+loadCsv();
+setInterval(loadCsv, 30000);
+</script>
+</body>
+</html>
