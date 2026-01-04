@@ -8,22 +8,22 @@
 <style>
   body { margin:0; height:100vh; font-family: 'Inter', system-ui, sans-serif; display: flex; flex-direction: column; background: #f8f9fa; }
   
-  /* Loading Bar */
   #progress-container { width: 100%; background: #e9ecef; height: 4px; position: fixed; top: 0; z-index: 10001; }
   #progress-bar { width: 0%; height: 100%; background: #2ecc71; transition: width 0.2s; }
   
-  /* Header & UI */
   #header { padding: 10px 20px; background: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); z-index: 1000; }
   #map { flex-grow: 1; z-index: 1; }
 
-  /* Info & Legend */
-  #info-panel { position: absolute; bottom: 30px; left: 20px; background: rgba(255,255,255,0.95); padding: 12px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); z-index: 1000; min-width: 220px; backdrop-filter: blur(4px); border-left: 5px solid #3498db; }
+  #info-panel { position: absolute; bottom: 30px; left: 20px; background: rgba(255,255,255,0.95); padding: 12px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); z-index: 1000; min-width: 220px; backdrop-filter: blur(4px); border-left: 5px solid #3498db; pointer-events: none; }
+  
   .legend { position: absolute; top: 70px; right: 20px; background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); z-index: 1000; font-size: 12px; }
   .swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
 
-  .search-box { display: flex; gap: 5px; }
+  .controls { display: flex; gap: 8px; align-items: center; }
   input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 180px; font-size: 13px; }
-  .btn { padding: 8px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .btn { padding: 8px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+  .btn-gps { background: white; color: #333; border: 1px solid #ccc; width: 35px; height: 35px; padding: 0; }
+  .btn-gps img { width: 20px; height: 20px; }
 </style>
 </head>
 <body>
@@ -32,7 +32,10 @@
 
 <div id="header">
   <div style="font-weight: 700; color: #2c3e50;">Coverage Map <span id="counter" style="color: #95a5a6; font-weight: 400; font-size: 12px;"></span></div>
-  <div class="search-box">
+  <div class="controls">
+    <button id="resetBtn" class="btn btn-gps" title="Reset View">
+      <img src="https://cdn-icons-png.flaticon.com/512/854/854878.png" alt="GPS">
+    </button>
     <input id="search" type="text" placeholder="Search SRAN_ID...">
     <button id="searchBtn" class="btn">Find</button>
   </div>
@@ -47,7 +50,7 @@
 </div>
 
 <div id="info-panel">
-  <div id="info-content" style="font-size: 13px; color: #2c3e50;">Hover over a site point</div>
+  <div id="info-content" style="font-size: 13px; color: #2c3e50;">Hover over a site or coverage area</div>
 </div>
 
 <div id="map"></div>
@@ -56,8 +59,11 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-// --- Map Initialized to your specific coordinates ---
-const map = L.map('map', { preferCanvas: true }).setView([11.56603, 104.9194], 14);
+// --- Map Center & Zoom (Closer view) ---
+const DEFAULT_CENTER = [11.56603, 104.9194];
+const DEFAULT_ZOOM = 15;
+
+const map = L.map('map', { preferCanvas: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 const coverageLayer = L.featureGroup().addTo(map);
@@ -65,13 +71,24 @@ const markersLayer = L.layerGroup().addTo(map);
 
 let registry = {};
 let uniqueCoords = new Set();
-const COLORS = { DONE: '#1e90ff', IBS: '#8a2be2', IMACRO: '#ff8c00', OTHER: '#ffd700' };
 
-// --- Function to create the Cone (Sector) ---
-function createCone(lat, lon, azimuth, color) {
+// Transparency Settings
+const COLORS = { DONE: '#1e90ff', IBS: '#8a2be2', IMACRO: '#ff8c00', OTHER: '#ffd700' };
+const OPACITY = { DONE: 0.3, IBS: 0.15, IMACRO: 0.5, OTHER: 0.3 };
+
+function updateInfo(data) {
+    document.getElementById('info-content').innerHTML = `
+        <div style="font-weight:700; border-bottom:1px solid #eee; margin-bottom:5px; padding-bottom:5px;">${data['Site Name'] || 'N/A'}</div>
+        <b>SRAN ID:</b> ${data.SRAN_ID || 'N/A'}<br>
+        <b>Site Code:</b> ${data['Site Code'] || 'N/A'}<br>
+        <b>Status:</b> ${data['Cutover Status'] || 'N/A'}
+    `;
+}
+
+function createCone(lat, lon, azimuth, color, row) {
     const pts = [];
     const radius = 150; 
-    const beamWidth = 60; // Spread of the cone
+    const beamWidth = 60;
     const steps = 12; 
 
     for (let i = 0; i <= steps; i++) {
@@ -81,17 +98,21 @@ function createCone(lat, lon, azimuth, color) {
         pts.push([lat + (dy / 111320), lon + (dx / (111320 * Math.cos(lat * Math.PI / 180)))]);
     }
     pts.unshift([lat, lon]);
-    // Removed stroke (outline) for a cleaner look
-    return L.polygon(pts, { stroke: false, fillColor: color, fillOpacity: 0.3, interactive: false });
+    
+    const poly = L.polygon(pts, { 
+        stroke: false, 
+        fillColor: color, 
+        fillOpacity: OPACITY.IMACRO,
+        interactive: true 
+    });
+    
+    poly.on('mouseover', () => updateInfo(row));
+    return poly;
 }
 
 async function loadData() {
     const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=1868990124&single=true&output=csv';
-    
-    Papa.parse(CSV_URL, {
-        download: true, header: true, skipEmptyLines: true,
-        complete: (results) => processData(results.data)
-    });
+    Papa.parse(CSV_URL, { download: true, header: true, skipEmptyLines: true, complete: (results) => processData(results.data) });
 }
 
 function processData(data) {
@@ -107,48 +128,48 @@ function processData(data) {
             const lon = parseFloat(r.Longitude);
             if (isNaN(lat) || isNaN(lon)) continue;
 
-            // Logic to determine color (Priority: Status > Type)
             const status = (r['Cutover Status'] || '').toLowerCase();
             const type = (r.SiteType || '').toUpperCase();
-            let color = COLORS.OTHER;
             
-            if (status.includes('done') || status.includes('live')) color = COLORS.DONE;
-            else if (type === 'IBS') color = COLORS.IBS;
-            else if (type.includes('IMACRO')) color = COLORS.IMACRO;
+            let color = COLORS.OTHER;
+            let opacity = OPACITY.OTHER;
+            
+            if (status.includes('done') || status.includes('live')) { color = COLORS.DONE; opacity = OPACITY.DONE; }
+            else if (type === 'IBS') { color = COLORS.IBS; opacity = OPACITY.IBS; }
+            else if (type.includes('IMACRO')) { color = COLORS.IMACRO; opacity = OPACITY.IMACRO; }
 
             const coordKey = `${lat.toFixed(5)}|${lon.toFixed(5)}`;
             const isIBS = type === 'IBS';
 
-            // --- Coverage Rendering (No Outlines) ---
+            // Coverage Render
             if (isIBS || !uniqueCoords.has(coordKey)) {
+                let shape;
                 if (isIBS) {
-                    L.circle([lat, lon], { radius: 100, stroke: false, fillColor: color, fillOpacity: 0.3, interactive: false }).addTo(coverageLayer);
+                    shape = L.circle([lat, lon], { radius: 100, stroke: false, fillColor: color, fillOpacity: opacity });
                 } else if (type.includes('IMACRO')) {
-                    createCone(lat, lon, parseFloat(r.Azimuth) || 0, color).addTo(coverageLayer);
+                    shape = createCone(lat, lon, parseFloat(r.Azimuth) || 0, color, r);
                 } else {
-                    L.circle([lat, lon], { radius: 150, stroke: false, fillColor: color, fillOpacity: 0.3, interactive: false }).addTo(coverageLayer);
+                    shape = L.circle([lat, lon], { radius: 150, stroke: false, fillColor: color, fillOpacity: opacity });
                 }
+                
+                shape.on('mouseover', () => updateInfo(r));
+                shape.addTo(coverageLayer);
                 if (!isIBS) uniqueCoords.add(coordKey);
             }
 
-            // --- Smaller Dot Marker ---
+            // Dot Marker
             const marker = L.circleMarker([lat, lon], {
-                radius: 3.5, // Smaller dots
+                radius: 3, 
                 stroke: false,
                 fillColor: color,
                 fillOpacity: 1
             }).addTo(markersLayer);
 
             marker.on('mouseover', () => {
-                document.getElementById('info-content').innerHTML = `
-                    <div style="font-weight:700; border-bottom:1px solid #eee; margin-bottom:5px; padding-bottom:5px;">${r['Site Name'] || 'N/A'}</div>
-                    <b>SRAN ID:</b> ${r.SRAN_ID || 'N/A'}<br>
-                    <b>Site Code:</b> ${r['Site Code'] || 'N/A'}<br>
-                    <b>Status:</b> ${r['Cutover Status'] || 'N/A'}
-                `;
+                updateInfo(r);
                 marker.setRadius(6);
             });
-            marker.on('mouseout', () => marker.setRadius(3.5));
+            marker.on('mouseout', () => marker.setRadius(3));
 
             registry[r.SRAN_ID] = marker;
         }
@@ -163,10 +184,15 @@ function processData(data) {
     renderBatch();
 }
 
+// Events
 document.getElementById('searchBtn').onclick = () => {
     const m = registry[document.getElementById('search').value.trim()];
-    if (m) { map.setView(m.getLatLng(), 17); m.fire('mouseover'); }
+    if (m) { map.setView(m.getLatLng(), 18); m.fire('mouseover'); }
     else alert("Site ID not found.");
+};
+
+document.getElementById('resetBtn').onclick = () => {
+    map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 };
 
 loadData();
