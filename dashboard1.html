@@ -368,7 +368,7 @@ function updateFilterDropdown() {
   // Clear existing options except "All Sites"
   select.innerHTML = '<option value="all">All Sites</option>';
   
-  // Add unique batches as options (including "Extra")
+  // Add unique batches as options (including "blocked")
   Array.from(uniqueBatches)
     .filter(batch => batch && batch.trim() !== '')
     .sort()
@@ -452,7 +452,7 @@ function loadCsvText(text){
 
     allRows.push(row);
     
-    // Add batch to unique batches set (including "Extra")
+    // Add batch to unique batches set (including "blocked")
     if (swap_batch && swap_batch.trim() !== '') {
       uniqueBatches.add(swap_batch.trim());
     }
@@ -490,16 +490,16 @@ function render(){
   
   let rows = allRows.slice();
   
-  // MODIFIED: When "All Sites" is selected, exclude "Extra" batch
+  // MODIFIED: When "All Sites" is selected, exclude "blocked" batch
   if(view === 'all') {
     rows = allRows.filter(r => {
       // Check both normalized and original batch value
-      const isExtra = r.normalized_batch === 'extra' || 
-                      (r.swap_batch && r.swap_batch.toString().toLowerCase().trim() === 'extra');
-      return !isExtra;
+      const isblocked = r.normalized_batch === 'blocked' || 
+                      (r.swap_batch && r.swap_batch.toString().toLowerCase().trim() === 'blocked');
+      return !isblocked;
     });
   } 
-  // If not "all", filter by normalized_batch (including "extra" if selected)
+  // If not "all", filter by normalized_batch (including "blocked" if selected)
   else if(view !== '') {
     rows = allRows.filter(r => r.normalized_batch === view);
   }
@@ -743,4 +743,5 @@ setInterval(smartFetchCsv, REFRESH_INTERVAL_MS);
 </script>
 </body>
 </html>
+
 
