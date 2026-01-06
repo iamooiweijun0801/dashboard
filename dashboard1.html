@@ -492,13 +492,15 @@ function render(){
   
   // MODIFIED: When "All Sites" is selected, exclude "blocked" batch
   if(view === 'all') {
-    rows = allRows.filter(r => {
-      // Check both normalized and original batch value
-      const isblocked = r.normalized_batch === 'blocked' || 
-                      (r.swap_batch && r.swap_batch.toString().toLowerCase().trim() === 'blocked');
-      return !isblocked;
-    });
-  } 
+  rows = allRows.filter(r => {
+    const batch = r.normalized_batch;
+    const isExcluded =
+      batch === 'blocked' ||
+      batch === '24g_only';
+    return !isExcluded;
+  });
+}
+
   // If not "all", filter by normalized_batch (including "blocked" if selected)
   else if(view !== '') {
     rows = allRows.filter(r => r.normalized_batch === view);
@@ -743,5 +745,6 @@ setInterval(smartFetchCsv, REFRESH_INTERVAL_MS);
 </script>
 </body>
 </html>
+
 
 
