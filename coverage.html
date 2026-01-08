@@ -58,13 +58,11 @@ const DEFAULT_CENTER = [11.56603,104.9194];
 const map = L.map('map',{preferCanvas:true}).setView(DEFAULT_CENTER,17);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-map.createPane('yellowPane').style.zIndex = 450;
 map.createPane('markerPane').style.zIndex = 600;
 
 const coverageLayer = L.layerGroup().addTo(map);
 const markerLayer = L.layerGroup().addTo(map);
 const registry = {};
-const usedCoords = new Set();
 const siteNameSet = new Set();
 const info = document.getElementById('info-content');
 
@@ -75,7 +73,6 @@ const COLORS = {
   OTHER:'#ffd700'
 };
 
-// Generate HTML for popup/hover
 function siteHTML(r){
   return `
     <div style="font-weight:700;color:#1a73e8;margin-bottom:6px;">${r['Site Name']||'N/A'}</div>
@@ -88,27 +85,22 @@ function siteHTML(r){
     </table>`;
 }
 
-// Create cone for iMacro/easyMacro
 function createCone(lat, lon, az, color){
   const pts=[[lat,lon]];
   const r=150,b=60,s=12;
   for(let i=0;i<=s;i++){
     const a=(az-b/2+(i/s)*b)*Math.PI/180;
-    pts.push([
-      lat+(r*Math.cos(a)/111320),
-      lon+(r*Math.sin(a)/(111320*Math.cos(lat*Math.PI/180)))
-    ]);
+    pts.push([lat+(r*Math.cos(a)/111320), lon+(r*Math.sin(a)/(111320*Math.cos(lat*Math.PI/180)))]);
   }
   return L.polygon(pts,{fillColor:color,fillOpacity:.45,stroke:false});
 }
 
-// Load data from Google Sheets
+// Load CSV
 Papa.parse('https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=108612568&single=true&output=csv',
 { download:true, header:true, skipEmptyLines:true, complete: r=>draw(r.data) });
 
 function draw(data){
   let i=0, batch=800;
-
   function render(){
     const end=Math.min(i+batch,data.length);
     for(;i<end;i++){
@@ -123,42 +115,34 @@ function draw(data){
 
       // Determine polygon color
       let polyColor = COLORS.OTHER;
-      if(vendor==='HUAWEI') polyColor = COLORS.HUAWEI;
-      else if(type==='IBS'||type==='QCELL') polyColor = COLORS.IBS;
-      else if(type.includes('IMACRO')||type.includes('EASYMACRO')) polyColor = COLORS.IMACRO;
+      let polyOpacity = 0.35;
+      if(vendor==='HUAWEI'){ polyColor = COLORS.HUAWEI; polyOpacity = 0.6; }
+      else if(type==='IBS'||type==='QCELL'){ polyColor = COLORS.IBS; }
+      else if(type.includes('IMACRO')||type.includes('EASYMACRO')){ polyColor = COLORS.IMACRO; }
 
       // Determine shape
       let shape = null;
-      const key=`${lat.toFixed(5)}|${lon.toFixed(5)}`;
-
       if(type==='IBS'||type==='QCELL'){
-        shape=L.circle([lat,lon],{radius:50,fillColor:polyColor,fillOpacity:.25,stroke:false});
-      }
-      else if(type.includes('IMACRO')||type.includes('EASYMACRO')){
+        shape=L.circle([lat,lon],{radius:50,fillColor:polyColor,fillOpacity:polyOpacity,stroke:false});
+      } else if(type.includes('IMACRO')||type.includes('EASYMACRO')){
         shape=createCone(lat,lon,az,polyColor);
-      }
-      else if(!usedCoords.has(key) || vendor==='HUAWEI'){
-        shape=L.circle([lat,lon],{radius:150,fillColor:polyColor,fillOpacity:.35,stroke:false});
+      } else {
+        shape=L.circle([lat,lon],{radius:150,fillColor:polyColor,fillOpacity:polyOpacity,stroke:false});
       }
 
-      // Add hover / click for polygon
-      if(shape){
-        shape.on('mouseover',()=>info.innerHTML=siteHTML(r))
-             .on('mouseout',()=>info.innerHTML='Hover over site')
-             .on('click',()=>shape.bindPopup(siteHTML(r)).openPopup())
-             .addTo(coverageLayer);
-        usedCoords.add(key);
-      }
+      // Polygon hover/click
+      shape.on('mouseover',()=>info.innerHTML=siteHTML(r))
+           .on('mouseout',()=>info.innerHTML='Hover over site')
+           .on('click',()=>shape.bindPopup(siteHTML(r)).openPopup())
+           .addTo(coverageLayer);
 
       // Marker
       let markerColor = (vendor==='HUAWEI') ? COLORS.HUAWEI : polyColor;
       const dot = L.circleMarker([lat,lon],{radius:4,fillColor:markerColor,fillOpacity:1,stroke:false,pane:'markerPane'})
         .addTo(markerLayer);
-
       dot.on('mouseover',()=>{ info.innerHTML=siteHTML(r); dot.setRadius(7); });
       dot.on('mouseout',()=>dot.setRadius(4));
       dot.on('click',()=>dot.bindPopup(siteHTML(r)).openPopup());
-
       registry[r.SRAN_ID]=dot;
     }
 
@@ -171,14 +155,12 @@ function draw(data){
   render();
 }
 
-// Search
 document.getElementById('searchBtn').onclick=()=>{
   const id=document.getElementById('search').value.trim();
   const m=registry[id];
   if(m){ map.setView(m.getLatLng(),18); m.fire('click'); }
   else alert('SRAN_ID not found');
 };
-
 document.getElementById('resetBtn').onclick=()=>map.setView(DEFAULT_CENTER,17);
 </script>
 </body>
