@@ -54,50 +54,48 @@ input { padding:8px; width:180px; border:1px solid #ddd; border-radius:4px; }
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-const DEFAULT_CENTER = [11.56603, 104.9194];
-const map = L.map('map',{preferCanvas:true}).setView(DEFAULT_CENTER,17);
+const DEFAULT_CENTER=[11.56603,104.9194];
+const map=L.map('map',{preferCanvas:true}).setView(DEFAULT_CENTER,17);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// Panes
-map.createPane('coveragePane').style.zIndex = 400;
-map.createPane('markerPane').style.zIndex = 600;
+map.createPane('coveragePane').style.zIndex=400;
+map.createPane('markerPane').style.zIndex=600;
 
-const coverageLayer = L.layerGroup().addTo(map);
-const markersLayer = L.layerGroup().addTo(map);
+const coverageLayer=L.layerGroup().addTo(map);
+const markersLayer=L.layerGroup().addTo(map);
 
-const registry = {};
-const siteNameSet = new Set();
+const registry={};
+const siteNameSet=new Set();
 
-const COLORS = { HUAWEI:'#1e90ff', IBS:'#8a2be2', IMACRO:'#ff8c00', OTHER:'#ffd700' };
-const OPACITY = { HUAWEI:0.6, IBS:0.15, IMACRO:0.5, OTHER:0.35 };
+const COLORS={HUAWEI:'#1e90ff',IBS:'#8a2be2',IMACRO:'#ff8c00',OTHER:'#ffd700'};
+const OPACITY={HUAWEI:0.6,IBS:0.15,IMACRO:0.5,OTHER:0.35};
 
 function siteHTML(r){
   return `<div style="font-weight:700;color:#1a73e8;margin-bottom:6px;">${r['Site Name']||'N/A'}</div>
-    <table class="site-popup-table">
-      <tr><td>SRAN Name:</td><td align="right">${r['SRAN Name']||'N/A'}</td></tr>
-      <tr><td>Vendor:</td><td align="right">${r.Vendor||'N/A'}</td></tr>
-      <tr><td>Site Code:</td><td align="right">${r['Site Code']||'N/A'}</td></tr>
-      <tr><td>SRAN ID:</td><td align="right">${r.SRAN_ID||'N/A'}</td></tr>
-      <tr><td>Site Type:</td><td align="right">${r.SiteType||'N/A'}</td></tr>
-    </table>`;
+  <table class="site-popup-table">
+    <tr><td>SRAN Name:</td><td align="right">${r['SRAN Name']||'N/A'}</td></tr>
+    <tr><td>Vendor:</td><td align="right">${r.Vendor||'N/A'}</td></tr>
+    <tr><td>Site Code:</td><td align="right">${r['Site Code']||'N/A'}</td></tr>
+    <tr><td>SRAN ID:</td><td align="right">${r.SRAN_ID||'N/A'}</td></tr>
+    <tr><td>Site Type:</td><td align="right">${r.SiteType||'N/A'}</td></tr>
+  </table>`;
 }
 
-function createCone(lat, lon, azimuth, color){
+function createCone(lat,lon,az,color){
   const pts=[[lat,lon]];
   const radius=150,beam=60,steps=12;
   for(let i=0;i<=steps;i++){
-    const a=(azimuth-beam/2+(i/steps)*beam)*Math.PI/180;
+    const a=(az-beam/2+(i/steps)*beam)*Math.PI/180;
     pts.push([lat+(radius*Math.cos(a)/111320), lon+(radius*Math.sin(a)/(111320*Math.cos(lat*Math.PI/180)))]);
   }
   return L.polygon(pts,{fillColor:color,fillOpacity:OPACITY.IMACRO,stroke:false,pane:'coveragePane',interactive:true});
 }
 
 Papa.parse('https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=1868990124&single=true&output=csv',
-{ download:true, header:true, skipEmptyLines:true, complete: r=>processData(r.data) });
+{download:true,header:true,skipEmptyLines:true,complete:r=>processData(r.data)});
 
 function processData(data){
-  let current=0, batchSize=1000, total=data.length;
-
+  let current=0,batchSize=1000,total=data.length;
   function renderBatch(){
     const end=Math.min(current+batchSize,total);
     for(let i=current;i<end;i++){
@@ -110,25 +108,23 @@ function processData(data){
       const type=(r.SiteType||'').toUpperCase();
       const az=parseFloat(r.Azimuth)||0;
 
-      // Determine color based on vendor
-      let color = COLORS.OTHER;
+      // 1. Vendor decides color
+      let color=COLORS.OTHER;
       if(vendor==='HUAWEI') color=COLORS.HUAWEI;
       else if(type==='IBS'||type==='QCELL') color=COLORS.IBS;
       else if(type.includes('IMACRO')||type.includes('EASYMACRO')) color=COLORS.IMACRO;
 
-      // Determine shape based on site type
+      // 2. Type decides shape
       let shape=null;
       if(type==='IBS'||type==='QCELL') shape=L.circle([lat,lon],{radius:50,fillColor:color,fillOpacity:OPACITY.IBS,stroke:false,pane:'coveragePane',interactive:true});
       else if(type.includes('IMACRO')||type.includes('EASYMACRO')) shape=createCone(lat,lon,az,color);
       else shape=L.circle([lat,lon],{radius:150,fillColor:color,fillOpacity:OPACITY.OTHER,stroke:false,pane:'coveragePane',interactive:true});
 
-      // Polygon hover/click
       shape.on('mouseover',()=>info.innerHTML=siteHTML(r))
            .on('mouseout',()=>info.innerHTML='Hover over coverage or site')
            .on('click',()=>shape.bindPopup(siteHTML(r)).openPopup())
            .addTo(coverageLayer);
 
-      // Marker
       const dot=L.circleMarker([lat,lon],{radius:3.5,fillColor:color,fillOpacity:1,stroke:false,pane:'markerPane'}).addTo(markersLayer);
       dot.on('mouseover',()=>{info.innerHTML=siteHTML(r); dot.setRadius(7);});
       dot.on('mouseout',()=>dot.setRadius(3.5));
@@ -136,14 +132,12 @@ function processData(data){
 
       registry[r.SRAN_ID]=dot;
     }
-
     current=end;
     document.getElementById('progress-bar').style.width=(current/total*100)+'%';
     document.getElementById('counter').innerText=`${siteNameSet.size.toLocaleString()} Sites`;
     if(current<total) requestAnimationFrame(renderBatch);
     else document.getElementById('progress-container').style.display='none';
   }
-
   renderBatch();
 }
 
@@ -154,7 +148,6 @@ document.getElementById('searchBtn').onclick=()=>{
   else alert("Site ID not found.");
 };
 document.getElementById('resetBtn').onclick=()=>map.setView(DEFAULT_CENTER,17);
-
 const info=document.getElementById('info-content');
 </script>
 </body>
