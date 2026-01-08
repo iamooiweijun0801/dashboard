@@ -8,26 +8,20 @@
 <style>
 body { margin:0; height:100vh; font-family:Inter,system-ui,sans-serif; display:flex; flex-direction:column; background:#f8f9fa; }
 #map { flex-grow:1; }
-
 #progress-container { width:100%; height:4px; background:#e9ecef; position:fixed; top:0; z-index:10001; }
 #progress-bar { width:0%; height:100%; background:#2ecc71; transition:width .2s; }
-
 #header { padding:10px 20px; background:white; display:flex; justify-content:space-between; align-items:center; box-shadow:0 2px 10px rgba(0,0,0,.05); z-index:1000; }
 .controls { display:flex; gap:8px; align-items:center; }
 input { padding:8px; width:180px; border:1px solid #ddd; border-radius:4px; }
 .btn { padding:8px 12px; background:#3498db; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:600; }
 .btn-gps { background:white; border:1px solid #ccc; width:35px; height:35px; display:flex; align-items:center; justify-content:center; }
-
 #info-panel { position:absolute; bottom:30px; left:20px; background:rgba(255,255,255,.95); padding:12px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,.1); min-width:260px; z-index:1000; pointer-events:none; border-left:5px solid #3498db; }
-
 .legend { position:absolute; top:70px; right:20px; background:white; padding:12px; border-radius:8px; font-size:12px; box-shadow:0 2px 10px rgba(0,0,0,.08); z-index:1000; }
 .swatch { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; }
-
 .site-popup-table { width:100%; font-size:11px; border-collapse:collapse; }
 .site-popup-table td { padding:3px 0; border-bottom:1px solid #eee; }
 </style>
 </head>
-
 <body>
 
 <div id="progress-container"><div id="progress-bar"></div></div>
@@ -60,26 +54,28 @@ input { padding:8px; width:180px; border:1px solid #ddd; border-radius:4px; }
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-const DEFAULT_CENTER = [11.56603,104.9194];
-const map = L.map('map',{preferCanvas:true}).setView(DEFAULT_CENTER,17);
+const DEFAULT_CENTER=[11.56603,104.9194];
+const map=L.map('map',{preferCanvas:true}).setView(DEFAULT_CENTER,17);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-map.createPane('markerPane').style.zIndex = 600;
+map.createPane('markerPane').style.zIndex=600;
+map.createPane('polygonPane').style.zIndex=500;
 
-const coverageLayer = L.layerGroup().addTo(map);
-const markerLayer = L.layerGroup().addTo(map);
+const coverageLayer=L.layerGroup().addTo(map);
+const markerLayer=L.layerGroup().addTo(map);
+const registry={};
+const usedCoords=new Set();
+const siteNameSet=new Set();
 
-const registry = {};
-const usedCoords = new Set();
-const siteNameSet = new Set();
-
-const COLORS = { HUAWEI:'#1e90ff', OTHER:'#ffd700' };
+const COLORS={
+  HUAWEI:'#1e90ff',  // color of vendor only
+  IMACRO:'#ff8c00',  // coverage polygon for type
+  IBS:'#8a2be2',
+  OTHER:'#ffd700'
+};
 
 function siteHTML(r){
-  return `
-  <div style="font-weight:700;color:#1a73e8;margin-bottom:6px;">
-    ${r['Site Name']||'N/A'}
-  </div>
+  return `<div style="font-weight:700;color:#1a73e8;margin-bottom:6px;">${r['Site Name']||'N/A'}</div>
   <table class="site-popup-table">
     <tr><td>SRAN Name</td><td align="right">${r['SRAN Name']||'N/A'}</td></tr>
     <tr><td>Vendor</td><td align="right">${r.Vendor||'N/A'}</td></tr>
@@ -94,21 +90,20 @@ function createCone(lat, lon, az, color){
   const r=150,b=60,s=12;
   for(let i=0;i<=s;i++){
     const a=(az-b/2+(i/s)*b)*Math.PI/180;
-    pts.push([
-      lat+(r*Math.cos(a)/111320),
-      lon+(r*Math.sin(a)/(111320*Math.cos(lat*Math.PI/180)))
-    ]);
+    pts.push([lat+(r*Math.cos(a)/111320), lon+(r*Math.sin(a)/(111320*Math.cos(lat*Math.PI/180)))]);
   }
-  return L.polygon(pts,{fillColor:color,fillOpacity:.45,stroke:false});
+  return L.polygon(pts,{fillColor:color,fillOpacity:.45,stroke:false,pane:'polygonPane'});
 }
 
-Papa.parse(
-  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=108612568&single=true&output=csv',
-  { download:true, header:true, skipEmptyLines:true, complete:r=>draw(r.data) }
-);
+// Load CSV
+Papa.parse('https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=108612568&single=true&output=csv',{
+  download:true, header:true, skipEmptyLines:true,
+  complete: r => draw(r.data)
+});
 
 function draw(data){
-  let i=0,batch=800;
+  let i=0, batch=800;
+
   function render(){
     const end=Math.min(i+batch,data.length);
     for(;i<end;i++){
@@ -116,40 +111,40 @@ function draw(data){
       const lat=+r.Latitude, lon=+r.Longitude;
       if(isNaN(lat)||isNaN(lon)) continue;
 
-      siteNameSet.add((r['Site Name']||'').trim());
+      if(r['Site Name']) siteNameSet.add(r['Site Name'].trim());
 
-      const type=(r.SiteType||'').toUpperCase().trim();
-      const vendor=(r.Vendor||'').toUpperCase().trim();
+      const vendor=(r.Vendor||'').toUpperCase();
+      const type=(r.SiteType||'').toUpperCase();
       const az=+r.Azimuth||0;
 
-      /* COLOR = VENDOR ONLY */
-      let color = vendor === 'HUAWEI' ? COLORS.HUAWEI : COLORS.OTHER;
+      // Determine polygon color based on site type
+      let polyColor = COLORS.OTHER;
+      if(type==='IBS' || type==='QCELL') polyColor=COLORS.IBS;
+      else if(type.includes('IMACRO') || type.includes('EASYMACRO')) polyColor=COLORS.IMACRO;
 
-      /* SHAPE = SITETYPE ONLY */
+      // Vendor color for marker
+      let markerColor = (vendor==='HUAWEI') ? COLORS.HUAWEI : polyColor;
+
       let shape=null;
       const key=`${lat.toFixed(5)}|${lon.toFixed(5)}`;
 
-      if(type==='IBS'||type==='QCELL'){
-        shape=L.circle([lat,lon],{radius:50,fillColor:color,fillOpacity:.25,stroke:false});
-      }
-      else if(type.includes('IMACRO')||type.includes('EASYMACRO')){
-        shape=createCone(lat,lon,az,color);
-      }
-      else if(!usedCoords.has(key)){
-        shape=L.circle([lat,lon],{radius:150,fillColor:color,fillOpacity:.35,stroke:false});
+      if(type==='IBS'||type==='QCELL') shape=L.circle([lat,lon],{radius:50,fillColor:polyColor,fillOpacity:.25,stroke:false,pane:'polygonPane'});
+      else if(type.includes('IMACRO')||type.includes('EASYMACRO')) shape=createCone(lat,lon,az,polyColor);
+      else if(!usedCoords.has(key)) shape=L.circle([lat,lon],{radius:150,fillColor:polyColor,fillOpacity:.35,stroke:false,pane:'polygonPane'});
+
+      if(shape){
+        shape.on('mouseover',()=>info.innerHTML=siteHTML(r))
+             .on('mouseout',()=>info.innerHTML='Hover over site')
+             .on('click',()=>shape.bindPopup(siteHTML(r)).openPopup())
+             .addTo(coverageLayer);
         usedCoords.add(key);
       }
 
-      if(shape){
-        shape.on('mouseover',()=>info.innerHTML=siteHTML(r)).addTo(coverageLayer);
-      }
-
-      const dot=L.circleMarker([lat,lon],{
-        radius:4,fillColor:color,fillOpacity:1,stroke:false,pane:'markerPane'
-      }).addTo(markerLayer);
+      const dot=L.circleMarker([lat,lon],{radius:4,fillColor:markerColor,fillOpacity:1,stroke:false,pane:'markerPane'})
+        .addTo(markerLayer);
 
       dot.on('mouseover',()=>{info.innerHTML=siteHTML(r);dot.setRadius(7);});
-      dot.on('mouseout',()=>dot.setRadius(4));
+      dot.on('mouseout',()=>{info.innerHTML='Hover over site'; dot.setRadius(4);});
       dot.on('click',()=>dot.bindPopup(siteHTML(r)).openPopup());
 
       registry[r.SRAN_ID]=dot;
@@ -164,8 +159,10 @@ function draw(data){
   render();
 }
 
+// Search by SRAN_ID
 document.getElementById('searchBtn').onclick=()=>{
-  const m=registry[document.getElementById('search').value.trim()];
+  const id=document.getElementById('search').value.trim();
+  const m=registry[id];
   if(m){ map.setView(m.getLatLng(),18); m.fire('click'); }
   else alert('SRAN_ID not found');
 };
