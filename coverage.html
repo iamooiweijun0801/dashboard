@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
 body { margin:0; height:100vh; font-family:'Inter',system-ui,sans-serif; display:flex; flex-direction:column; background:#f8f9fa; }
-#map { flex-grow:1; z-index:1; }
+#map { flex-grow:1; }
 #progress-container { width:100%; height:4px; background:#e9ecef; position:fixed; top:0; z-index:10001; }
 #progress-bar { width:0%; height:100%; background:#2ecc71; transition:width .2s; }
 #header { padding:10px 20px; background:white; display:flex; justify-content:space-between; align-items:center; box-shadow:0 2px 10px rgba(0,0,0,.05); z-index:1000; }
@@ -67,9 +67,9 @@ const markersLayer=L.layerGroup().addTo(map);
 const registry={};
 const siteNameSet=new Set();
 
-// Color and opacity based on color
+// Color and opacity by type
 const COLORS={HUAWEI:'#1e90ff',IBS:'#8a2be2',IMACRO:'#ff8c00',OTHER:'#ffd700'};
-const OPACITY_BY_COLOR={HUAWEI:0.6,IBS:0.15,IMACRO:0.5,OTHER:0.35};
+const OPACITY={HUAWEI:0.6,IBS:0.15,IMACRO:0.5,OTHER:0.35};
 
 function siteHTML(r){
   return `<div style="font-weight:700;color:#1a73e8;margin-bottom:6px;">${r['Site Name']||'N/A'}</div>
@@ -82,8 +82,8 @@ function siteHTML(r){
   </table>`;
 }
 
-// Create cone shape for micro/iMacro
-function createCone(lat,lon,az,color,opacity){
+// Cone for iMacro
+function createCone(lat, lon, az, color, opacity){
   const pts=[[lat,lon]];
   const radius=150,beam=60,steps=12;
   for(let i=0;i<=steps;i++){
@@ -93,6 +93,7 @@ function createCone(lat,lon,az,color,opacity){
   return L.polygon(pts,{fillColor:color,fillOpacity:opacity,stroke:false,pane:'coveragePane',interactive:true});
 }
 
+// Load CSV
 Papa.parse('https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=108612568&single=true&output=csv',
 {download:true,header:true,skipEmptyLines:true,complete:r=>processData(r.data)});
 
@@ -110,27 +111,27 @@ function processData(data){
       const type=(r.SiteType||'').toUpperCase();
       const az=parseFloat(r.Azimuth)||0;
 
-      // 1. Determine color by vendor/type rules
+      // Determine color by vendor/type rules
       let colorKey='OTHER';
       if(vendor==='HUAWEI') colorKey='HUAWEI';
       else if(type==='IBS'||type==='QCELL') colorKey='IBS';
       else if(type.includes('IMACRO')||type.includes('EASYMACRO')) colorKey='IMACRO';
       const color=COLORS[colorKey];
-      const opacity=OPACITY_BY_COLOR[colorKey];
+      const opacity=OPACITY[colorKey];
 
-      // 2. Determine shape by SiteType
+      // Shape by type
       let shape=null;
       if(type==='IBS'||type==='QCELL') shape=L.circle([lat,lon],{radius:50,fillColor:color,fillOpacity:opacity,stroke:false,pane:'coveragePane',interactive:true});
       else if(type.includes('IMACRO')||type.includes('EASYMACRO')) shape=createCone(lat,lon,az,color,opacity);
       else shape=L.circle([lat,lon],{radius:150,fillColor:color,fillOpacity:opacity,stroke:false,pane:'coveragePane',interactive:true});
 
-      // Add hover/click events for polygon
+      // Hover/click polygon
       shape.on('mouseover',()=>info.innerHTML=siteHTML(r))
            .on('mouseout',()=>info.innerHTML='Hover over coverage or site')
            .on('click',()=>shape.bindPopup(siteHTML(r)).openPopup())
            .addTo(coverageLayer);
 
-      // Circle marker for point
+      // Circle marker
       const dot=L.circleMarker([lat,lon],{radius:3.5,fillColor:color,fillOpacity:1,stroke:false,pane:'markerPane'}).addTo(markersLayer);
       dot.on('mouseover',()=>{info.innerHTML=siteHTML(r); dot.setRadius(7);});
       dot.on('mouseout',()=>dot.setRadius(3.5));
