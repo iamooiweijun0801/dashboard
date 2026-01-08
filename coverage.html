@@ -7,73 +7,30 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <style>
-body {
-  margin: 0;
-  height: 100vh;
-  font-family: Inter, system-ui, sans-serif;
-  display: flex;
-  flex-direction: column;
-  background: #f8f9fa;
+body { margin:0; height:100vh; font-family:Inter,system-ui,sans-serif; display:flex; flex-direction:column; }
+#map { flex-grow:1; }
+#info-panel {
+  position:absolute;
+  bottom:30px; left:20px;
+  background:white;
+  padding:10px;
+  border-radius:6px;
+  box-shadow:0 4px 15px rgba(0,0,0,.15);
+  z-index:1000;
+  min-width:260px;
+  pointer-events:none;
 }
-#progress-container {
-  width: 100%;
-  height: 4px;
-  background: #e9ecef;
-  position: fixed;
-  top: 0;
-  z-index: 10001;
-}
-#progress-bar {
-  width: 0%;
-  height: 100%;
-  background: #2ecc71;
-  transition: width 0.2s;
-}
-#header {
-  padding: 10px 20px;
-  background: white;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-}
-#map { flex-grow: 1; }
-
 .legend {
-  position: absolute;
-  top: 70px;
-  right: 20px;
-  background: white;
-  padding: 12px;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-  font-size: 12px;
-  z-index: 1000;
+  position:absolute; top:70px; right:20px;
+  background:white; padding:10px;
+  border-radius:6px;
+  font-size:12px; z-index:1000;
 }
-.swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-  margin-right: 8px;
-}
+.swatch { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; }
 </style>
 </head>
 
 <body>
-
-<div id="progress-container"><div id="progress-bar"></div></div>
-
-<div id="header">
-  <div style="font-weight:700;">
-    Coverage Map
-    <span id="counter" style="color:#3498db;margin-left:10px;"></span>
-  </div>
-  <div>
-    <input id="search" placeholder="Search SRAN_ID">
-    <button id="searchBtn">Find</button>
-  </div>
-</div>
 
 <div class="legend">
   <div><span class="swatch" style="background:#1e90ff"></span> Huawei</div>
@@ -82,136 +39,110 @@ body {
   <div><span class="swatch" style="background:#ffd700"></span> Other</div>
 </div>
 
+<div id="info-panel"><div id="info-content">Hover site</div></div>
 <div id="map"></div>
 
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-const DEFAULT_CENTER = [11.56603, 104.9194];
-const map = L.map('map', { preferCanvas: true }).setView(DEFAULT_CENTER, 17);
+const map = L.map('map').setView([11.56603,104.9194],17);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 const coverageLayer = L.layerGroup().addTo(map);
 const markerLayer = L.layerGroup().addTo(map);
-const uniqueCoords = new Set();
 const registry = {};
-const siteNameSet = new Set();
+const usedCoords = new Set();
 
 const COLORS = {
-  HUAWEI: '#1e90ff',
-  IMACRO: '#ff8c00',
-  IBS: '#8a2be2',
-  OTHER: '#ffd700'
+  HUAWEI:'#1e90ff',
+  IMACRO:'#ff8c00',
+  IBS:'#8a2be2',
+  OTHER:'#ffd700'
 };
 
-const OPACITY = {
-  HUAWEI: 0.35,
-  IMACRO: 0.5,
-  IBS: 0.2,
-  OTHER: 0.35
-};
+function siteHTML(r){
+  return `
+    <b>${r['Site Name']||'N/A'}</b><br>
+    SRAN ID: ${r.SRAN_ID||'N/A'}<br>
+    Type: ${r.SiteType||'N/A'}<br>
+    Vendor: ${r.Vendor||'N/A'}
+  `;
+}
 
-function createCone(lat, lon, azimuth, color) {
-  const pts = [[lat, lon]];
-  const radius = 150, beam = 60, steps = 12;
-
-  for (let i = 0; i <= steps; i++) {
-    const angle = (azimuth - beam / 2 + (i / steps) * beam) * Math.PI / 180;
+function createCone(lat, lon, az, color){
+  const pts=[[lat,lon]];
+  const r=150,b=60,s=12;
+  for(let i=0;i<=s;i++){
+    const a=(az-b/2+(i/s)*b)*Math.PI/180;
     pts.push([
-      lat + (radius * Math.cos(angle) / 111320),
-      lon + (radius * Math.sin(angle) / (111320 * Math.cos(lat * Math.PI / 180)))
+      lat+(r*Math.cos(a)/111320),
+      lon+(r*Math.sin(a)/(111320*Math.cos(lat*Math.PI/180)))
     ]);
   }
-
-  return L.polygon(pts, {
-    stroke: false,
-    fillColor: color,
-    fillOpacity: OPACITY.IMACRO
-  });
+  return L.polygon(pts,{fillColor:color,fillOpacity:.45,stroke:false});
 }
 
 Papa.parse(
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=108612568&single=true&output=csv',
   {
-    download: true,
-    header: true,
-    skipEmptyLines: true,
-    complete: res => processData(res.data)
+    download:true,
+    header:true,
+    complete:r=>draw(r.data)
   }
 );
 
-function processData(data) {
-  data.forEach(r => {
-    const lat = parseFloat(r.Latitude);
-    const lon = parseFloat(r.Longitude);
-    if (isNaN(lat) || isNaN(lon)) return;
+function draw(data){
+  data.forEach(r=>{
+    const lat=+r.Latitude, lon=+r.Longitude;
+    if(isNaN(lat)||isNaN(lon)) return;
 
-    const type = (r.SiteType || '').toUpperCase();
-    const vendor = (r.Vendor || '').toUpperCase();
-    const az = parseFloat(r.Azimuth) || 0;
-
-    let color = COLORS.OTHER;
+    const type=(r.SiteType||'').toUpperCase();
+    const vendor=(r.Vendor||'').toUpperCase();
+    const az=+r.Azimuth||0;
 
     // 🎨 COLOR PRIORITY
-    if (vendor === 'HUAWEI') color = COLORS.HUAWEI;
-    else if (type === 'IBS' || type === 'QCELL') color = COLORS.IBS;
-    else if (type.includes('IMACRO') || type.includes('EASYMACRO')) color = COLORS.IMACRO;
+    let color = COLORS.OTHER;
+    if(vendor==='HUAWEI') color=COLORS.HUAWEI;
+    else if(type==='IBS'||type==='QCELL') color=COLORS.IBS;
+    else if(type.includes('IMACRO')||type.includes('EASYMACRO')) color=COLORS.IMACRO;
 
-    const key = `${lat.toFixed(5)}|${lon.toFixed(5)}`;
-    let shape = null;
+    let shape=null;
+    const key=`${lat.toFixed(5)}|${lon.toFixed(5)}`;
 
-    // 📐 SHAPE LOGIC
-    if (type === 'IBS' || type === 'QCELL') {
-      shape = L.circle([lat, lon], {
-        radius: 50,
-        fillColor: color,
-        fillOpacity: OPACITY.IBS,
-        stroke: false
-      });
+    if(type==='IBS'||type==='QCELL'){
+      shape=L.circle([lat,lon],{radius:50,fillColor:color,fillOpacity:.25,stroke:false});
     }
-    else if (type.includes('IMACRO') || type.includes('EASYMACRO')) {
-      shape = createCone(lat, lon, az, color);
+    else if(type.includes('IMACRO')||type.includes('EASYMACRO')){
+      shape=createCone(lat,lon,az,color);
     }
-    else if (!uniqueCoords.has(key)) {
-      shape = L.circle([lat, lon], {
-        radius: 150,
-        fillColor: color,
-        fillOpacity: OPACITY.OTHER,
-        stroke: false
-      });
+    else if(!usedCoords.has(key)){
+      shape=L.circle([lat,lon],{radius:150,fillColor:color,fillOpacity:.35,stroke:false});
     }
 
-    if (shape) {
-      shape.addTo(coverageLayer);
-      uniqueCoords.add(key);
+    if(shape){
+      shape
+        .on('mouseover',()=>info.innerHTML=siteHTML(r))
+        .addTo(coverageLayer);
+      usedCoords.add(key);
     }
 
-    const dot = L.circleMarker([lat, lon], {
-      radius: 3.5,
-      fillColor: color,
-      fillOpacity: 1,
-      stroke: false
+    const dot=L.circleMarker([lat,lon],{
+      radius:4,fillColor:color,fillOpacity:1,stroke:false
     }).addTo(markerLayer);
 
-    registry[r.SRAN_ID] = dot;
-    if (r['Site Name']) siteNameSet.add(r['Site Name']);
-  });
+    dot.on('mouseover',()=>{
+      info.innerHTML=siteHTML(r);
+      dot.setRadius(7);
+    });
+    dot.on('mouseout',()=>dot.setRadius(4));
+    dot.on('click',()=>dot.bindPopup(siteHTML(r)).openPopup());
 
-  document.getElementById('counter').innerText =
-    `${siteNameSet.size.toLocaleString()} Sites`;
+    registry[r.SRAN_ID]=dot;
+  });
 }
 
-document.getElementById('searchBtn').onclick = () => {
-  const id = document.getElementById('search').value.trim();
-  const m = registry[id];
-  if (m) {
-    map.setView(m.getLatLng(), 18);
-    m.openPopup();
-  } else {
-    alert('Site not found');
-  }
-};
+const info=document.getElementById('info-content');
 </script>
 </body>
 </html>
