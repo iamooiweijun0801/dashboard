@@ -22,8 +22,8 @@ input { padding:8px; width:180px; border:1px solid #ddd; border-radius:4px; }
 .site-popup-table td { padding:3px 0; border-bottom:1px solid #eee; }
 </style>
 </head>
-
 <body>
+
 <div id="progress-container"><div id="progress-bar"></div></div>
 
 <div id="header">
@@ -58,7 +58,9 @@ const DEFAULT_CENTER = [11.56603,104.9194];
 const map = L.map('map',{preferCanvas:true}).setView(DEFAULT_CENTER,17);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-map.createPane('markerPane').style.zIndex = 600;
+// Create separate panes
+map.createPane('coveragePane').style.zIndex = 400; // below markers
+map.createPane('markerPane').style.zIndex = 500;   // above polygons
 
 const coverageLayer = L.layerGroup().addTo(map);
 const markerLayer = L.layerGroup().addTo(map);
@@ -94,7 +96,7 @@ function createCone(lat, lon, az, color){
     const a=(az-b/2+(i/s)*b)*Math.PI/180;
     pts.push([lat+(r*Math.cos(a)/111320), lon+(r*Math.sin(a)/(111320*Math.cos(lat*Math.PI/180)))]);
   }
-  return L.polygon(pts,{fillColor:color,fillOpacity:POLY_OPACITY,stroke:false});
+  return L.polygon(pts,{fillColor:color,fillOpacity:POLY_OPACITY,stroke:false,pane:'coveragePane'});
 }
 
 // Load CSV
@@ -115,7 +117,7 @@ function draw(data){
       const vendor=(r.Vendor||'').toUpperCase();
       const az=+r.Azimuth||0;
 
-      // Determine polygon color
+      // Polygon color based on vendor/type
       let polyColor = COLORS.OTHER;
       if(vendor==='HUAWEI') polyColor = COLORS.HUAWEI;
       else if(type==='IBS'||type==='QCELL') polyColor = COLORS.IBS;
@@ -124,11 +126,11 @@ function draw(data){
       // Determine shape
       let shape = null;
       if(type==='IBS'||type==='QCELL'){
-        shape=L.circle([lat,lon],{radius:50,fillColor:polyColor,fillOpacity:POLY_OPACITY,stroke:false});
+        shape=L.circle([lat,lon],{radius:50,fillColor:polyColor,fillOpacity:POLY_OPACITY,stroke:false,pane:'coveragePane'});
       } else if(type.includes('IMACRO')||type.includes('EASYMACRO')){
         shape=createCone(lat,lon,az,polyColor);
       } else {
-        shape=L.circle([lat,lon],{radius:150,fillColor:polyColor,fillOpacity:POLY_OPACITY,stroke:false});
+        shape=L.circle([lat,lon],{radius:150,fillColor:polyColor,fillOpacity:POLY_OPACITY,stroke:false,pane:'coveragePane'});
       }
 
       // Polygon hover/click
