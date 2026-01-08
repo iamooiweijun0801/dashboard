@@ -20,6 +20,7 @@
   .controls { display: flex; gap: 8px; align-items: center; }
   input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 180px; font-size: 13px; }
   .btn { padding: 8px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .btn-export { background: #27ae60; } /* Style for Export Button */
   .btn-gps { background: white; color: #333; border: 1px solid #ccc; width: 35px; height: 35px; padding: 0; display: flex; align-items: center; justify-content: center; }
   
   .site-popup-table { width: 100%; font-size: 11px; border-collapse: collapse; }
@@ -33,6 +34,7 @@
 <div id="header">
   <div style="font-weight: 700; color: #2c3e50;">Coverage Map <span id="counter" style="color: #3498db; font-weight: 700; font-size: 14px; margin-left:10px;"></span></div>
   <div class="controls">
+    <button id="exportBtn" class="btn btn-export">Export KML</button>
     <button id="resetBtn" class="btn btn-gps" title="Reset View">
       <img src="https://cdn-icons-png.flaticon.com/512/854/854878.png" width="18" height="18">
     </button>
@@ -94,7 +96,8 @@ function createCone(lat, lon, azimuth, color, isYellow) {
         const angle = (azimuth - beam / 2 + (i / steps) * beam) * (Math.PI / 180);
         pts.push([lat + (radius * Math.cos(angle) / 111320), lon + (radius * Math.sin(angle) / (111320 * Math.cos(lat * Math.PI / 180)))]);
     }
-    return L.polygon(pts, { stroke: false, fillColor: color, fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.IMACRO, pane: isYellow ? 'yellowPane' : 'overlayPane', interactive: true });
+    const poly = L.polygon(pts, { stroke: false, fillColor: color, fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.IMACRO, pane: isYellow ? 'yellowPane' : 'overlayPane', interactive: true });
+    return poly;
 }
 
 async function loadData() {
@@ -120,10 +123,9 @@ function processData(data) {
             const type = (r.SiteType || '').toUpperCase();
             let color = COLORS.OTHER, isYellow = false;
             
-            // Cutover status logic changed to check for HUAWEI in Vendor
             if (vendor.includes('HUAWEI')) color = COLORS.HUAWEI;
-            else if (type === 'IBS' || type === 'QCELL') color = COLORS.IBS; // add QCELL to IBS
-            else if (type.includes('IMACRO') || type.includes('EASYMACRO')) color = COLORS.IMACRO; // add EASYMACRO to IMACRO
+            else if (type === 'IBS' || type === 'QCELL') color = COLORS.IBS;
+            else if (type.includes('IMACRO') || type.includes('EASYMACRO')) color = COLORS.IMACRO;
             else isYellow = true;
 
             const coordKey = `${lat.toFixed(5)}|${lon.toFixed(5)}`;
@@ -137,14 +139,16 @@ function processData(data) {
                     shape = L.circle([lat, lon], { radius: 150, stroke: false, fillColor: color, fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.HUAWEI, pane: isYellow ? 'yellowPane' : 'overlayPane' });
                 }
                 
-                // Add Hover to Coverage Shape
+                // Attach data to shape for KML export
+                shape.options.siteData = r; 
                 shape.on('mouseover', () => { document.getElementById('info-content').innerHTML = getSiteHTML(r); });
                 shape.addTo(coverageLayer);
                 if (!(type === 'IBS' || type === 'QCELL')) uniqueCoords.add(coordKey);
             }
 
             const dot = L.circleMarker([lat, lon], { radius: 3.5, stroke: false, fillColor: color, fillOpacity: 1, pane: 'markerPane' }).addTo(markersLayer);
-            
+            dot.options.siteData = r; // Attach data to marker for KML export
+
             dot.on('mouseover', () => { 
                 document.getElementById('info-content').innerHTML = getSiteHTML(r); 
                 dot.setRadius(7); 
@@ -163,6 +167,73 @@ function processData(data) {
     renderBatch();
 }
 
+// --- KML EXPORT LOGIC ---
+function exportToKML() {
+    let kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Network Coverage Export</name>`;
+
+    // Helper: Convert Hex + Opacity to KML Color (aabbggrr)
+    const toKmlColor = (hex, opacity) => {
+        const a = Math.round(opacity * 255).toString(16).padStart(2, '0');
+        const r = hex.substring(1, 3);
+        const g = hex.substring(3, 5);
+        const b = hex.substring(5, 7);
+        return a + b + g + r;
+    };
+
+    // Process Coverage Shapes (Polygons/Cones)
+    coverageLayer.eachLayer(layer => {
+        const data = layer.options.siteData || {};
+        const color = toKmlColor(layer.options.fillColor, layer.options.fillOpacity);
+        let coordsString = "";
+
+        if (layer instanceof L.Polygon) {
+            coordsString = layer.getLatLngs()[0].map(p => `${p.lng},${p.lat},0`).join(" ");
+        } else if (layer instanceof L.Circle) {
+            // Approximating circle for KML
+            const center = layer.getLatLng();
+            const radius = layer.getRadius();
+            for (let i = 0; i <= 360; i += 10) {
+                const ang = i * Math.PI / 180;
+                const lat = center.lat + (radius * Math.cos(ang) / 111320);
+                const lng = center.lng + (radius * Math.sin(ang) / (111320 * Math.cos(center.lat * Math.PI / 180)));
+                coordsString += `${lng},${lat},0 `;
+            }
+        }
+
+        kml += `
+    <Placemark>
+      <name>${data['Site Name'] || 'Coverage'}</name>
+      <Style><PolyStyle><color>${color}</color><outline>0</outline></PolyStyle></Style>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>${coordsString}</coordinates></LinearRing></outerBoundaryIs></Polygon>
+    </Placemark>`;
+    });
+
+    // Process Site Markers
+    markersLayer.eachLayer(layer => {
+        const data = layer.options.siteData || {};
+        const pos = layer.getLatLng();
+        kml += `
+    <Placemark>
+      <name>${data.SRAN_ID || 'Site'}</name>
+      <description>${data['Site Name'] || ''}</description>
+      <Point><coordinates>${pos.lng},${pos.lat},0</coordinates></Point>
+    </Placemark>`;
+    });
+
+    kml += `\n  </Document>\n</kml>`;
+
+    const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Network_Export_${new Date().getTime()}.kml`;
+    link.click();
+}
+
+document.getElementById('exportBtn').onclick = exportToKML;
 document.getElementById('searchBtn').onclick = () => {
     const m = registry[document.getElementById('search').value.trim()];
     if (m) { map.setView(m.getLatLng(), 18); m.fire('click'); } else alert("Site ID not found.");
