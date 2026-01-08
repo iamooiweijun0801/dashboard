@@ -20,6 +20,7 @@
   .controls { display: flex; gap: 8px; align-items: center; }
   input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 180px; font-size: 13px; }
   .btn { padding: 8px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .btn-export { background: #27ae60; }
   .btn-gps { background: white; color: #333; border: 1px solid #ccc; width: 35px; height: 35px; padding: 0; display: flex; align-items: center; justify-content: center; }
   
   .site-popup-table { width: 100%; font-size: 11px; border-collapse: collapse; }
@@ -33,6 +34,7 @@
 <div id="header">
   <div style="font-weight: 700; color: #2c3e50;">Coverage Map <span id="counter" style="color: #3498db; font-weight: 700; font-size: 14px; margin-left:10px;"></span></div>
   <div class="controls">
+    <button id="exportBtn" class="btn btn-export">Export Polygon KML</button>
     <button id="resetBtn" class="btn btn-gps" title="Reset View">
       <img src="https://cdn-icons-png.flaticon.com/512/854/854878.png" width="18" height="18">
     </button>
@@ -67,7 +69,6 @@ const coverageLayer = L.layerGroup().addTo(map);
 const markersLayer = L.layerGroup().addTo(map);
 
 let registry = {};
-let allSites = [];
 let uniqueCoords = new Set();
 let siteNameSet = new Set();
 
@@ -120,15 +121,14 @@ function processData(data) {
             const type = (r.SiteType || '').toUpperCase();
             let color = COLORS.OTHER, isYellow = false;
             
-            // Cutover status logic changed to check for HUAWEI in Vendor
             if (vendor.includes('HUAWEI')) color = COLORS.HUAWEI;
-            else if (type === 'IBS' || type === 'QCELL') color = COLORS.IBS; // add QCELL to IBS
-            else if (type.includes('IMACRO') || type.includes('EASYMACRO')) color = COLORS.IMACRO; // add EASYMACRO to IMACRO
+            else if (type === 'IBS' || type === 'QCELL') color = COLORS.IBS;
+            else if (type.includes('IMACRO') || type.includes('EASYMACRO')) color = COLORS.IMACRO;
             else isYellow = true;
 
             const coordKey = `${lat.toFixed(5)}|${lon.toFixed(5)}`;
-            let shape;
             if (type === 'IBS' || !uniqueCoords.has(coordKey)) {
+                let shape;
                 if (type === 'IBS' || type === 'QCELL') {
                     shape = L.circle([lat, lon], { radius: 50, stroke: false, fillColor: color, fillOpacity: OPACITY.IBS });
                 } else if (type.includes('IMACRO') || type.includes('EASYMACRO')) {
@@ -136,22 +136,26 @@ function processData(data) {
                 } else {
                     shape = L.circle([lat, lon], { radius: 150, stroke: false, fillColor: color, fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.HUAWEI, pane: isYellow ? 'yellowPane' : 'overlayPane' });
                 }
-                
-                // Add Hover to Coverage Shape
+                shape.options.siteData = r; 
                 shape.on('mouseover', () => { document.getElementById('info-content').innerHTML = getSiteHTML(r); });
                 shape.addTo(coverageLayer);
                 if (!(type === 'IBS' || type === 'QCELL')) uniqueCoords.add(coordKey);
             }
 
-            const dot = L.circleMarker([lat, lon], { radius: 3.5, stroke: false, fillColor: color, fillOpacity: 1, pane: 'markerPane' }).addTo(markersLayer);
+            // SENSITIVITY FIX: weight: 15 and color: transparent creates an invisible click target
+            const dot = L.circleMarker([lat, lon], { 
+                radius: 4, 
+                weight: 15, 
+                color: 'transparent', 
+                fillColor: color, 
+                fillOpacity: 1, 
+                pane: 'markerPane' 
+            }).addTo(markersLayer);
             
-            dot.on('mouseover', () => { 
-                document.getElementById('info-content').innerHTML = getSiteHTML(r); 
-                dot.setRadius(7); 
-            });
-            dot.on('mouseout', () => dot.setRadius(3.5));
+            dot.options.siteData = r;
+            dot.on('mouseover', () => { document.getElementById('info-content').innerHTML = getSiteHTML(r); dot.setRadius(8); });
+            dot.on('mouseout', () => dot.setRadius(4));
             dot.on('click', () => { dot.bindPopup(getSiteHTML(r)).openPopup(); });
-
             registry[r.SRAN_ID] = dot;
         }
         current = end;
@@ -163,11 +167,73 @@ function processData(data) {
     renderBatch();
 }
 
+function exportToKML() {
+    let kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Network_Coverage_Polygons</name>
+    <Folder><name>Coverage Areas</name>`;
+
+    const toKmlColor = (hex, opacity) => {
+        const a = Math.round(opacity * 255).toString(16).padStart(2, '0');
+        const r = hex.substring(1, 3);
+        const g = hex.substring(3, 5);
+        const b = hex.substring(5, 7);
+        return a + b + g + r; // KML uses aabbggrr format
+    };
+
+    coverageLayer.eachLayer(layer => {
+        const d = layer.options.siteData || {};
+        // Export opacity set to 0.7 as requested (Higher than dashboard)
+        const kmlCol = toKmlColor(layer.options.fillColor, 0.7);
+        let coordsArr = [];
+        
+        if (layer instanceof L.Polygon) {
+            coordsArr = layer.getLatLngs()[0].map(p => `${p.lng},${p.lat},0`);
+            coordsArr.push(coordsArr[0]); // Close ring
+        } else if (layer instanceof L.Circle) {
+            const center = layer.getLatLng();
+            const rad = layer.getRadius();
+            for (let i = 0; i <= 360; i += 15) {
+                const a = i * Math.PI / 180;
+                const lat = center.lat + (rad * Math.cos(a) / 111320);
+                const lng = center.lng + (rad * Math.sin(a) / (111320 * Math.cos(center.lat * Math.PI / 180)));
+                coordsArr.push(`${lng},${lat},0`);
+            }
+        }
+
+        kml += `
+      <Placemark>
+        <name>${d.SRAN_ID || 'Cell'}</name>
+        <description><![CDATA[
+            <b>Site Name:</b> ${d['Site Name'] || 'N/A'}<br/>
+            <b>SRAN ID:</b> ${d.SRAN_ID || 'N/A'}<br/>
+            <b>Type:</b> ${d.SiteType || 'N/A'}<br/>
+            <b>Vendor:</b> ${d.Vendor || 'N/A'}
+        ]]></description>
+        <Style><PolyStyle><color>${kmlCol}</color><fill>1</fill><outline>0</outline></PolyStyle></Style>
+        <Polygon>
+          <altitudeMode>clampToGround</altitudeMode>
+          <outerBoundaryIs><LinearRing><coordinates>${coordsArr.join(' ')}</coordinates></LinearRing></outerBoundaryIs>
+        </Polygon>
+      </Placemark>`;
+    });
+
+    kml += `</Folder></Document></kml>`;
+
+    const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Coverage_Polygons_Export.kml`;
+    link.click();
+}
+
+document.getElementById('exportBtn').onclick = exportToKML;
 document.getElementById('searchBtn').onclick = () => {
     const m = registry[document.getElementById('search').value.trim()];
     if (m) { map.setView(m.getLatLng(), 18); m.fire('click'); } else alert("Site ID not found.");
 };
-
 document.getElementById('resetBtn').onclick = () => map.setView(DEFAULT_CENTER, 17);
 loadData();
 </script>
