@@ -11,17 +11,17 @@
   #progress-bar { width: 0%; height: 100%; background: #2ecc71; transition: width 0.2s; }
   #header { padding: 10px 20px; background: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); z-index: 1000; }
   #map { flex-grow: 1; z-index: 1; }
-  
-  #info-panel { position: absolute; bottom: 30px; left: 20px; background: rgba(255,255,255,0.95); padding: 12px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); z-index: 1000; min-width: 260px; backdrop-filter: blur(4px); border-left: 5px solid #3498db; pointer-events: none; }
-  
+
+  #info-panel { position: absolute; bottom: 30px; left: 20px; background: rgba(255,255,255,0.95); padding: 12px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); z-index: 1000; min-width: 260px; pointer-events: none; }
+
   .legend { position: absolute; top: 70px; right: 20px; background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); z-index: 1000; font-size: 12px; }
   .swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
-  
+
   .controls { display: flex; gap: 8px; align-items: center; }
   input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 180px; font-size: 13px; }
   .btn { padding: 8px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; }
   .btn-gps { background: white; color: #333; border: 1px solid #ccc; width: 35px; height: 35px; padding: 0; display: flex; align-items: center; justify-content: center; }
-  
+
   .site-popup-table { width: 100%; font-size: 11px; border-collapse: collapse; }
   .site-popup-table td { padding: 3px 0; border-bottom: 1px solid #eee; }
 </style>
@@ -31,18 +31,20 @@
 <div id="progress-container"><div id="progress-bar"></div></div>
 
 <div id="header">
-  <div style="font-weight: 700; color: #2c3e50;">Coverage Map <span id="counter" style="color: #3498db; font-weight: 700; font-size: 14px; margin-left:10px;"></span></div>
+  <div style="font-weight:700;color:#2c3e50;">
+    Coverage Map <span id="counter" style="color:#3498db;font-weight:700;font-size:14px;margin-left:10px;"></span>
+  </div>
   <div class="controls">
-    <button id="resetBtn" class="btn btn-gps" title="Reset View">
-      <img src="https://cdn-icons-png.flaticon.com/512/854/854878.png" width="18" height="18">
+    <button id="resetBtn" class="btn btn-gps">
+      <img src="https://cdn-icons-png.flaticon.com/512/854/854878.png" width="18">
     </button>
     <input id="search" type="text" placeholder="Search SRAN_ID...">
     <button id="searchBtn" class="btn">Find</button>
+    <button id="exportKMLBtn" class="btn">Export KML</button>
   </div>
 </div>
 
 <div class="legend">
-  <div style="margin-bottom:6px; font-weight:bold;">Legend</div>
   <div><span class="swatch" style="background:#ffd700"></span> Other</div>
   <div><span class="swatch" style="background:#ff8c00"></span> iMacro</div>
   <div><span class="swatch" style="background:#1e90ff"></span> Huawei</div>
@@ -57,119 +59,83 @@
 
 <script>
 const DEFAULT_CENTER = [11.56603, 104.9194];
-const map = L.map('map', { preferCanvas: true }).setView(DEFAULT_CENTER, 17);
+const map = L.map('map').setView(DEFAULT_CENTER, 17);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-map.createPane('yellowPane').style.zIndex = 450;
-map.createPane('markerPane').style.zIndex = 600;
 
 const coverageLayer = L.layerGroup().addTo(map);
 const markersLayer = L.layerGroup().addTo(map);
+let registry = {}, uniqueCoords = new Set(), siteNameSet = new Set();
 
-let registry = {};
-let allSites = [];
-let uniqueCoords = new Set();
-let siteNameSet = new Set();
+const COLORS = { HUAWEI:'#1e90ff', IBS:'#8a2be2', IMACRO:'#ff8c00', OTHER:'#ffd700' };
+const OPACITY = { HUAWEI:0.3, IBS:0.15, IMACRO:0.6, OTHER:0.35 };
 
-const COLORS = { HUAWEI: '#1e90ff', IBS: '#8a2be2', IMACRO: '#ff8c00', OTHER: '#ffd700' };
-const OPACITY = { HUAWEI: 0.3, IBS: 0.15, IMACRO: 0.6, OTHER: 0.35 };
-
-function getSiteHTML(data) {
-    return `
-        <div style="font-weight:700; border-bottom:1px solid #3498db; margin-bottom:8px; padding-bottom:5px; font-size:14px; color:#1a73e8;">
-            ${data['Site Name'] || 'N/A'}
-        </div>
-        <table class="site-popup-table">
-            <tr><td style="color:#666;">SRAN Name:</td><td style="font-weight:600; text-align:right;">${data['SRAN Name'] || 'N/A'}</td></tr>
-            <tr><td style="color:#666;">Site Code:</td><td style="font-weight:600; text-align:right;">${data['Site Code'] || 'N/A'}</td></tr>
-            <tr><td style="color:#666;">SRAN ID:</td><td style="font-weight:600; text-align:right;">${data.SRAN_ID || 'N/A'}</td></tr>
-            <tr><td style="color:#666;">Site Type:</td><td style="font-weight:600; text-align:right;">${data.SiteType || 'N/A'}</td></tr>
-        </table>`;
+function getSiteHTML(r){
+  return `<b>${r['Site Name']||''}</b><br>SRAN ID: ${r.SRAN_ID||''}<br>Type: ${r.SiteType||''}`;
 }
 
-function createCone(lat, lon, azimuth, color, isYellow) {
-    const pts = [[lat, lon]];
-    const radius = 150, beam = 60, steps = 12;
-    for (let i = 0; i <= steps; i++) {
-        const angle = (azimuth - beam / 2 + (i / steps) * beam) * (Math.PI / 180);
-        pts.push([lat + (radius * Math.cos(angle) / 111320), lon + (radius * Math.sin(angle) / (111320 * Math.cos(lat * Math.PI / 180)))]);
+function createCone(lat, lon, azimuth, color){
+  const pts=[[lat,lon]];
+  for(let i=0;i<=12;i++){
+    const a=(azimuth-30+i*5)*Math.PI/180;
+    pts.push([lat+150*Math.cos(a)/111320, lon+150*Math.sin(a)/(111320*Math.cos(lat*Math.PI/180))]);
+  }
+  return L.polygon(pts,{stroke:false,fillColor:color,fillOpacity:OPACITY.IMACRO});
+}
+
+Papa.parse(
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=108612568&single=true&output=csv',
+  {download:true,header:true,complete:r=>processData(r.data)}
+);
+
+function processData(data){
+  data.forEach(r=>{
+    const lat=+r.Latitude, lon=+r.Longitude;
+    if(isNaN(lat)||isNaN(lon)) return;
+
+    const vendor=(r.Vendor||'').toUpperCase();
+    const type=(r.SiteType||'').toUpperCase();
+    let color=COLORS.OTHER;
+
+    if(vendor.includes('HUAWEI')) color=COLORS.HUAWEI;
+    else if(type==='IBS'||type==='QCELL') color=COLORS.IBS;
+    else if(type.includes('IMACRO')||type.includes('EASYMACRO')) color=COLORS.IMACRO;
+
+    const key=`${lat}|${lon}`;
+    if(!uniqueCoords.has(key)){
+      let shape = type.includes('IMACRO') ? createCone(lat,lon,+r.Azimuth||0,color)
+        : L.circle([lat,lon],{radius:100,fillColor:color,stroke:false,fillOpacity:OPACITY.HUAWEI});
+      shape.on('click',()=>shape.bindPopup(getSiteHTML(r)).openPopup());
+      coverageLayer.addLayer(shape);
+      uniqueCoords.add(key);
     }
-    return L.polygon(pts, { stroke: false, fillColor: color, fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.IMACRO, pane: isYellow ? 'yellowPane' : 'overlayPane', interactive: true });
+
+    const dot=L.circleMarker([lat,lon],{radius:4,fillColor:color,fillOpacity:1,stroke:false})
+      .on('click',()=>dot.bindPopup(getSiteHTML(r)).openPopup())
+      .addTo(markersLayer);
+
+    registry[r.SRAN_ID]=dot;
+  });
 }
 
-async function loadData() {
-    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=108612568&single=true&output=csv';
-    Papa.parse(CSV_URL, { download: true, header: true, skipEmptyLines: true, complete: (results) => processData(results.data) });
-}
-
-function processData(data) {
-    let current = 0;
-    const batchSize = 1000;
-    const total = data.length;
-
-    function renderBatch() {
-        const end = Math.min(current + batchSize, total);
-        for (let i = current; i < end; i++) {
-            const r = data[i];
-            const lat = parseFloat(r.Latitude), lon = parseFloat(r.Longitude);
-            if (isNaN(lat) || isNaN(lon)) continue;
-
-            if (r['Site Name']) siteNameSet.add(r['Site Name'].trim());
-
-            const vendor = (r['Vendor'] || '').toUpperCase();
-            const type = (r.SiteType || '').toUpperCase();
-            let color = COLORS.OTHER, isYellow = false;
-            
-            // Cutover status logic changed to check for HUAWEI in Vendor
-            if (vendor.includes('HUAWEI')) color = COLORS.HUAWEI;
-            else if (type === 'IBS' || type === 'QCELL') color = COLORS.IBS; // add QCELL to IBS
-            else if (type.includes('IMACRO') || type.includes('EASYMACRO')) color = COLORS.IMACRO; // add EASYMACRO to IMACRO
-            else isYellow = true;
-
-            const coordKey = `${lat.toFixed(5)}|${lon.toFixed(5)}`;
-            let shape;
-            if (type === 'IBS' || !uniqueCoords.has(coordKey)) {
-                if (type === 'IBS' || type === 'QCELL') {
-                    shape = L.circle([lat, lon], { radius: 50, stroke: false, fillColor: color, fillOpacity: OPACITY.IBS });
-                } else if (type.includes('IMACRO') || type.includes('EASYMACRO')) {
-                    shape = createCone(lat, lon, parseFloat(r.Azimuth) || 0, color, isYellow);
-                } else {
-                    shape = L.circle([lat, lon], { radius: 150, stroke: false, fillColor: color, fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.HUAWEI, pane: isYellow ? 'yellowPane' : 'overlayPane' });
-                }
-                
-                // Add Hover to Coverage Shape
-                shape.on('mouseover', () => { document.getElementById('info-content').innerHTML = getSiteHTML(r); });
-                shape.addTo(coverageLayer);
-                if (!(type === 'IBS' || type === 'QCELL')) uniqueCoords.add(coordKey);
-            }
-
-            const dot = L.circleMarker([lat, lon], { radius: 3.5, stroke: false, fillColor: color, fillOpacity: 1, pane: 'markerPane' }).addTo(markersLayer);
-            
-            dot.on('mouseover', () => { 
-                document.getElementById('info-content').innerHTML = getSiteHTML(r); 
-                dot.setRadius(7); 
-            });
-            dot.on('mouseout', () => dot.setRadius(3.5));
-            dot.on('click', () => { dot.bindPopup(getSiteHTML(r)).openPopup(); });
-
-            registry[r.SRAN_ID] = dot;
-        }
-        current = end;
-        document.getElementById('progress-bar').style.width = (current / total * 100) + '%';
-        document.getElementById('counter').innerText = `${siteNameSet.size.toLocaleString()} Sites`;
-        if (current < total) requestAnimationFrame(renderBatch);
-        else document.getElementById('progress-container').style.display = 'none';
-    }
-    renderBatch();
-}
-
-document.getElementById('searchBtn').onclick = () => {
-    const m = registry[document.getElementById('search').value.trim()];
-    if (m) { map.setView(m.getLatLng(), 18); m.fire('click'); } else alert("Site ID not found.");
+document.getElementById('exportKMLBtn').onclick=()=>{
+  let kml=`<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document>`;
+  markersLayer.eachLayer(m=>{
+    const p=m.getLatLng();
+    kml+=`<Placemark><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`;
+  });
+  kml+='</Document></kml>';
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([kml],{type:'application/vnd.google-earth.kml+xml'}));
+  a.download='coverage_sites.kml';
+  a.click();
 };
 
-document.getElementById('resetBtn').onclick = () => map.setView(DEFAULT_CENTER, 17);
-loadData();
+document.getElementById('searchBtn').onclick=()=>{
+  const m=registry[search.value.trim()];
+  if(m){map.setView(m.getLatLng(),18);m.fire('click');}
+};
+document.getElementById('resetBtn').onclick=()=>map.setView(DEFAULT_CENTER,17);
 </script>
 </body>
 </html>
