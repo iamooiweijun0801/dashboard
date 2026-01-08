@@ -62,11 +62,11 @@ const DEFAULT_CENTER = [11.56603, 104.9194];
 const map = L.map('map', { preferCanvas: true }).setView(DEFAULT_CENTER, 17);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// LAYER STACKING FIX
-map.createPane('bluePane').style.zIndex = 400;     // Huawei at bottom
-map.createPane('yellowPane').style.zIndex = 450;   // Other middle
-map.createPane('topPane').style.zIndex = 500;      // iMacro/IBS top
-map.createPane('markerPane').style.zIndex = 600;   // Dots absolute top
+// DEFINING STRICT STACKING ORDER FOR DASHBOARD
+map.createPane('bluePane').style.zIndex = 410;    // Blue stays at the absolute bottom
+map.createPane('yellowPane').style.zIndex = 420;  // Yellow sits on top of Blue
+map.createPane('topPane').style.zIndex = 430;     // iMacro/IBS sits on top of everything
+map.createPane('markerPane').style.zIndex = 600;  // Dots stay on top for clicking
 
 const coverageLayer = L.layerGroup().addTo(map);
 const markersLayer = L.layerGroup().addTo(map);
@@ -97,13 +97,7 @@ function createCone(lat, lon, azimuth, color, paneName) {
         const angle = (azimuth - beam / 2 + (i / steps) * beam) * (Math.PI / 180);
         pts.push([lat + (radius * Math.cos(angle) / 111320), lon + (radius * Math.sin(angle) / (111320 * Math.cos(lat * Math.PI / 180)))]);
     }
-    return L.polygon(pts, { 
-        stroke: false, 
-        fillColor: color, 
-        fillOpacity: OPACITY.IMACRO, 
-        pane: paneName, 
-        interactive: true 
-    });
+    return L.polygon(pts, { stroke: false, fillColor: color, fillOpacity: OPACITY.IMACRO, pane: paneName, interactive: true });
 }
 
 async function loadData() {
@@ -129,20 +123,10 @@ function processData(data) {
             const type = (r.SiteType || '').toUpperCase();
             
             let color, targetPane;
-            
-            if (vendor.includes('HUAWEI')) {
-                color = COLORS.HUAWEI;
-                targetPane = 'bluePane'; // Force to bottom
-            } else if (type === 'IBS' || type === 'QCELL') {
-                color = COLORS.IBS;
-                targetPane = 'topPane';
-            } else if (type.includes('IMACRO') || type.includes('EASYMACRO')) {
-                color = COLORS.IMACRO;
-                targetPane = 'topPane';
-            } else {
-                color = COLORS.OTHER;
-                targetPane = 'yellowPane';
-            }
+            if (vendor.includes('HUAWEI')) { color = COLORS.HUAWEI; targetPane = 'bluePane'; }
+            else if (type === 'IBS' || type === 'QCELL') { color = COLORS.IBS; targetPane = 'topPane'; }
+            else if (type.includes('IMACRO') || type.includes('EASYMACRO')) { color = COLORS.IMACRO; targetPane = 'topPane'; }
+            else { color = COLORS.OTHER; targetPane = 'yellowPane'; }
 
             const coordKey = `${lat.toFixed(5)}|${lon.toFixed(5)}`;
             if (type === 'IBS' || !uniqueCoords.has(coordKey)) {
@@ -155,20 +139,13 @@ function processData(data) {
                     shape = L.circle([lat, lon], { radius: 150, stroke: false, fillColor: color, fillOpacity: (color === COLORS.HUAWEI ? OPACITY.HUAWEI : OPACITY.OTHER), pane: targetPane });
                 }
                 shape.options.siteData = r; 
+                shape.options.exportColor = color; // Store for sorting during export
                 shape.on('mouseover', () => { document.getElementById('info-content').innerHTML = getSiteHTML(r); });
                 shape.addTo(coverageLayer);
                 if (!(type === 'IBS' || type === 'QCELL')) uniqueCoords.add(coordKey);
             }
 
-            const dot = L.circleMarker([lat, lon], { 
-                radius: 4, 
-                weight: 15, 
-                color: 'transparent', 
-                fillColor: color, 
-                fillOpacity: 1, 
-                pane: 'markerPane' 
-            }).addTo(markersLayer);
-            
+            const dot = L.circleMarker([lat, lon], { radius: 4, weight: 15, color: 'transparent', fillColor: color, fillOpacity: 1, pane: 'markerPane' }).addTo(markersLayer);
             dot.options.siteData = r;
             dot.on('mouseover', () => { document.getElementById('info-content').innerHTML = getSiteHTML(r); dot.setRadius(8); });
             dot.on('mouseout', () => dot.setRadius(4));
@@ -188,7 +165,7 @@ function exportToKML() {
     let kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>Network_Coverage_Export</name>
+    <name>Network_Coverage_Strict_Order</name>
     <Folder><name>Coverage Areas</name>`;
 
     const toKmlColor = (hex, opacity) => {
@@ -199,9 +176,19 @@ function exportToKML() {
         return a + b + g + r;
     };
 
-    coverageLayer.eachLayer(layer => {
+    // CONVERT LAYER GROUP TO ARRAY AND SORT BY COLOR FOR KML
+    // Drawing order in KML: First in file = bottom of stack.
+    let exportItems = [];
+    coverageLayer.eachLayer(layer => exportItems.push(layer));
+
+    exportItems.sort((a, b) => {
+        const order = { [COLORS.HUAWEI]: 1, [COLORS.OTHER]: 2, [COLORS.IMACRO]: 3, [COLORS.IBS]: 4 };
+        return (order[a.options.exportColor] || 99) - (order[b.options.exportColor] || 99);
+    });
+
+    exportItems.forEach(layer => {
         const d = layer.options.siteData || {};
-        const kmlCol = toKmlColor(layer.options.fillColor, 0.7);
+        const kmlCol = toKmlColor(layer.options.fillColor, 0.75); // Slightly higher opacity for GE
         let coordsArr = [];
         
         if (layer instanceof L.Polygon) {
@@ -221,16 +208,9 @@ function exportToKML() {
         kml += `
       <Placemark>
         <name>${d.SRAN_ID || 'Cell'}</name>
-        <description><![CDATA[
-            <b>Site Name:</b> ${d['Site Name'] || 'N/A'}<br/>
-            <b>Vendor:</b> ${d.Vendor || 'N/A'}<br/>
-            <b>Type:</b> ${d.SiteType || 'N/A'}
-        ]]></description>
+        <description><![CDATA[<b>Site Name:</b> ${d['Site Name']}<br/><b>Vendor:</b> ${d.Vendor}]]></description>
         <Style><PolyStyle><color>${kmlCol}</color><fill>1</fill><outline>0</outline></PolyStyle></Style>
-        <Polygon>
-          <altitudeMode>clampToGround</altitudeMode>
-          <outerBoundaryIs><LinearRing><coordinates>${coordsArr.join(' ')}</coordinates></LinearRing></outerBoundaryIs>
-        </Polygon>
+        <Polygon><altitudeMode>clampToGround</altitudeMode><outerBoundaryIs><LinearRing><coordinates>${coordsArr.join(' ')}</coordinates></LinearRing></outerBoundaryIs></Polygon>
       </Placemark>`;
     });
 
@@ -240,7 +220,7 @@ function exportToKML() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Coverage_Map_Export.kml`;
+    link.download = `Coverage_Strict_Stacking.kml`;
     link.click();
 }
 
