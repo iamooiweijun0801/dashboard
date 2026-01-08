@@ -45,7 +45,7 @@
   <div style="margin-bottom:6px; font-weight:bold;">Legend</div>
   <div><span class="swatch" style="background:#ffd700"></span> Other</div>
   <div><span class="swatch" style="background:#ff8c00"></span> iMacro</div>
-  <div><span class="swatch" style="background:#1e90ff"></span> Done</div>
+  <div><span class="swatch" style="background:#1e90ff"></span> Huawei</div>
   <div><span class="swatch" style="background:#8a2be2"></span> IBS</div>
 </div>
 
@@ -71,8 +71,8 @@ let allSites = [];
 let uniqueCoords = new Set();
 let siteNameSet = new Set();
 
-const COLORS = { DONE: '#1e90ff', IBS: '#8a2be2', IMACRO: '#ff8c00', OTHER: '#ffd700' };
-const OPACITY = { DONE: 0.3, IBS: 0.15, IMACRO: 0.5, OTHER: 0.35 };
+const COLORS = { HUAWEI: '#1e90ff', IBS: '#8a2be2', IMACRO: '#ff8c00', OTHER: '#ffd700' };
+const OPACITY = { HUAWEI: 0.3, IBS: 0.15, IMACRO: 0.6, OTHER: 0.35 };
 
 function getSiteHTML(data) {
     return `
@@ -121,7 +121,7 @@ function processData(data) {
             let color = COLORS.OTHER, isYellow = false;
             
             // Cutover status logic changed to check for HUAWEI in Vendor
-            if (vendor.includes('HUAWEI')) color = COLORS.DONE;
+            if (vendor.includes('HUAWEI')) color = COLORS.HUAWEI;
             else if (type === 'IBS' || type === 'QCELL') color = COLORS.IBS; // add QCELL to IBS
             else if (type.includes('IMACRO') || type.includes('EASYMACRO')) color = COLORS.IMACRO; // add EASYMACRO to IMACRO
             else isYellow = true;
@@ -134,7 +134,7 @@ function processData(data) {
                 } else if (type.includes('IMACRO') || type.includes('EASYMACRO')) {
                     shape = createCone(lat, lon, parseFloat(r.Azimuth) || 0, color, isYellow);
                 } else {
-                    shape = L.circle([lat, lon], { radius: 150, stroke: false, fillColor: color, fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.DONE, pane: isYellow ? 'yellowPane' : 'overlayPane' });
+                    shape = L.circle([lat, lon], { radius: 150, stroke: false, fillColor: color, fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.HUAWEI, pane: isYellow ? 'yellowPane' : 'overlayPane' });
                 }
                 
                 // Add Hover to Coverage Shape
