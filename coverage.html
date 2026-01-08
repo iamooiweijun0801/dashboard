@@ -12,7 +12,7 @@
   #header { padding: 10px 20px; background: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); z-index: 1000; }
   #map { flex-grow: 1; z-index: 1; }
 
-  #info-panel { position: absolute; bottom: 30px; left: 20px; background: rgba(255,255,255,0.95); padding: 12px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); z-index: 1000; min-width: 260px; pointer-events: none; }
+  #info-panel { position: absolute; bottom: 30px; left: 20px; background: rgba(255,255,255,0.95); padding: 12px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); z-index: 1000; min-width: 260px; backdrop-filter: blur(4px); border-left: 5px solid #3498db; pointer-events: none; }
 
   .legend { position: absolute; top: 70px; right: 20px; background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); z-index: 1000; font-size: 12px; }
   .swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
@@ -38,17 +38,18 @@
     <button id="resetBtn" class="btn btn-gps">
       <img src="https://cdn-icons-png.flaticon.com/512/854/854878.png" width="18">
     </button>
-    <input id="search" type="text" placeholder="Search SRAN_ID...">
+    <input id="search" placeholder="Search SRAN_ID...">
     <button id="searchBtn" class="btn">Find</button>
     <button id="exportKMLBtn" class="btn">Export KML</button>
   </div>
 </div>
 
 <div class="legend">
-  <div><span class="swatch" style="background:#ffd700"></span> Other</div>
-  <div><span class="swatch" style="background:#ff8c00"></span> iMacro</div>
-  <div><span class="swatch" style="background:#1e90ff"></span> Huawei</div>
-  <div><span class="swatch" style="background:#8a2be2"></span> IBS</div>
+  <b>Legend</b><br>
+  <span class="swatch" style="background:#ffd700"></span> Other<br>
+  <span class="swatch" style="background:#ff8c00"></span> iMacro<br>
+  <span class="swatch" style="background:#1e90ff"></span> Huawei<br>
+  <span class="swatch" style="background:#8a2be2"></span> IBS
 </div>
 
 <div id="info-panel"><div id="info-content">Hover over coverage or site</div></div>
@@ -58,84 +59,78 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-const DEFAULT_CENTER = [11.56603, 104.9194];
-const map = L.map('map').setView(DEFAULT_CENTER, 17);
+const DEFAULT_CENTER=[11.56603,104.9194];
+const map=L.map('map',{preferCanvas:true}).setView(DEFAULT_CENTER,17);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-const coverageLayer = L.layerGroup().addTo(map);
-const markersLayer = L.layerGroup().addTo(map);
-let registry = {}, uniqueCoords = new Set(), siteNameSet = new Set();
+map.createPane('yellowPane').style.zIndex=450;
+map.createPane('markerPane').style.zIndex=600;
 
-const COLORS = { HUAWEI:'#1e90ff', IBS:'#8a2be2', IMACRO:'#ff8c00', OTHER:'#ffd700' };
-const OPACITY = { HUAWEI:0.3, IBS:0.15, IMACRO:0.6, OTHER:0.35 };
+const coverageLayer=L.layerGroup().addTo(map);
+const markersLayer=L.layerGroup().addTo(map);
+
+let registry={},uniqueCoords=new Set(),siteNameSet=new Set();
+
+const COLORS={HUAWEI:'#1e90ff',IBS:'#8a2be2',IMACRO:'#ff8c00',OTHER:'#ffd700'};
+const OPACITY={HUAWEI:0.3,IBS:0.15,IMACRO:0.6,OTHER:0.35};
 
 function getSiteHTML(r){
-  return `<b>${r['Site Name']||''}</b><br>SRAN ID: ${r.SRAN_ID||''}<br>Type: ${r.SiteType||''}`;
+return `<b>${r['Site Name']||'N/A'}</b><br>SRAN:${r.SRAN_ID||'N/A'}<br>Type:${r.SiteType||'N/A'}`;
 }
 
-function createCone(lat, lon, azimuth, color){
-  const pts=[[lat,lon]];
-  for(let i=0;i<=12;i++){
-    const a=(azimuth-30+i*5)*Math.PI/180;
-    pts.push([lat+150*Math.cos(a)/111320, lon+150*Math.sin(a)/(111320*Math.cos(lat*Math.PI/180))]);
-  }
-  return L.polygon(pts,{stroke:false,fillColor:color,fillOpacity:OPACITY.IMACRO});
+function createCone(lat,lon,az,color){
+const pts=[[lat,lon]];
+for(let i=0;i<=12;i++){
+const a=(az-30+i*5)*Math.PI/180;
+pts.push([lat+150*Math.cos(a)/111320,lon+150*Math.sin(a)/(111320*Math.cos(lat*Math.PI/180))]);
+}
+return L.polygon(pts,{fillColor:color,fillOpacity:0.6,stroke:false});
 }
 
-Papa.parse(
-  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=108612568&single=true&output=csv',
-  {download:true,header:true,complete:r=>processData(r.data)}
-);
+Papa.parse('https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?output=csv',{
+download:true,header:true,complete:r=>{
+r.data.forEach(d=>{
+const lat=+d.Latitude,lon=+d.Longitude;
+if(!lat||!lon)return;
+let color=COLORS.OTHER;
+if((d.Vendor||'').includes('HUAWEI'))color=COLORS.HUAWEI;
+else if((d.SiteType||'').includes('IMACRO'))color=COLORS.IMACRO;
+else if((d.SiteType||'')==='IBS')color=COLORS.IBS;
 
-function processData(data){
-  data.forEach(r=>{
-    const lat=+r.Latitude, lon=+r.Longitude;
-    if(isNaN(lat)||isNaN(lon)) return;
-
-    const vendor=(r.Vendor||'').toUpperCase();
-    const type=(r.SiteType||'').toUpperCase();
-    let color=COLORS.OTHER;
-
-    if(vendor.includes('HUAWEI')) color=COLORS.HUAWEI;
-    else if(type==='IBS'||type==='QCELL') color=COLORS.IBS;
-    else if(type.includes('IMACRO')||type.includes('EASYMACRO')) color=COLORS.IMACRO;
-
-    const key=`${lat}|${lon}`;
-    if(!uniqueCoords.has(key)){
-      let shape = type.includes('IMACRO') ? createCone(lat,lon,+r.Azimuth||0,color)
-        : L.circle([lat,lon],{radius:100,fillColor:color,stroke:false,fillOpacity:OPACITY.HUAWEI});
-      shape.on('click',()=>shape.bindPopup(getSiteHTML(r)).openPopup());
-      coverageLayer.addLayer(shape);
-      uniqueCoords.add(key);
-    }
-
-    const dot=L.circleMarker([lat,lon],{radius:4,fillColor:color,fillOpacity:1,stroke:false})
-      .on('click',()=>dot.bindPopup(getSiteHTML(r)).openPopup())
-      .addTo(markersLayer);
-
-    registry[r.SRAN_ID]=dot;
-  });
+const key=lat.toFixed(5)+'|'+lon.toFixed(5);
+if(!uniqueCoords.has(key)){
+let shape=(d.SiteType||'').includes('IMACRO')?createCone(lat,lon,+d.Azimuth||0,color):L.circle([lat,lon],{radius:150,fillColor:color,fillOpacity:0.4,stroke:false});
+shape.on('mouseover',()=>info-content.innerHTML=getSiteHTML(d));
+coverageLayer.addLayer(shape);
+uniqueCoords.add(key);
 }
+
+const m=L.circleMarker([lat,lon],{radius:4,fillColor:color,fillOpacity:1,stroke:false,pane:'markerPane'}).addTo(markersLayer);
+m.on('mouseover',()=>info-content.innerHTML=getSiteHTML(d));
+registry[d.SRAN_ID]=m;
+});
+}});
+document.getElementById('resetBtn').onclick=()=>map.setView(DEFAULT_CENTER,17);
+document.getElementById('searchBtn').onclick=()=>{const m=registry[search.value];if(m)map.setView(m.getLatLng(),18);};
 
 document.getElementById('exportKMLBtn').onclick=()=>{
-  let kml=`<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2"><Document>`;
-  markersLayer.eachLayer(m=>{
-    const p=m.getLatLng();
-    kml+=`<Placemark><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`;
-  });
-  kml+='</Document></kml>';
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([kml],{type:'application/vnd.google-earth.kml+xml'}));
-  a.download='coverage_sites.kml';
-  a.click();
+const hex=(h,o)=>Math.round(o*255).toString(16).padStart(2,'0')+h.slice(5,7)+h.slice(3,5)+h.slice(1,3);
+let kml=`<?xml version="1.0"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>`;
+Object.entries(COLORS).forEach(([k,c])=>kml+=`<Style id="${k}"><PolyStyle><color>${hex(c,0.4)}</color></PolyStyle><IconStyle><color>${hex(c,1)}</color></IconStyle></Style>`);
+coverageLayer.eachLayer(l=>{
+const pts=(l.getLatLngs()[0]||l.getLatLngs()).map(p=>`${p.lng},${p.lat},0`).join(' ');
+kml+=`<Placemark><Polygon><outerBoundaryIs><LinearRing><coordinates>${pts}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>`;
+});
+markersLayer.eachLayer(m=>{
+const p=m.getLatLng();
+kml+=`<Placemark><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`;
+});
+kml+=`</Document></kml>`;
+const a=document.createElement('a');
+a.href=URL.createObjectURL(new Blob([kml],{type:'application/vnd.google-earth.kml+xml'}));
+a.download='coverage_dashboard.kml';
+a.click();
 };
-
-document.getElementById('searchBtn').onclick=()=>{
-  const m=registry[search.value.trim()];
-  if(m){map.setView(m.getLatLng(),18);m.fire('click');}
-};
-document.getElementById('resetBtn').onclick=()=>map.setView(DEFAULT_CENTER,17);
 </script>
 </body>
 </html>
