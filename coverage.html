@@ -44,9 +44,9 @@
 <div class="legend">
   <div style="margin-bottom:6px; font-weight:bold;">Legend</div>
   <div><span class="swatch" style="background:#ffd700"></span> Other</div>
-  <div><span class="swatch" style="background:#ff8c00"></span> iMacro / EasyMacro</div>
+  <div><span class="swatch" style="background:#ff8c00"></span> iMacro</div>
   <div><span class="swatch" style="background:#1e90ff"></span> Huawei</div>
-  <div><span class="swatch" style="background:#8a2be2"></span> IBS / QCell</div>
+  <div><span class="swatch" style="background:#8a2be2"></span> IBS</div>
 </div>
 
 <div id="info-panel"><div id="info-content">Hover over coverage or site</div></div>
@@ -60,21 +60,19 @@ const DEFAULT_CENTER = [11.56603, 104.9194];
 const map = L.map('map', { preferCanvas: true }).setView(DEFAULT_CENTER, 17);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// Define Panes for strict Z-indexing (Bottom to Top)
-map.createPane('otherPane').style.zIndex = 410;
-map.createPane('ibsPane').style.zIndex = 420;
-map.createPane('macroPane').style.zIndex = 430;
+map.createPane('yellowPane').style.zIndex = 450;
 map.createPane('markerPane').style.zIndex = 600;
 
 const coverageLayer = L.layerGroup().addTo(map);
 const markersLayer = L.layerGroup().addTo(map);
 
 let registry = {};
+let allSites = [];
 let uniqueCoords = new Set();
 let siteNameSet = new Set();
 
 const COLORS = { HUAWEI: '#1e90ff', IBS: '#8a2be2', IMACRO: '#ff8c00', OTHER: '#ffd700' };
-const OPACITY = { HUAWEI: 0.3, IBS: 0.25, IMACRO: 0.6, OTHER: 0.35 };
+const OPACITY = { HUAWEI: 0.3, IBS: 0.15, IMACRO: 0.6, OTHER: 0.35 };
 
 function getSiteHTML(data) {
     return `
@@ -89,14 +87,14 @@ function getSiteHTML(data) {
         </table>`;
 }
 
-function createCone(lat, lon, azimuth, color, pane) {
+function createCone(lat, lon, azimuth, color, isYellow) {
     const pts = [[lat, lon]];
     const radius = 150, beam = 60, steps = 12;
     for (let i = 0; i <= steps; i++) {
         const angle = (azimuth - beam / 2 + (i / steps) * beam) * (Math.PI / 180);
         pts.push([lat + (radius * Math.cos(angle) / 111320), lon + (radius * Math.sin(angle) / (111320 * Math.cos(lat * Math.PI / 180)))]);
     }
-    return L.polygon(pts, { stroke: false, fillColor: color, fillOpacity: OPACITY.IMACRO, pane: pane, interactive: true });
+    return L.polygon(pts, { stroke: false, fillColor: color, fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.IMACRO, pane: isYellow ? 'yellowPane' : 'overlayPane', interactive: true });
 }
 
 async function loadData() {
@@ -120,45 +118,31 @@ function processData(data) {
 
             const vendor = (r['Vendor'] || '').toUpperCase();
             const type = (r.SiteType || '').toUpperCase();
+            let color = COLORS.OTHER, isYellow = false;
             
-            let color = COLORS.OTHER;
-            let targetPane = 'otherPane';
-
-            // Logic for hierarchy and coloring
-            if (type.includes('IMACRO') || type.includes('EASYMACRO')) {
-                color = COLORS.IMACRO;
-                targetPane = 'macroPane';
-            } else if (type === 'IBS' || type === 'QCELL') {
-                color = COLORS.IBS;
-                targetPane = 'ibsPane';
-            } else if (vendor.includes('HUAWEI')) {
-                color = COLORS.HUAWEI;
-                targetPane = 'otherPane';
-            }
+            // Cutover status logic changed to check for HUAWEI in Vendor
+            if (vendor.includes('HUAWEI')) color = COLORS.HUAWEI;
+            else if (type === 'IBS' || type === 'QCELL') color = COLORS.IBS; // add QCELL to IBS
+            else if (type.includes('IMACRO') || type.includes('EASYMACRO')) color = COLORS.IMACRO; // add EASYMACRO to IMACRO
+            else isYellow = true;
 
             const coordKey = `${lat.toFixed(5)}|${lon.toFixed(5)}`;
             let shape;
-
-            // Generate coverage shapes
-            if (type === 'IBS' || type === 'QCELL') {
-                shape = L.circle([lat, lon], { radius: 50, stroke: false, fillColor: color, fillOpacity: OPACITY.IBS, pane: targetPane, interactive: true });
-            } else if (type.includes('IMACRO') || type.includes('EASYMACRO')) {
-                shape = createCone(lat, lon, parseFloat(r.Azimuth) || 0, color, targetPane);
-            } else if (!uniqueCoords.has(coordKey)) {
-                shape = L.circle([lat, lon], { radius: 150, stroke: false, fillColor: color, fillOpacity: OPACITY.OTHER, pane: targetPane, interactive: true });
-                uniqueCoords.add(coordKey);
-            }
-
-            if (shape) {
-                // Hover and Click functions for polygons/circles
+            if (type === 'IBS' || !uniqueCoords.has(coordKey)) {
+                if (type === 'IBS' || type === 'QCELL') {
+                    shape = L.circle([lat, lon], { radius: 50, stroke: false, fillColor: color, fillOpacity: OPACITY.IBS });
+                } else if (type.includes('IMACRO') || type.includes('EASYMACRO')) {
+                    shape = createCone(lat, lon, parseFloat(r.Azimuth) || 0, color, isYellow);
+                } else {
+                    shape = L.circle([lat, lon], { radius: 150, stroke: false, fillColor: color, fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.HUAWEI, pane: isYellow ? 'yellowPane' : 'overlayPane' });
+                }
+                
+                // Add Hover to Coverage Shape
                 shape.on('mouseover', () => { document.getElementById('info-content').innerHTML = getSiteHTML(r); });
-                shape.on('click', (e) => { 
-                    L.popup().setLatLng(e.latlng).setContent(getSiteHTML(r)).openOn(map);
-                });
                 shape.addTo(coverageLayer);
+                if (!(type === 'IBS' || type === 'QCELL')) uniqueCoords.add(coordKey);
             }
 
-            // Create center marker dots
             const dot = L.circleMarker([lat, lon], { radius: 3.5, stroke: false, fillColor: color, fillOpacity: 1, pane: 'markerPane' }).addTo(markersLayer);
             
             dot.on('mouseover', () => { 
