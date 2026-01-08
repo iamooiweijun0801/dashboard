@@ -20,7 +20,7 @@
   .controls { display: flex; gap: 8px; align-items: center; }
   input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 180px; font-size: 13px; }
   .btn { padding: 8px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; }
-  .btn-export { background: #27ae60; } /* Style for Export Button */
+  .btn-export { background: #27ae60; }
   .btn-gps { background: white; color: #333; border: 1px solid #ccc; width: 35px; height: 35px; padding: 0; display: flex; align-items: center; justify-content: center; }
   
   .site-popup-table { width: 100%; font-size: 11px; border-collapse: collapse; }
@@ -96,8 +96,7 @@ function createCone(lat, lon, azimuth, color, isYellow) {
         const angle = (azimuth - beam / 2 + (i / steps) * beam) * (Math.PI / 180);
         pts.push([lat + (radius * Math.cos(angle) / 111320), lon + (radius * Math.sin(angle) / (111320 * Math.cos(lat * Math.PI / 180)))]);
     }
-    const poly = L.polygon(pts, { stroke: false, fillColor: color, fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.IMACRO, pane: isYellow ? 'yellowPane' : 'overlayPane', interactive: true });
-    return poly;
+    return L.polygon(pts, { stroke: false, fillColor: color, fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.IMACRO, pane: isYellow ? 'yellowPane' : 'overlayPane', interactive: true });
 }
 
 async function loadData() {
@@ -138,22 +137,21 @@ function processData(data) {
                 } else {
                     shape = L.circle([lat, lon], { radius: 150, stroke: false, fillColor: color, fillOpacity: isYellow ? OPACITY.OTHER : OPACITY.HUAWEI, pane: isYellow ? 'yellowPane' : 'overlayPane' });
                 }
-                
-                // Attach data to shape for KML export
-                shape.options.siteData = r; 
+                shape.options.siteData = r; // Store for export
                 shape.on('mouseover', () => { document.getElementById('info-content').innerHTML = getSiteHTML(r); });
                 shape.addTo(coverageLayer);
                 if (!(type === 'IBS' || type === 'QCELL')) uniqueCoords.add(coordKey);
             }
 
-            const dot = L.circleMarker([lat, lon], { radius: 3.5, stroke: false, fillColor: color, fillOpacity: 1, pane: 'markerPane' }).addTo(markersLayer);
-            dot.options.siteData = r; // Attach data to marker for KML export
+            // DOTS SIZE: Reduced from 3.5 to 1.5 for a cleaner look
+            const dot = L.circleMarker([lat, lon], { radius: 1.5, stroke: false, fillColor: color, fillOpacity: 1, pane: 'markerPane' }).addTo(markersLayer);
+            dot.options.siteData = r; // Store for export
 
             dot.on('mouseover', () => { 
                 document.getElementById('info-content').innerHTML = getSiteHTML(r); 
-                dot.setRadius(7); 
+                dot.setRadius(5); // Slight hover increase
             });
-            dot.on('mouseout', () => dot.setRadius(3.5));
+            dot.on('mouseout', () => dot.setRadius(1.5));
             dot.on('click', () => { dot.bindPopup(getSiteHTML(r)).openPopup(); });
 
             registry[r.SRAN_ID] = dot;
@@ -167,14 +165,13 @@ function processData(data) {
     renderBatch();
 }
 
-// --- KML EXPORT LOGIC ---
+// --- UPDATED EXPORT KML LOGIC ---
 function exportToKML() {
     let kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>Network Coverage Export</name>`;
+    <name>Network_Coverage_Export</name>`;
 
-    // Helper: Convert Hex + Opacity to KML Color (aabbggrr)
     const toKmlColor = (hex, opacity) => {
         const a = Math.round(opacity * 255).toString(16).padStart(2, '0');
         const r = hex.substring(1, 3);
@@ -183,42 +180,51 @@ function exportToKML() {
         return a + b + g + r;
     };
 
-    // Process Coverage Shapes (Polygons/Cones)
+    // Export Coverage Polygons
     coverageLayer.eachLayer(layer => {
-        const data = layer.options.siteData || {};
-        const color = toKmlColor(layer.options.fillColor, layer.options.fillOpacity);
-        let coordsString = "";
-
+        const d = layer.options.siteData || {};
+        const kmlCol = toKmlColor(layer.options.fillColor, layer.options.fillOpacity);
+        let coords = "";
+        
         if (layer instanceof L.Polygon) {
-            coordsString = layer.getLatLngs()[0].map(p => `${p.lng},${p.lat},0`).join(" ");
+            coords = layer.getLatLngs()[0].map(p => `${p.lng},${p.lat},0`).join(" ");
         } else if (layer instanceof L.Circle) {
-            // Approximating circle for KML
             const center = layer.getLatLng();
-            const radius = layer.getRadius();
-            for (let i = 0; i <= 360; i += 10) {
-                const ang = i * Math.PI / 180;
-                const lat = center.lat + (radius * Math.cos(ang) / 111320);
-                const lng = center.lng + (radius * Math.sin(ang) / (111320 * Math.cos(center.lat * Math.PI / 180)));
-                coordsString += `${lng},${lat},0 `;
+            const rad = layer.getRadius();
+            for (let i = 0; i <= 360; i += 15) {
+                const a = i * Math.PI / 180;
+                const lat = center.lat + (rad * Math.cos(a) / 111320);
+                const lng = center.lng + (rad * Math.sin(a) / (111320 * Math.cos(center.lat * Math.PI / 180)));
+                coords += `${lng},${lat},0 `;
             }
         }
 
         kml += `
     <Placemark>
-      <name>${data['Site Name'] || 'Coverage'}</name>
-      <Style><PolyStyle><color>${color}</color><outline>0</outline></PolyStyle></Style>
-      <Polygon><outerBoundaryIs><LinearRing><coordinates>${coordsString}</coordinates></LinearRing></outerBoundaryIs></Polygon>
+      <name>${d['SRAN Name'] || 'Coverage'}</name>
+      <description><![CDATA[
+        <b>Site Name:</b> ${d['Site Name'] || 'N/A'}<br>
+        <b>SRAN ID:</b> ${d.SRAN_ID || 'N/A'}<br>
+        <b>Type:</b> ${d.SiteType || 'N/A'}<br>
+        <b>Vendor:</b> ${d.Vendor || 'N/A'}
+      ]]></description>
+      <Style><PolyStyle><color>${kmlCol}</color><outline>0</outline></PolyStyle></Style>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>${coords}</coordinates></LinearRing></outerBoundaryIs></Polygon>
     </Placemark>`;
     });
 
-    // Process Site Markers
+    // Export Points
     markersLayer.eachLayer(layer => {
-        const data = layer.options.siteData || {};
+        const d = layer.options.siteData || {};
         const pos = layer.getLatLng();
         kml += `
     <Placemark>
-      <name>${data.SRAN_ID || 'Site'}</name>
-      <description>${data['Site Name'] || ''}</description>
+      <name>${d.SRAN_ID || 'Point'}</name>
+      <description><![CDATA[
+        <b>Site Name:</b> ${d['Site Name'] || 'N/A'}<br>
+        <b>Vendor:</b> ${d.Vendor || 'N/A'}<br>
+        <b>Type:</b> ${d.SiteType || 'N/A'}
+      ]]></description>
       <Point><coordinates>${pos.lng},${pos.lat},0</coordinates></Point>
     </Placemark>`;
     });
@@ -229,11 +235,12 @@ function exportToKML() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Network_Export_${new Date().getTime()}.kml`;
+    link.download = `Coverage_Data_${new Date().toISOString().split('T')[0]}.kml`;
     link.click();
 }
 
 document.getElementById('exportBtn').onclick = exportToKML;
+
 document.getElementById('searchBtn').onclick = () => {
     const m = registry[document.getElementById('search').value.trim()];
     if (m) { map.setView(m.getLatLng(), 18); m.fire('click'); } else alert("Site ID not found.");
