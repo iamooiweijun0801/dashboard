@@ -7,30 +7,76 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <style>
-body { margin:0; height:100vh; font-family:Inter,system-ui,sans-serif; display:flex; flex-direction:column; }
+body { margin:0; height:100vh; font-family:Inter,system-ui,sans-serif; display:flex; flex-direction:column; background:#f8f9fa; }
 #map { flex-grow:1; }
+
+#progress-container { width:100%; height:4px; background:#e9ecef; position:fixed; top:0; z-index:10001; }
+#progress-bar { width:0%; height:100%; background:#2ecc71; transition:width .2s; }
+
+#header {
+  padding:10px 20px;
+  background:white;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  box-shadow:0 2px 10px rgba(0,0,0,.05);
+  z-index:1000;
+}
+
+.controls { display:flex; gap:8px; align-items:center; }
+input { padding:8px; width:180px; border:1px solid #ddd; border-radius:4px; }
+.btn { padding:8px 12px; background:#3498db; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:600; }
+.btn-gps { background:white; border:1px solid #ccc; width:35px; height:35px; display:flex; align-items:center; justify-content:center; }
+
 #info-panel {
   position:absolute;
-  bottom:30px; left:20px;
-  background:white;
-  padding:10px;
-  border-radius:6px;
-  box-shadow:0 4px 15px rgba(0,0,0,.15);
-  z-index:1000;
+  bottom:30px;
+  left:20px;
+  background:rgba(255,255,255,.95);
+  padding:12px;
+  border-radius:8px;
+  box-shadow:0 4px 20px rgba(0,0,0,.1);
   min-width:260px;
+  z-index:1000;
   pointer-events:none;
+  border-left:5px solid #3498db;
 }
+
 .legend {
-  position:absolute; top:70px; right:20px;
-  background:white; padding:10px;
-  border-radius:6px;
-  font-size:12px; z-index:1000;
+  position:absolute;
+  top:70px;
+  right:20px;
+  background:white;
+  padding:12px;
+  border-radius:8px;
+  font-size:12px;
+  box-shadow:0 2px 10px rgba(0,0,0,.08);
+  z-index:1000;
 }
 .swatch { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; }
+
+.site-popup-table { width:100%; font-size:11px; border-collapse:collapse; }
+.site-popup-table td { padding:3px 0; border-bottom:1px solid #eee; }
 </style>
 </head>
 
 <body>
+
+<div id="progress-container"><div id="progress-bar"></div></div>
+
+<div id="header">
+  <div style="font-weight:700;color:#2c3e50;">
+    Coverage Map
+    <span id="counter" style="color:#3498db;font-weight:700;font-size:14px;margin-left:10px;"></span>
+  </div>
+  <div class="controls">
+    <button id="resetBtn" class="btn btn-gps">
+      <img src="https://cdn-icons-png.flaticon.com/512/854/854878.png" width="18">
+    </button>
+    <input id="search" placeholder="Search SRAN_ID...">
+    <button id="searchBtn" class="btn">Find</button>
+  </div>
+</div>
 
 <div class="legend">
   <div><span class="swatch" style="background:#1e90ff"></span> Huawei</div>
@@ -39,20 +85,26 @@ body { margin:0; height:100vh; font-family:Inter,system-ui,sans-serif; display:f
   <div><span class="swatch" style="background:#ffd700"></span> Other</div>
 </div>
 
-<div id="info-panel"><div id="info-content">Hover site</div></div>
+<div id="info-panel"><div id="info-content">Hover over site</div></div>
 <div id="map"></div>
 
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-const map = L.map('map').setView([11.56603,104.9194],17);
+const DEFAULT_CENTER = [11.56603,104.9194];
+const map = L.map('map',{preferCanvas:true}).setView(DEFAULT_CENTER,17);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+map.createPane('yellowPane').style.zIndex = 450;
+map.createPane('markerPane').style.zIndex = 600;
 
 const coverageLayer = L.layerGroup().addTo(map);
 const markerLayer = L.layerGroup().addTo(map);
+
 const registry = {};
 const usedCoords = new Set();
+const siteNameSet = new Set();
 
 const COLORS = {
   HUAWEI:'#1e90ff',
@@ -63,11 +115,16 @@ const COLORS = {
 
 function siteHTML(r){
   return `
-    <b>${r['Site Name']||'N/A'}</b><br>
-    SRAN ID: ${r.SRAN_ID||'N/A'}<br>
-    Type: ${r.SiteType||'N/A'}<br>
-    Vendor: ${r.Vendor||'N/A'}
-  `;
+    <div style="font-weight:700;color:#1a73e8;margin-bottom:6px;">
+      ${r['Site Name']||'N/A'}
+    </div>
+    <table class="site-popup-table">
+      <tr><td>SRAN Name</td><td align="right">${r['SRAN Name']||'N/A'}</td></tr>
+      <tr><td>Vendor</td><td align="right">${r.Vendor||'N/A'}</td></tr>
+      <tr><td>Site Code</td><td align="right">${r['Site Code']||'N/A'}</td></tr>
+      <tr><td>SRAN ID</td><td align="right">${r.SRAN_ID||'N/A'}</td></tr>
+      <tr><td>Site Type</td><td align="right">${r.SiteType||'N/A'}</td></tr>
+    </table>`;
 }
 
 function createCone(lat, lon, az, color){
@@ -85,63 +142,75 @@ function createCone(lat, lon, az, color){
 
 Papa.parse(
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=108612568&single=true&output=csv',
-  {
-    download:true,
-    header:true,
-    complete:r=>draw(r.data)
-  }
+  { download:true, header:true, skipEmptyLines:true, complete:r=>draw(r.data) }
 );
 
 function draw(data){
-  data.forEach(r=>{
-    const lat=+r.Latitude, lon=+r.Longitude;
-    if(isNaN(lat)||isNaN(lon)) return;
+  let i=0, batch=800;
 
-    const type=(r.SiteType||'').toUpperCase();
-    const vendor=(r.Vendor||'').toUpperCase();
-    const az=+r.Azimuth||0;
+  function render(){
+    const end=Math.min(i+batch,data.length);
+    for(;i<end;i++){
+      const r=data[i];
+      const lat=+r.Latitude, lon=+r.Longitude;
+      if(isNaN(lat)||isNaN(lon)) continue;
 
-    // 🎨 COLOR PRIORITY
-    let color = COLORS.OTHER;
-    if(vendor==='HUAWEI') color=COLORS.HUAWEI;
-    else if(type==='IBS'||type==='QCELL') color=COLORS.IBS;
-    else if(type.includes('IMACRO')||type.includes('EASYMACRO')) color=COLORS.IMACRO;
+      if(r['Site Name']) siteNameSet.add(r['Site Name'].trim());
 
-    let shape=null;
-    const key=`${lat.toFixed(5)}|${lon.toFixed(5)}`;
+      const type=(r.SiteType||'').toUpperCase();
+      const vendor=(r.Vendor||'').toUpperCase();
+      const az=+r.Azimuth||0;
 
-    if(type==='IBS'||type==='QCELL'){
-      shape=L.circle([lat,lon],{radius:50,fillColor:color,fillOpacity:.25,stroke:false});
+      let color=COLORS.OTHER;
+      if(vendor==='HUAWEI') color=COLORS.HUAWEI;
+      else if(type==='IBS'||type==='QCELL') color=COLORS.IBS;
+      else if(type.includes('IMACRO')||type.includes('EASYMACRO')) color=COLORS.IMACRO;
+
+      let shape=null;
+      const key=`${lat.toFixed(5)}|${lon.toFixed(5)}`;
+
+      if(type==='IBS'||type==='QCELL'){
+        shape=L.circle([lat,lon],{radius:50,fillColor:color,fillOpacity:.25,stroke:false});
+      }
+      else if(type.includes('IMACRO')||type.includes('EASYMACRO')){
+        shape=createCone(lat,lon,az,color);
+      }
+      else if(!usedCoords.has(key)){
+        shape=L.circle([lat,lon],{radius:150,fillColor:color,fillOpacity:.35,stroke:false});
+      }
+
+      if(shape){
+        shape.on('mouseover',()=>info.innerHTML=siteHTML(r)).addTo(coverageLayer);
+        usedCoords.add(key);
+      }
+
+      const dot=L.circleMarker([lat,lon],{radius:4,fillColor:color,fillOpacity:1,stroke:false,pane:'markerPane'})
+        .addTo(markerLayer);
+
+      dot.on('mouseover',()=>{info.innerHTML=siteHTML(r);dot.setRadius(7);});
+      dot.on('mouseout',()=>dot.setRadius(4));
+      dot.on('click',()=>dot.bindPopup(siteHTML(r)).openPopup());
+
+      registry[r.SRAN_ID]=dot;
     }
-    else if(type.includes('IMACRO')||type.includes('EASYMACRO')){
-      shape=createCone(lat,lon,az,color);
-    }
-    else if(!usedCoords.has(key)){
-      shape=L.circle([lat,lon],{radius:150,fillColor:color,fillOpacity:.35,stroke:false});
-    }
 
-    if(shape){
-      shape
-        .on('mouseover',()=>info.innerHTML=siteHTML(r))
-        .addTo(coverageLayer);
-      usedCoords.add(key);
-    }
+    document.getElementById('progress-bar').style.width=(i/data.length*100)+'%';
+    document.getElementById('counter').innerText=`${siteNameSet.size.toLocaleString()} Sites`;
 
-    const dot=L.circleMarker([lat,lon],{
-      radius:4,fillColor:color,fillOpacity:1,stroke:false
-    }).addTo(markerLayer);
-
-    dot.on('mouseover',()=>{
-      info.innerHTML=siteHTML(r);
-      dot.setRadius(7);
-    });
-    dot.on('mouseout',()=>dot.setRadius(4));
-    dot.on('click',()=>dot.bindPopup(siteHTML(r)).openPopup());
-
-    registry[r.SRAN_ID]=dot;
-  });
+    if(i<data.length) requestAnimationFrame(render);
+    else document.getElementById('progress-container').style.display='none';
+  }
+  render();
 }
 
+document.getElementById('searchBtn').onclick=()=>{
+  const id=document.getElementById('search').value.trim();
+  const m=registry[id];
+  if(m){ map.setView(m.getLatLng(),18); m.fire('click'); }
+  else alert('SRAN_ID not found');
+};
+
+document.getElementById('resetBtn').onclick=()=>map.setView(DEFAULT_CENTER,17);
 const info=document.getElementById('info-content');
 </script>
 </body>
