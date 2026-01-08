@@ -73,6 +73,8 @@ const COLORS = {
   OTHER:'#ffd700'
 };
 
+const POLY_OPACITY = 0.45; // unified transparency for all polygons
+
 function siteHTML(r){
   return `
     <div style="font-weight:700;color:#1a73e8;margin-bottom:6px;">${r['Site Name']||'N/A'}</div>
@@ -92,7 +94,7 @@ function createCone(lat, lon, az, color){
     const a=(az-b/2+(i/s)*b)*Math.PI/180;
     pts.push([lat+(r*Math.cos(a)/111320), lon+(r*Math.sin(a)/(111320*Math.cos(lat*Math.PI/180)))]);
   }
-  return L.polygon(pts,{fillColor:color,fillOpacity:.45,stroke:false});
+  return L.polygon(pts,{fillColor:color,fillOpacity:POLY_OPACITY,stroke:false});
 }
 
 // Load CSV
@@ -115,19 +117,18 @@ function draw(data){
 
       // Determine polygon color
       let polyColor = COLORS.OTHER;
-      let polyOpacity = 0.35;
-      if(vendor==='HUAWEI'){ polyColor = COLORS.HUAWEI; polyOpacity = 0.6; }
-      else if(type==='IBS'||type==='QCELL'){ polyColor = COLORS.IBS; }
-      else if(type.includes('IMACRO')||type.includes('EASYMACRO')){ polyColor = COLORS.IMACRO; }
+      if(vendor==='HUAWEI') polyColor = COLORS.HUAWEI;
+      else if(type==='IBS'||type==='QCELL') polyColor = COLORS.IBS;
+      else if(type.includes('IMACRO')||type.includes('EASYMACRO')) polyColor = COLORS.IMACRO;
 
       // Determine shape
       let shape = null;
       if(type==='IBS'||type==='QCELL'){
-        shape=L.circle([lat,lon],{radius:50,fillColor:polyColor,fillOpacity:polyOpacity,stroke:false});
+        shape=L.circle([lat,lon],{radius:50,fillColor:polyColor,fillOpacity:POLY_OPACITY,stroke:false});
       } else if(type.includes('IMACRO')||type.includes('EASYMACRO')){
         shape=createCone(lat,lon,az,polyColor);
       } else {
-        shape=L.circle([lat,lon],{radius:150,fillColor:polyColor,fillOpacity:polyOpacity,stroke:false});
+        shape=L.circle([lat,lon],{radius:150,fillColor:polyColor,fillOpacity:POLY_OPACITY,stroke:false});
       }
 
       // Polygon hover/click
@@ -137,8 +138,7 @@ function draw(data){
            .addTo(coverageLayer);
 
       // Marker
-      let markerColor = (vendor==='HUAWEI') ? COLORS.HUAWEI : polyColor;
-      const dot = L.circleMarker([lat,lon],{radius:4,fillColor:markerColor,fillOpacity:1,stroke:false,pane:'markerPane'})
+      const dot = L.circleMarker([lat,lon],{radius:4,fillColor:polyColor,fillOpacity:1,stroke:false,pane:'markerPane'})
         .addTo(markerLayer);
       dot.on('mouseover',()=>{ info.innerHTML=siteHTML(r); dot.setRadius(7); });
       dot.on('mouseout',()=>dot.setRadius(4));
