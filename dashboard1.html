@@ -496,7 +496,8 @@ function render(){
     const batch = r.normalized_batch;
     const isExcluded =
       batch === 'blocked' ||
-      batch === '24g_only';
+      batch === '24g_only'||
+      batch === 'iMacro' ;
     return !isExcluded;
   });
 }
@@ -745,6 +746,7 @@ setInterval(smartFetchCsv, REFRESH_INTERVAL_MS);
 </script>
 </body>
 </html>
+
 
 
 
