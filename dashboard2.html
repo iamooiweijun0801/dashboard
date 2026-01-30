@@ -1,254 +1,360 @@
 <!doctype html>
 <html lang="en">
 <head>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-XBHVRKLJCD"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-XBHVRKLJCD');
-</script>
-<meta charset="utf-8" />
-<title>Interactive Sites Map — Dynamic Filter</title>
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<style>
-  :root{
-    --bg:#e0eaff;
-    --card:#ffffff80;
-    --accent:#2F80ED;
-    --accent-hover:#1C60B3;
-    --pending:#1F4E79;
-    --done:#66ff00;
-    --phase1:#A020F0;
-    --shadow:0 8px 30px rgba(0,0,0,0.12);
-    --radius:12px;
-  }
-  html, body { margin:0; height:100%; font-family: 'Inter', system-ui, Arial; background: linear-gradient(to bottom right, #e0eaff, #ffffff); color:#222; font-size:14px; line-height:1.5; }
-  .app{ display:grid; grid-template-columns:380px 1fr; gap:16px; height:100vh; padding:16px; box-sizing:border-box; }
-  .panel{ background:var(--card); backdrop-filter: blur(12px); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); display:flex; flex-direction:column; overflow:auto; border:1px solid rgba(255,255,255,0.3); }
-  #map{ height:100%; border-radius:var(--radius); box-shadow:var(--shadow); border:2px solid rgba(255,255,255,0.3); }
-  h2{ margin-bottom:12px; font-weight:700; font-size:1.4em; color:#1a1a1a; }
-  label{ font-weight:600; color:#333; }
-  .controls{ display:flex; flex-direction:column; gap:12px; }
-  .row{ display:flex; gap:12px; align-items:center; }
-  select,input[type=text]{ padding:8px 10px; border-radius:var(--radius); border:1px solid #ccc; transition:0.2s; width: 100%; }
-  .btn{ padding:10px 16px; border-radius:var(--radius); border:none; font-weight:600; cursor:pointer; color:#fff; background: linear-gradient(135deg,var(--accent),#1e5fc1); transition:0.3s; box-shadow:0 4px 12px rgba(0,0,0,0.2); }
-  .stat{ background:rgba(255,255,255,0.85); flex:1; padding:12px; border-radius:var(--radius); box-shadow:0 4px 12px rgba(0,0,0,0.08); text-align:center; }
-  .stat .small{ font-weight:500; color:#555; margin-bottom:4px; }
-  .stat div[id]{ font-weight:700; font-size:20px; margin-top:4px; }
-  .legend .sw{ width:16px; height:16px; border-radius:50%; display:inline-block; margin-right:8px; border:2px solid #fff; box-shadow:0 0 4px rgba(0,0,0,0.25); vertical-align:middle; }
-  #details{ font-size:14px; color:#222; margin-top:8px; padding:8px; border-radius:var(--radius); background:rgba(255,255,255,0.7); box-shadow:0 4px 12px rgba(0,0,0,0.08); min-height:64px; }
-  .map-sniper-btn{position:absolute;bottom:20px;right:20px;z-index:9999;width:50px;height:50px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #444;}
-  @media(max-width:950px){ .app{ grid-template-columns:1fr; grid-template-rows:320px 1fr; } }
-</style>
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XBHVRKLJCD"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-XBHVRKLJCD');
+  </script>
+
+  <meta charset="utf-8" />
+  <title>Interactive Sites Map — Dynamic Filter</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+  <style>
+    :root{
+      --bg:#e0eaff;
+      --card:#ffffff80;
+      --accent:#2F80ED;
+      --accent-hover:#1C60B3;
+      --pending:#1F4E79;
+      --done:#66ff00;
+      --phase1:#A020F0;
+      --shadow:0 8px 30px rgba(0,0,0,0.12);
+      --radius:12px;
+    }
+
+    html, body {
+      margin:0;
+      height:100%;
+      font-family: 'Inter', system-ui, Arial;
+      background: linear-gradient(to bottom right, #e0eaff, #ffffff);
+      color:#222;
+      font-size:14px;
+      line-height:1.5;
+    }
+
+    .app{
+      display:grid;
+      grid-template-columns:380px 1fr;
+      gap:16px;
+      height:100vh;
+      padding:16px;
+      box-sizing:border-box;
+    }
+
+    .panel{
+      background:var(--card);
+      backdrop-filter: blur(12px);
+      border-radius:var(--radius);
+      padding:16px;
+      box-shadow:var(--shadow);
+      display:flex;
+      flex-direction:column;
+      overflow:auto;
+      border:1px solid rgba(255,255,255,0.3);
+    }
+
+    #map{
+      height:100%;
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      border:2px solid rgba(255,255,255,0.3);
+      position: relative;
+    }
+
+    h2{
+      margin-bottom:12px;
+      font-weight:700;
+      font-size:1.4em;
+      color:#1a1a1a;
+    }
+
+    label{ font-weight:600; color:#333; }
+
+    .controls{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+
+    .row{
+      display:flex;
+      gap:12px;
+      align-items:center;
+    }
+
+    select, input[type=text]{
+      padding:8px 10px;
+      border-radius:var(--radius);
+      border:1px solid #ccc;
+      transition:0.2s;
+      width: 100%;
+      outline: none;
+    }
+
+    select:focus, input[type=text]:focus, button:focus{
+      outline: 3px solid rgba(47,128,237,0.35);
+      outline-offset: 2px;
+    }
+
+    .btn{
+      padding:10px 16px;
+      border-radius:var(--radius);
+      border:none;
+      font-weight:600;
+      cursor:pointer;
+      color:#fff;
+      background: linear-gradient(135deg,var(--accent),#1e5fc1);
+      transition:0.3s;
+      box-shadow:0 4px 12px rgba(0,0,0,0.2);
+      white-space: nowrap;
+    }
+    .btn:hover{ filter: brightness(1.03); }
+
+    .stat{
+      background:rgba(255,255,255,0.85);
+      flex:1;
+      padding:12px;
+      border-radius:var(--radius);
+      box-shadow:0 4px 12px rgba(0,0,0,0.08);
+      text-align:center;
+    }
+
+    .stat .small{ font-weight:500; color:#555; margin-bottom:4px; }
+    .stat div[id]{ font-weight:700; font-size:20px; margin-top:4px; }
+
+    .legend .sw{
+      width:16px;
+      height:16px;
+      border-radius:50%;
+      display:inline-block;
+      margin-right:8px;
+      border:2px solid #fff;
+      box-shadow:0 0 4px rgba(0,0,0,0.25);
+      vertical-align:middle;
+      cursor: pointer;
+    }
+
+    #details{
+      font-size:14px;
+      color:#222;
+      margin-top:8px;
+      padding:8px;
+      border-radius:var(--radius);
+      background:rgba(255,255,255,0.7);
+      box-shadow:0 4px 12px rgba(0,0,0,0.08);
+      min-height:64px;
+    }
+
+    /* Fit-to-markers button */
+    .map-sniper-btn{
+      position:absolute;
+      bottom:20px;
+      right:20px;
+      z-index:9999;
+      width:52px;
+      height:52px;
+      border-radius:50%;
+      background:white;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      border:2px solid #444;
+      box-shadow:0 6px 18px rgba(0,0,0,0.18);
+    }
+    .map-sniper-btn img{ pointer-events:none; }
+
+    @media(max-width:950px){
+      .app{ grid-template-columns:1fr; grid-template-rows:320px 1fr; }
+    }
+  </style>
 </head>
+
 <body>
 <div class="app">
   <div class="panel">
     <h2>Site Map Dashboard</h2>
+
     <div class="controls">
       <div class="row">
         <label for="viewSelect">View</label>
-        <select id="viewSelect"><option value="all">All Sites</option></select>
+        <select id="viewSelect" aria-label="Select view">
+          <option value="all">All Sites</option>
+        </select>
       </div>
+
       <div class="row">
-        <div class="stat"><div class="small">Done / Total</div><div id="doneTotal">0 / 0</div><div class="small" id="donePct">0%</div></div>
-        <div class="stat"><div class="small">Pending</div><div id="pendingCount">0</div><div class="small" id="totalCount">Total: 0</div></div>
+        <div class="stat">
+          <div class="small">Done / Total</div>
+          <div id="doneTotal">0 / 0</div>
+          <div class="small" id="donePct">0%</div>
+        </div>
+        <div class="stat">
+          <div class="small">Pending</div>
+          <div id="pendingCount">0</div>
+          <div class="small" id="totalCount">Total: 0</div>
+        </div>
       </div>
-      <div class="row legend small">
-        <span class="sw" style="background:var(--done)"></span>Done
-        <span class="sw" style="background:var(--pending)"></span>Pending
-        <span id="phase1Legend" style="display:none; margin-left:10px;"><span class="sw" style="background:var(--phase1)"></span>Phase 1</span>
+
+      <div class="row legend small" aria-label="Legend (click dots to change colors)">
+        <span class="sw" data-status="done" style="background:var(--done)" title="Change Done color"></span>Done
+        <span class="sw" data-status="pending" style="background:var(--pending)" title="Change Pending color"></span>Pending
+
+        <span id="phase1Legend" style="display:none; margin-left:10px;">
+          <span class="sw" data-status="phase1" style="background:var(--phase1)" title="Change Phase 1 color"></span>Phase 1
+        </span>
       </div>
+
       <hr style="border:none;border-top:1px solid #eee;margin:12px 0;"/>
-      <div class="row"><input id="searchInput" type="text" placeholder="Search eNodeB ID / Site name"/><button id="searchBtn" class="btn">Find</button></div>
+
+      <div class="row">
+        <input id="searchInput" type="text" placeholder="Search eNodeB ID / Site name" autocomplete="off" />
+        <button id="searchBtn" class="btn" type="button">Find</button>
+      </div>
+
       <div id="details">Hover a marker or search to see details here.</div>
     </div>
   </div>
-  <div class="panel" style="padding:0;"><div id="map"><div id="sniperBtn" class="map-sniper-btn"><img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" width="28"></div></div></div>
+
+  <div class="panel" style="padding:0;">
+    <div id="map">
+      <button id="sniperBtn" class="map-sniper-btn" type="button" title="Fit map to visible markers" aria-label="Fit map to visible markers">
+        <img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" width="28" alt="" />
+      </button>
+    </div>
+  </div>
 </div>
 
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-// OPTIMIZATION 1: preferCanvas: true is crucial for circleMarkers
-const map = L.map('map', { preferCanvas: true }).setView([3.0, 101.5], 11);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+(() => {
+  'use strict';
 
-// OPTIMIZATION 2: Changed from const to let to allow efficient batch swapping
-let markersLayer = L.layerGroup().addTo(map);
+  // ----------------------------
+  // Config
+  // ----------------------------
+  const CONFIG = {
+    SHEET_CSV_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=232255476&single=true&output=csv',
+    REFRESH_INTERVAL_MS: 30_000, // 0.5 min
+    MAP_START: { center: [3.0, 101.5], zoom: 11 },
+    FOCUS_ZOOM: 16,
+    EXCLUDED_BATCHES_IN_ALL: new Set(['blocked', '24g_only', 'imacro']),
+    PHASE1_BATCHES: new Set(['phase_1', 'phase1']),
+    BOUNDS_PAD: 0.05
+  };
 
-// Color Constants
-const COLOR_PENDING = '#1F4E79';
-const COLOR_DONE = '#66ff00';
-const COLOR_PHASE1 = '#A020F0';
+  // ----------------------------
+  // DOM
+  // ----------------------------
+  const el = {
+    viewSelect: document.getElementById('viewSelect'),
+    doneTotal: document.getElementById('doneTotal'),
+    donePct: document.getElementById('donePct'),
+    pendingCount: document.getElementById('pendingCount'),
+    totalCount: document.getElementById('totalCount'),
+    phase1Legend: document.getElementById('phase1Legend'),
+    searchInput: document.getElementById('searchInput'),
+    searchBtn: document.getElementById('searchBtn'),
+    details: document.getElementById('details'),
+    sniperBtn: document.getElementById('sniperBtn')
+  };
 
-let allRows = [], visibleMarkers = {}, pinnedMarker = null;
-let uniqueBatches = new Set();
-let batchMap = new Map();
+  // ----------------------------
+  // Helpers
+  // ----------------------------
+  const escapeHtml = (s) =>
+    String(s ?? '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
 
-function normalizeKey(k){ return (k||'').toString().trim().toLowerCase().replace(/\s+/g,'_'); }
-function isDoneStatus(s){ return /on\s*-?\s*air|onair|done|live|activated|active|\bon\b/i.test(s); }
+  const normalizeHeaderKey = (k) =>
+    (k || '').toString().trim().toLowerCase().replace(/\s+/g,'_');
 
-function levenshtein(a,b){
-  a = a||''; b = b||'';
-  const m = a.length, n = b.length;
-  if(m===0) return n; if(n===0) return m;
-  const dp = Array(n+1).fill(0).map((_,i)=>i);
-  for(let i=1;i<=m;i++){
-    let prev = dp[0]; dp[0] = i;
-    for(let j=1;j<=n;j++){
-      const temp = dp[j];
-      const cost = a[i-1] === b[j-1] ? 0 : 1;
-      dp[j] = Math.min(dp[j] + 1, dp[j-1] + 1, prev + cost);
-      prev = temp;
-    }
-  }
-  return dp[n];
-}
+  const normalizeBatch = (b) =>
+    (b || '').toString().trim().toLowerCase().replace(/\s+/g,'_');
 
-function normForSearch(s){
-  if(!s) return '';
-  return s.toString().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
-}
+  const parseNum = (v) => {
+    if (v == null) return NaN;
+    const s = String(v).trim().replace(/\s+/g,'').replace(/,/g,'.');
+    const n = Number(s);
+    return Number.isFinite(n) ? n : NaN;
+  };
 
-function fuzzyFindInRows(term, rows){
-  term = term || '';
-  const tNorm = normForSearch(term);
-  if(!tNorm) return null;
-  let exact = rows.find(r => (r.enodeb_id && r.enodeb_id.toString().trim() === term));
-  if(exact) return { row: exact, score: 0, type: 'exact-id' };
-  exact = rows.find(r => (r.site_name && normForSearch(r.site_name) === tNorm) || (r.enodeb_name && normForSearch(r.enodeb_name) === tNorm));
-  if(exact) return { row: exact, score: 0, type: 'exact-name' };
-  const substringMatches = rows.filter(r =>(r.enodeb_id && r.enodeb_id.toString().toLowerCase().includes(term.toLowerCase()))
-    || (r.site_name && r.site_name.toString().toLowerCase().includes(term.toLowerCase()))
-    || (r.enodeb_name && r.enodeb_name.toString().toLowerCase().includes(term.toLowerCase())));
-  if(substringMatches.length === 1) return { row: substringMatches[0], score: 1, type: 'substring' };
-  if(substringMatches.length > 1) {
-    substringMatches.sort((a,b) => ( (a.site_name||a.enodeb_name||'').length - (b.site_name||b.enodeb_name||'').length ));
-    return { row: substringMatches[0], score: 2, type: 'substring-multiple' };
-  }
-  let best = null;
-  for(const r of rows){
-    const candidates = [normForSearch(r.site_name || ''), normForSearch(r.enodeb_name || ''), normForSearch(r.enodeb_id || '')];
-    for(const c of candidates){
-      if(!c) continue;
-      const dist = levenshtein(tNorm, c);
-      const maxAllowed = Math.max(1, Math.floor(Math.min(3, c.length * 0.2)));
-      if(dist <= maxAllowed){
-        if(!best || dist < best.score) best = { row: r, score: dist, type: 'fuzzy' };
-      }
-    }
-  }
-  return best;
-}
+  const isDoneStatus = (s) => /on\s*-?\s*air|onair|done|live|activated|active|\bon\b/i.test(s || '');
 
-function animateValue(id, start, end, total) {
-  const obj = document.getElementById(id);
-  if(!obj) return;
-  obj.textContent = total ? `${end} / ${total}` : end;
-}
+  const rowKey = (r) => (r.enodeb_id || ('row' + r._rowIndex)).toString().trim();
 
-function updateFilterDropdown() {
-  const select = document.getElementById('viewSelect');
-  const currentValue = select.value;
-  select.innerHTML = '<option value="all">All Sites</option>';
-  Array.from(uniqueBatches).filter(batch => batch && batch.trim() !== '').sort().forEach(batch => {
-      const option = document.createElement('option');
-      option.value = batch.toLowerCase().replace(/\s+/g, '_');
-      option.textContent = batch;
-      select.appendChild(option);
-      batchMap.set(option.value, batch);
-    });
-  if (currentValue) {
-    const optionExists = Array.from(select.options).some(opt => opt.value === currentValue);
-    if (optionExists) select.value = currentValue;
-  }
-}
-
-function loadCsvText(text){
-  const parsed = Papa.parse(text,{header:true, skipEmptyLines:true});
-  if(!parsed || !parsed.data) return;
-  allRows = []; uniqueBatches = new Set(); batchMap = new Map();
-  parsed.data.forEach((r,i)=>{
-    const norm = {}; for(const key in r) norm[normalizeKey(key)] = r[key];
-    const enodeb_id = (norm['enodeb_id'] ?? norm['enodeb id'] ?? norm['enodeb'] ?? '') + '';
-    const enodeb_name = (norm['enodeb_name'] ?? norm['enodeb name'] ?? '') + '';
-    const site_name = (norm['site_name'] ?? norm['site name'] ?? '') + '';
-    const swap_batch = (norm['swap_batch'] ?? norm['swap batch'] ?? '') + '';
-    const status = (norm['status'] ?? '') + '';
-    const lat = parseFloat((norm['latitude'] ?? norm['lat'] ?? '').toString().replace(/,/g,'.'));
-    const lon = parseFloat((norm['longitude'] ?? norm['lon'] ?? norm['lng'] ?? '').toString().replace(/,/g,'.'));
-    let on_air_date = norm['on_air_date'] || norm['on-air_date'] || norm['on_air'] || '';
-    
-    const row = {
-      _rowIndex: i, enodeb_id, enodeb_name: enodeb_name || site_name, site_name,
-      swap_batch, status, on_air_date, lat, lon,
-      normalized_batch: (swap_batch || '').toLowerCase().replace(/\s+/g, '_')
-    };
-    allRows.push(row);
-    if (swap_batch && swap_batch.trim() !== '') uniqueBatches.add(swap_batch.trim());
-  });
-  updateFilterDropdown();
-  render();
-}
-
-function fetchFullList() {
-  const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=232255476&single=true&output=csv';
-  fetch(SHEET_CSV_URL)
-    .then(r => r.text())
-    .then(text => loadCsvText(text))
-    .catch(err => alert('Could not fetch data from Google Sheets: ' + err));
-}
-
-function render(){
-  // OPTIMIZATION 3: Prepare array first instead of adding to map in loop
-  const newMarkers = [];
-  visibleMarkers = {};
-  const view = document.getElementById('viewSelect').value;
-  
-  let rows = allRows.slice();
-  if(view === 'all') {
-    rows = allRows.filter(r => !['blocked', '24g_only', 'imacro'].includes(r.normalized_batch));
-  } else if(view !== '') {
-    rows = allRows.filter(r => r.normalized_batch === view);
+  function getCssVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   }
 
-  let doneCount = 0, pendingCount = 0, countableTotal = 0;
-  let hasPhase1 = false;
-  const bounds = [];
+  // ----------------------------
+  // Persistent UI prefs (colors + view)
+  // ----------------------------
+  const PREF_KEY = 'siteMapPrefs.v1';
+  const prefs = (() => {
+    try { return JSON.parse(localStorage.getItem(PREF_KEY) || '{}'); }
+    catch { return {}; }
+  })();
 
-  // OPTIMIZATION 4: Use a single loop to generate lightweight circle markers
-  rows.forEach(r=>{
-    if(!Number.isFinite(r.lat) || !Number.isFinite(r.lon)) return;
-    
-    const isPhase1 = (r.normalized_batch === 'phase_1' || r.normalized_batch === 'phase1');
-    if (isPhase1) hasPhase1 = true;
+  const statusColors = {
+    done: prefs.colors?.done || getCssVar('--done') || '#66ff00',
+    pending: prefs.colors?.pending || getCssVar('--pending') || '#1F4E79',
+    phase1: prefs.colors?.phase1 || getCssVar('--phase1') || '#A020F0'
+  };
+  // apply persisted colors to CSS variables (so legend matches immediately)
+  document.documentElement.style.setProperty('--done', statusColors.done);
+  document.documentElement.style.setProperty('--pending', statusColors.pending);
+  document.documentElement.style.setProperty('--phase1', statusColors.phase1);
 
-    let color, displayStatus;
-    
-    // Logic: Phase 1
-    if (isPhase1 && view === 'all') {
-      color = COLOR_PHASE1; // Purple
-      displayStatus = "Done"; 
-      // Not counted
-    } 
-    else if (isPhase1 && view === 'phase_1') {
-      color = COLOR_DONE; // Green
-      displayStatus = "Done";
-      doneCount++; countableTotal++;
-    } 
-    else {
-      const done = isDoneStatus(r.status);
-      if(done) doneCount++; else pendingCount++;
-      countableTotal++;
-      color = done ? COLOR_DONE : COLOR_PENDING;
-      displayStatus = r.status;
-    }
+  // ----------------------------
+  // Map
+  // ----------------------------
+  const map = L.map('map', { preferCanvas: true }).setView(CONFIG.MAP_START.center, CONFIG.MAP_START.zoom);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-    const popupHtml = `<div style="min-width:240px">
+  const canvasRenderer = L.canvas({ padding: 0.5 });
+
+  // ----------------------------
+  // State
+  // ----------------------------
+  const state = {
+    rows: [],
+    batches: new Set(),
+    rowByKey: new Map(),      // key -> row
+    markerByKey: new Map(),   // key -> circleMarker
+    markersLayer: L.layerGroup().addTo(map),
+
+    // Search indices
+    byId: new Map(),          // exact id -> row
+    byName: new Map(),        // normalized name -> row (first match)
+
+    pinnedKey: null,
+    lastView: 'all',
+    hasFitOnce: false,
+
+    lastCsvText: null,
+    refreshTimer: null,
+    abortController: null
+  };
+
+  // ----------------------------
+  // Popup/details builder
+  // ----------------------------
+  function buildDetailsHtml(r, displayStatus){
+    return `<div style="min-width:240px">
       <strong>${escapeHtml(r.enodeb_name)}</strong><br/>
       <em>Site Name:</em> ${escapeHtml(r.site_name)}<br/>
       <em>eNodeB ID:</em> ${escapeHtml(r.enodeb_id)}<br/>
@@ -256,153 +362,563 @@ function render(){
       <em>Status:</em> ${escapeHtml(displayStatus)}<br/>
       <em>On-Air Date:</em> ${escapeHtml(r.on_air_date || '—')}
     </div>`;
+  }
 
-    // OPTIMIZATION 5: Use L.circleMarker (Canvas) instead of L.marker (DOM)
-    // This is 100x faster for thousands of points
-    const m = L.circleMarker([r.lat, r.lon], {
+  // ----------------------------
+  // CSV -> rows
+  // ----------------------------
+  function buildSearchIndex(){
+    state.byId.clear();
+    state.byName.clear();
+
+    for (const r of state.rows){
+      const id = (r.enodeb_id || '').trim();
+      if (id && !state.byId.has(id)) state.byId.set(id, r);
+
+      const nameKeys = [r.site_name, r.enodeb_name]
+        .filter(Boolean)
+        .map(normForSearch);
+
+      for (const k of nameKeys){
+        if (k && !state.byName.has(k)) state.byName.set(k, r);
+      }
+    }
+  }
+
+  function loadCsvText(csvText){
+    Papa.parse(csvText, {
+      header: true,
+      skipEmptyLines: true,
+      worker: true,
+      complete: (parsed) => {
+        if (!parsed || !parsed.data) return;
+
+        state.rows = [];
+        state.batches = new Set();
+        state.rowByKey.clear();
+
+        const rows = parsed.data;
+        for (let i = 0; i < rows.length; i++){
+          const raw = rows[i] || {};
+          const norm = {};
+          for (const k in raw) norm[normalizeHeaderKey(k)] = raw[k];
+
+          const enodeb_id = String(norm['enodeb_id'] ?? norm['enodeb id'] ?? norm['enodeb'] ?? '').trim();
+          const enodeb_name = String(norm['enodeb_name'] ?? norm['enodeb name'] ?? '').trim();
+          const site_name = String(norm['site_name'] ?? norm['site name'] ?? '').trim();
+          const swap_batch = String(norm['swap_batch'] ?? norm['swap batch'] ?? '').trim();
+          const status = String(norm['status'] ?? '').trim();
+          const lat = parseNum(norm['latitude'] ?? norm['lat']);
+          const lon = parseNum(norm['longitude'] ?? norm['lon'] ?? norm['lng']);
+          const on_air_date = String(norm['on_air_date'] ?? norm['on-air_date'] ?? norm['on_air'] ?? '').trim();
+
+          const normalized_batch = normalizeBatch(swap_batch);
+          const done = isDoneStatus(status);
+          const isPhase1 = CONFIG.PHASE1_BATCHES.has(normalized_batch);
+
+          const row = {
+            _rowIndex: i,
+            enodeb_id,
+            enodeb_name: enodeb_name || site_name,
+            site_name,
+            swap_batch,
+            status,
+            on_air_date,
+            lat,
+            lon,
+            normalized_batch,
+            done,
+            isPhase1
+          };
+          row.key = rowKey(row);
+
+          state.rows.push(row);
+          state.rowByKey.set(row.key, row);
+          if (swap_batch) state.batches.add(swap_batch);
+        }
+
+        updateFilterDropdown();
+        buildSearchIndex();
+
+        // restore preferred view if still present
+        if (prefs.view && Array.from(el.viewSelect.options).some(o => o.value === prefs.view)){
+          el.viewSelect.value = prefs.view;
+        }
+
+        render({ fit: !state.hasFitOnce });
+      }
+    });
+  }
+
+  // ----------------------------
+  // Dropdown
+  // ----------------------------
+  function updateFilterDropdown(){
+    const currentValue = el.viewSelect.value || 'all';
+    el.viewSelect.innerHTML = '<option value="all">All Sites</option>';
+
+    Array.from(state.batches)
+      .filter(b => b && b.trim() !== '')
+      .sort((a,b) => a.localeCompare(b))
+      .forEach(batch => {
+        const opt = document.createElement('option');
+        opt.value = normalizeBatch(batch);
+        opt.textContent = batch;
+        el.viewSelect.appendChild(opt);
+      });
+
+    // keep current selection if possible
+    if (Array.from(el.viewSelect.options).some(o => o.value === currentValue)){
+      el.viewSelect.value = currentValue;
+    }
+  }
+
+  // ----------------------------
+  // Filtering logic
+  // ----------------------------
+  function getRowsForView(view){
+    if (view === 'all'){
+      return state.rows.filter(r => !CONFIG.EXCLUDED_BATCHES_IN_ALL.has(r.normalized_batch));
+    }
+    return state.rows.filter(r => r.normalized_batch === view);
+  }
+
+  // ----------------------------
+  // Render
+  // ----------------------------
+  function render({ fit = false } = {}){
+    const view = el.viewSelect.value || 'all';
+    const rows = getRowsForView(view);
+
+    // Persist view selection
+    prefs.view = view;
+    savePrefs();
+
+    // If view changed, allow fit
+    const viewChanged = (state.lastView !== view);
+    state.lastView = view;
+
+    state.markerByKey.clear();
+    state.markersLayer.clearLayers();
+
+    let doneCount = 0, pendingCount = 0, countableTotal = 0;
+    let hasPhase1 = false;
+
+    let bounds = null;
+
+    // Build markers
+    for (const r of rows){
+      if (!Number.isFinite(r.lat) || !Number.isFinite(r.lon)) continue;
+
+      if (r.isPhase1) hasPhase1 = true;
+
+      // Color/status logic (preserves your behavior)
+      let fillColor = statusColors.pending;
+      let displayStatus = r.status;
+
+      if (r.isPhase1 && view === 'all'){
+        fillColor = statusColors.phase1;     // purple in all view
+        displayStatus = 'Done';              // label
+        // NOT counted
+      } else if (r.isPhase1 && CONFIG.PHASE1_BATCHES.has(view)){
+        fillColor = statusColors.done;       // green when viewing phase1
+        displayStatus = 'Done';
+        doneCount++; countableTotal++;
+      } else {
+        if (r.done) { doneCount++; fillColor = statusColors.done; }
+        else { pendingCount++; fillColor = statusColors.pending; }
+        countableTotal++;
+      }
+
+      const marker = L.circleMarker([r.lat, r.lon], {
+        renderer: canvasRenderer,
         radius: 6,
-        fillColor: color,
+        fillColor,
         color: "#ffffff",
         weight: 2,
         opacity: 1,
         fillOpacity: 1
-    });
-    
-    m.bindPopup(popupHtml, { autoClose:false, closeOnClick:false });
-    m.on('mouseover', () => {
-      if(pinnedMarker && pinnedMarker !== m) pinnedMarker.closePopup();
-      pinnedMarker = null;
-      m.openPopup();
-      document.getElementById('details').innerHTML = popupHtml;
-    });
-    m.on('mouseout', function() { if(pinnedMarker !== this) this.closePopup(); });
-    m.on('click', function() {
-      if(pinnedMarker && pinnedMarker !== this) pinnedMarker.closePopup();
-      pinnedMarker = this;
-      this.openPopup();
-      document.getElementById('details').innerHTML = popupHtml;
-      map.setView(this.getLatLng(), 16);
-    });
+      });
 
-    newMarkers.push(m); // Add to batch array
-    const key = (r.enodeb_id || ('row' + r._rowIndex)).toString();
-    visibleMarkers[key] = m;
-    bounds.push([r.lat, r.lon]);
-  });
+      // Store key on marker for fast access
+      marker.__key = r.key;
 
-  // OPTIMIZATION 6: Batch add layers to map
-  markersLayer.clearLayers();
-  markersLayer = L.layerGroup(newMarkers).addTo(map);
+      // Build HTML lazily on interaction (saves memory when many markers)
+      marker.on('mouseover', () => {
+        if (!state.pinnedKey){
+          el.details.innerHTML = buildDetailsHtml(r, displayStatus);
+        }
+      });
 
-  const p1Leg = document.getElementById('phase1Legend');
-  if (p1Leg) p1Leg.style.display = (view === 'all' && hasPhase1) ? 'inline-block' : 'none';
+      marker.on('click', () => {
+        // close previous pinned popup if any
+        if (state.pinnedKey && state.pinnedKey !== r.key){
+          const prev = state.markerByKey.get(state.pinnedKey);
+          if (prev) prev.closePopup();
+        }
+        state.pinnedKey = r.key;
 
-  animateValue('doneTotal', 0, doneCount, countableTotal);
-  animateValue('pendingCount', 0, pendingCount);
-  document.getElementById('donePct').textContent = countableTotal ? (Math.round(doneCount/countableTotal*10000)/100) + '%' : '0%';
-  document.getElementById('totalCount').textContent = `Total: ${countableTotal}`;
+        const html = buildDetailsHtml(r, displayStatus);
+        marker.bindPopup(html, { autoClose: false, closeOnClick: false });
+        marker.openPopup();
+        el.details.innerHTML = html;
 
-  if(bounds.length){
-    const b = L.latLngBounds(bounds);
-    if(b.isValid()) map.fitBounds(b.pad(0.05));
-  }
-}
+        map.setView(marker.getLatLng(), CONFIG.FOCUS_ZOOM);
+      });
 
-// Updated Color Picker for CircleMarkers
-const statusColors = { done: '#66ff00', pending: '#1F4E79' };
-document.querySelectorAll('.legend .sw').forEach((el, idx) => {
-  if(idx > 1) return;
-  const status = idx === 0 ? 'done' : 'pending';
-  el.addEventListener('click', async () => {
-    const newColor = await pickColor(statusColors[status]);
-    if (!newColor) return;
-    statusColors[status] = newColor;
-    el.style.background = newColor;
-    updateMarkerColors(status, newColor);
-  });
-});
+      state.markersLayer.addLayer(marker);
+      state.markerByKey.set(r.key, marker);
 
-function pickColor(current) {
-  return new Promise(resolve => {
-    const input = document.createElement('input'); input.type = 'color'; input.value = rgbToHex(current);
-    input.style.position = 'fixed'; input.style.left = '-9999px'; document.body.appendChild(input);
-    input.click();
-    input.addEventListener('input', () => resolve(input.value));
-    input.addEventListener('change', () => { resolve(input.value); document.body.removeChild(input); });
-    input.addEventListener('blur', () => { resolve(null); document.body.removeChild(input); });
-  });
-}
-
-function rgbToHex(rgb){
-  if(rgb.startsWith('#')) return rgb;
-  const nums = rgb.match(/\d+/g).map(Number);
-  return "#" + nums.map(n => n.toString(16).padStart(2,'0')).join('');
-}
-
-function updateMarkerColors(status, color){
-  for(const key in visibleMarkers){
-    const m = visibleMarkers[key];
-    const row = allRows.find(r => (r.enodeb_id || ('row'+r._rowIndex)).toString() === key);
-    if(!row) continue;
-    const isPhase1 = (row.normalized_batch === 'phase_1' || row.normalized_batch === 'phase1');
-    if (isPhase1 && document.getElementById('viewSelect').value === 'all') continue;
-    const done = isDoneStatus(row.status);
-    if ((status === 'done' && done) || (status === 'pending' && !done)){
-      m.setStyle({fillColor: color}); // CircleMarker uses setStyle
+      if (!bounds) bounds = L.latLngBounds([ [r.lat, r.lon], [r.lat, r.lon] ]);
+      else bounds.extend([r.lat, r.lon]);
     }
-  }
-}
 
-function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    // Phase1 legend visibility
+    el.phase1Legend.style.display = (view === 'all' && hasPhase1) ? 'inline-block' : 'none';
 
-function searchAndZoom(term){
-  if(!term || !term.toString().trim()){ alert('Enter a eNodeB ID, or Site name'); return; }
-  term = term.toString().trim();
-  if(visibleMarkers[term]){
-    const m = visibleMarkers[term];
-    map.setView(m.getLatLng(), 16);
-    m.openPopup(); pinnedMarker = m;
-    document.getElementById('details').innerHTML = m.getPopup().getContent();
-    return;
-  }
-  const result = fuzzyFindInRows(term, allRows);
-  if(result && result.row){
-    const found = result.row;
-    if(Number.isFinite(found.lat) && Number.isFinite(found.lon)){
-      map.setView([found.lat, found.lon], 16);
-      const key = (found.enodeb_id || ('row' + found._rowIndex)).toString();
-      if(visibleMarkers[key]){
-        const m = visibleMarkers[key];
-        m.openPopup(); pinnedMarker = m;
-        document.getElementById('details').innerHTML = m.getPopup().getContent();
+    // Stats
+    el.doneTotal.textContent = `${doneCount} / ${countableTotal}`;
+    el.pendingCount.textContent = String(pendingCount);
+    el.donePct.textContent = countableTotal ? (Math.round(doneCount / countableTotal * 10000) / 100) + '%' : '0%';
+    el.totalCount.textContent = `Total: ${countableTotal}`;
+
+    // Re-open pinned popup after rerender if still visible
+    if (state.pinnedKey){
+      const pinnedMarker = state.markerByKey.get(state.pinnedKey);
+      const pinnedRow = state.rowByKey.get(state.pinnedKey);
+      if (pinnedMarker && pinnedRow){
+        // keep details panel consistent
+        const displayStatusPinned =
+          (pinnedRow.isPhase1 && view === 'all') ? 'Done'
+          : (pinnedRow.isPhase1 && CONFIG.PHASE1_BATCHES.has(view)) ? 'Done'
+          : (pinnedRow.status || '');
+
+        const html = buildDetailsHtml(pinnedRow, displayStatusPinned);
+        pinnedMarker.bindPopup(html, { autoClose: false, closeOnClick: false });
+        pinnedMarker.openPopup();
+        el.details.innerHTML = html;
       } else {
-        // Show detail if hidden
-        document.getElementById('details').innerHTML = `<div style="min-width:220px"><strong>${escapeHtml(found.enodeb_name)}</strong><br/><em>Status:</em> ${escapeHtml(found.status)}</div>`;
+        state.pinnedKey = null;
       }
     }
-  } else { alert('Site not found.'); }
-}
 
-document.getElementById('viewSelect').addEventListener('change', render);
-document.getElementById('searchBtn').addEventListener('click', ()=> searchAndZoom(document.getElementById('searchInput').value));
-document.getElementById('searchInput').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); searchAndZoom(e.target.value); }});
-document.getElementById('sniperBtn').addEventListener('click',()=>render());
-  
-window.addEventListener('load', ()=>{ fetchFullList(); setTimeout(()=>map.invalidateSize(),300); });
+    // Fit bounds only when it makes sense
+    const shouldFit = fit || (!state.hasFitOnce) || viewChanged;
+    if (shouldFit && bounds && bounds.isValid()){
+      map.fitBounds(bounds.pad(CONFIG.BOUNDS_PAD));
+      state.hasFitOnce = true;
+    }
+  }
 
-let lastCsvText = null;
-const REFRESH_INTERVAL_MS = 0.5 * 60 * 1000;
-async function smartFetchCsv() {
-  try {
-    const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=232255476&single=true&output=csv';
-    const response = await fetch(SHEET_CSV_URL);
-    if (!response.ok) throw new Error('Network response not ok');
-    const csvText = await response.text();
-    if (csvText !== lastCsvText) { lastCsvText = csvText; loadCsvText(csvText); }
-  } catch (err) { console.error('Error fetching CSV:', err); }
-}
-smartFetchCsv();
-setInterval(smartFetchCsv, REFRESH_INTERVAL_MS);
+  function fitToVisible(){
+    const view = el.viewSelect.value || 'all';
+    const rows = getRowsForView(view);
+
+    let bounds = null;
+    for (const r of rows){
+      if (!Number.isFinite(r.lat) || !Number.isFinite(r.lon)) continue;
+      if (!bounds) bounds = L.latLngBounds([[r.lat, r.lon],[r.lat, r.lon]]);
+      else bounds.extend([r.lat, r.lon]);
+    }
+    if (bounds && bounds.isValid()){
+      map.fitBounds(bounds.pad(CONFIG.BOUNDS_PAD));
+    }
+  }
+
+  // ----------------------------
+  // Search (exact -> substring -> fuzzy)
+  // ----------------------------
+  function normForSearch(s){
+    if(!s) return '';
+    return s.toString()
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g,'')
+      .replace(/[^a-z0-9]/g,'');
+  }
+
+  function levenshtein(a,b){
+    a = a || ''; b = b || '';
+    const m = a.length, n = b.length;
+    if(m === 0) return n;
+    if(n === 0) return m;
+
+    const dp = Array(n+1);
+    for(let j=0; j<=n; j++) dp[j] = j;
+
+    for(let i=1; i<=m; i++){
+      let prev = dp[0];
+      dp[0] = i;
+      for(let j=1; j<=n; j++){
+        const tmp = dp[j];
+        const cost = a[i-1] === b[j-1] ? 0 : 1;
+        dp[j] = Math.min(dp[j] + 1, dp[j-1] + 1, prev + cost);
+        prev = tmp;
+      }
+    }
+    return dp[n];
+  }
+
+  function fuzzyFind(term){
+    term = (term || '').toString().trim();
+    if (!term) return null;
+
+    // 1) exact id
+    const exactId = state.byId.get(term);
+    if (exactId) return { row: exactId, type: 'exact-id' };
+
+    // 2) exact name
+    const tNorm = normForSearch(term);
+    const exactName = state.byName.get(tNorm);
+    if (exactName) return { row: exactName, type: 'exact-name' };
+
+    const tLower = term.toLowerCase();
+
+    // 3) substring
+    const matches = [];
+    for (const r of state.rows){
+      if ((r.enodeb_id || '').toLowerCase().includes(tLower) ||
+          (r.site_name || '').toLowerCase().includes(tLower) ||
+          (r.enodeb_name || '').toLowerCase().includes(tLower)){
+        matches.push(r);
+        if (matches.length > 25) break; // cap
+      }
+    }
+    if (matches.length === 1) return { row: matches[0], type: 'substring' };
+    if (matches.length > 1){
+      matches.sort((a,b) => ((a.site_name||a.enodeb_name||'').length - (b.site_name||b.enodeb_name||'').length));
+      return { row: matches[0], type: 'substring-multi' };
+    }
+
+    // 4) fuzzy (length-gated to keep it fast)
+    let best = null;
+    for (const r of state.rows){
+      const candidates = [
+        normForSearch(r.site_name || ''),
+        normForSearch(r.enodeb_name || ''),
+        normForSearch(r.enodeb_id || '')
+      ].filter(Boolean);
+
+      for (const c of candidates){
+        if (Math.abs(c.length - tNorm.length) > 3) continue;
+        const dist = levenshtein(tNorm, c);
+        const maxAllowed = Math.max(1, Math.floor(Math.min(3, c.length * 0.2)));
+        if (dist <= maxAllowed){
+          if (!best || dist < best.dist) best = { row: r, dist };
+        }
+      }
+    }
+    return best ? { row: best.row, type: 'fuzzy' } : null;
+  }
+
+  function ensureRowVisibleAndOpen(row){
+    const currentView = el.viewSelect.value || 'all';
+
+    // If marker isn't currently rendered, switch view to its batch (or all) and re-render.
+    const markerExists = state.markerByKey.has(row.key);
+    if (!markerExists){
+      const targetView = row.normalized_batch || 'all';
+      const optionExists = Array.from(el.viewSelect.options).some(o => o.value === targetView);
+
+      el.viewSelect.value = optionExists ? targetView : 'all';
+      render({ fit: true });
+    }
+
+    const marker = state.markerByKey.get(row.key);
+    if (!marker){
+      el.details.innerHTML = `<div><strong>${escapeHtml(row.enodeb_name)}</strong><br/>This site exists in data, but has no visible marker (missing coordinates or filtered out).</div>`;
+      return;
+    }
+
+    // simulate click behavior
+    marker.fire('click');
+  }
+
+  function searchAndZoom(term){
+    term = (term || '').toString().trim();
+    if (!term){
+      el.details.textContent = 'Enter an eNodeB ID or Site name.';
+      return;
+    }
+
+    // direct marker key hit
+    if (state.markerByKey.has(term)){
+      const row = state.rowByKey.get(term);
+      if (row) ensureRowVisibleAndOpen(row);
+      return;
+    }
+
+    const result = fuzzyFind(term);
+    if (!result || !result.row){
+      el.details.textContent = 'Site not found.';
+      return;
+    }
+
+    const row = result.row;
+    if (!Number.isFinite(row.lat) || !Number.isFinite(row.lon)){
+      el.details.innerHTML = `<div><strong>${escapeHtml(row.enodeb_name)}</strong><br/>Found in data, but missing coordinates.</div>`;
+      return;
+    }
+
+    ensureRowVisibleAndOpen(row);
+  }
+
+  // ----------------------------
+  // Color picker (legend dots)
+  // ----------------------------
+  function rgbToHex(rgb){
+    if (!rgb) return '#000000';
+    if (rgb.startsWith('#')) return rgb;
+    const nums = rgb.match(/\d+/g)?.map(Number) || [0,0,0];
+    return "#" + nums.slice(0,3).map(n => n.toString(16).padStart(2,'0')).join('');
+  }
+
+  function pickColor(currentHex){
+    return new Promise(resolve => {
+      const input = document.createElement('input');
+      input.type = 'color';
+      input.value = rgbToHex(currentHex);
+      input.style.position = 'fixed';
+      input.style.left = '-9999px';
+      document.body.appendChild(input);
+
+      const cleanup = (val) => {
+        try { document.body.removeChild(input); } catch {}
+        resolve(val);
+      };
+
+      input.addEventListener('change', () => cleanup(input.value), { once: true });
+      input.addEventListener('blur', () => cleanup(null), { once: true });
+
+      input.click();
+    });
+  }
+
+  function savePrefs(){
+    prefs.colors = { ...statusColors };
+    localStorage.setItem(PREF_KEY, JSON.stringify(prefs));
+  }
+
+  async function handleLegendClick(status){
+    const current = statusColors[status];
+    const next = await pickColor(current);
+    if (!next) return;
+
+    statusColors[status] = next;
+    document.documentElement.style.setProperty(`--${status === 'phase1' ? 'phase1' : status}`, next);
+    savePrefs();
+
+    // Update marker colors in-place (no full rerender)
+    const view = el.viewSelect.value || 'all';
+    for (const [key, marker] of state.markerByKey.entries()){
+      const row = state.rowByKey.get(key);
+      if (!row) continue;
+
+      // Phase 1 rule:
+      // - in "all": phase1 uses phase1 color and is not counted
+      // - in phase1 view: phase1 uses done color
+      if (row.isPhase1 && view === 'all'){
+        if (status === 'phase1') marker.setStyle({ fillColor: statusColors.phase1 });
+        continue;
+      }
+
+      if (row.isPhase1 && CONFIG.PHASE1_BATCHES.has(view)){
+        if (status === 'done') marker.setStyle({ fillColor: statusColors.done });
+        continue;
+      }
+
+      // Normal done/pending
+      if (row.done && status === 'done') marker.setStyle({ fillColor: statusColors.done });
+      if (!row.done && status === 'pending') marker.setStyle({ fillColor: statusColors.pending });
+    }
+  }
+
+  function wireLegend(){
+    document.querySelectorAll('.legend .sw[data-status]').forEach(sw => {
+      const status = sw.getAttribute('data-status');
+      if (!status) return;
+      sw.addEventListener('click', () => handleLegendClick(status));
+    });
+  }
+
+  // ----------------------------
+  // Fetch/refresh
+  // ----------------------------
+  async function smartFetchCsv(){
+    try {
+      // Abort any in-flight request
+      if (state.abortController) state.abortController.abort();
+      state.abortController = new AbortController();
+
+      const res = await fetch(CONFIG.SHEET_CSV_URL, { signal: state.abortController.signal, cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const csvText = await res.text();
+      if (csvText !== state.lastCsvText){
+        state.lastCsvText = csvText;
+        loadCsvText(csvText);
+      }
+    } catch (err){
+      if (err?.name === 'AbortError') return;
+      console.error('CSV fetch error:', err);
+      el.details.textContent = 'Could not fetch data from Google Sheets. Check console/network.';
+    }
+  }
+
+  function startRefresh(){
+    stopRefresh();
+    state.refreshTimer = setInterval(() => {
+      // avoid hammering when tab is hidden
+      if (document.visibilityState === 'visible') smartFetchCsv();
+    }, CONFIG.REFRESH_INTERVAL_MS);
+  }
+
+  function stopRefresh(){
+    if (state.refreshTimer) clearInterval(state.refreshTimer);
+    state.refreshTimer = null;
+  }
+
+  // ----------------------------
+  // Events
+  // ----------------------------
+  el.viewSelect.addEventListener('change', () => {
+    // view change: rerender + fit
+    render({ fit: true });
+  });
+
+  el.searchBtn.addEventListener('click', () => searchAndZoom(el.searchInput.value));
+
+  el.searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter'){
+      e.preventDefault();
+      searchAndZoom(e.target.value);
+    }
+  });
+
+  el.sniperBtn.addEventListener('click', () => fitToVisible());
+
+  window.addEventListener('resize', () => map.invalidateSize());
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible'){
+      smartFetchCsv();
+      startRefresh();
+    } else {
+      stopRefresh();
+    }
+  });
+
+  // ----------------------------
+  // Init
+  // ----------------------------
+  wireLegend();
+  smartFetchCsv();
+  startRefresh();
+
+  // small delay helps Leaflet size calculations on some mobile layouts
+  setTimeout(() => map.invalidateSize(), 250);
+
+})();
 </script>
 </body>
 </html>
