@@ -6,6 +6,7 @@
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
+
   gtag('config', 'G-XBHVRKLJCD');
 </script>
 <meta charset="utf-8" />
@@ -20,7 +21,7 @@
     --accent-hover:#1C60B3;
     --pending:#1F4E79;
     --done:#66ff00;
-    --phase1:#A020F0; /* Added Phase 1 Color */
+    --phase1:#A020F0; /* Added Purple Phase 1 Color */
     --shadow:0 8px 30px rgba(0,0,0,0.12);
     --radius:12px;
   }
@@ -207,7 +208,9 @@ hr{border:none;border-top:1px solid #eee;margin:12px 0;}
       <div class="row legend small">
         <span class="sw" style="background:var(--done)"></span>Done
         <span class="sw" style="background:var(--pending)"></span>Pending
-        <span id="phase1Legend" style="margin-left:8px;"><span class="sw" style="background:var(--phase1)"></span>Phase 1</span>
+        <span id="phase1Legend" style="display:none; margin-left:10px;">
+            <span class="sw" style="background:var(--phase1)"></span>Phase 1
+        </span>
       </div>
 
       <hr/>
@@ -242,7 +245,7 @@ const markersLayer = L.layerGroup().addTo(map);
 function dotIcon(color){ return L.divIcon({className:'', html:`<div style="width:10px;height:10px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.25);"></div>`, iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-10]}); }
 const ICON_PENDING = dotIcon('#1F4E79'); 
 const ICON_DONE = dotIcon('#66ff00');
-const ICON_PHASE1 = dotIcon('#A020F0'); // Added Purple Icon
+const ICON_PHASE1 = dotIcon('#A020F0'); // Purple icon for Phase 1
 
 let allRows = [], visibleMarkers = {}, pinnedMarker = null;
 let uniqueBatches = new Set();
@@ -496,7 +499,10 @@ function render(){
   if(view === 'all') {
     rows = allRows.filter(r => {
       const batch = r.normalized_batch;
-      const isExcluded = batch === 'blocked' || batch === '24g_only'|| batch === 'imacro' ;
+      const isExcluded =
+        batch === 'blocked' ||
+        batch === '24g_only'||
+        batch === 'imacro' ;
       return !isExcluded;
     });
   }
@@ -507,28 +513,48 @@ function render(){
   }
 
   let doneCount = 0, pendingCount = 0;
+  // We need a separate counter for "Total displayed in Stats" to skip Phase 1 in All View
+  let countableTotal = 0; 
+  let hasPhase1 = false;
   const bounds = [];
 
   rows.forEach(r=>{
     if(!Number.isFinite(r.lat) || !Number.isFinite(r.lon)) return;
     
-    let isDone = isDoneStatus(r.status);
-    let icon = isDone ? ICON_DONE : ICON_PENDING;
-    let displayStatus = r.status;
+    const isPhase1 = (r.normalized_batch === 'phase_1' || r.normalized_batch === 'phase1');
+    if (isPhase1) hasPhase1 = true;
 
-    // --- PHASE 1 LOGIC INJECTED HERE ---
-    if (r.normalized_batch === 'phase_1' || r.normalized_batch === 'phase1') {
-      if (view === 'all') {
-        icon = ICON_PHASE1; // Purple in All Sites
-        displayStatus = r.status + " (Phase 1)";
-      } else if (view === 'phase_1') {
-        isDone = true; // Force Done stats
-        icon = ICON_DONE; // Force Green marker
-        displayStatus = "Done (Phase 1)";
-      }
+    // --- PHASE 1 LOGIC ---
+    // 1. If All Sites view AND it's Phase 1:
+    //    - Show Purple Marker (ICON_PHASE1)
+    //    - Do NOT count it in done/pending/total stats.
+    // 2. If Phase 1 Filter is selected:
+    //    - Show Green Marker (ICON_DONE)
+    //    - Count it as Done.
+    // 3. Else (Normal Site):
+    //    - Normal logic.
+
+    let icon, displayStatus;
+    
+    if (isPhase1 && view === 'all') {
+      icon = ICON_PHASE1; // Purple
+      displayStatus = "Phase 1 (Done)";
+      // Note: We intentionally do NOT increment doneCount/pendingCount/countableTotal here.
+    } 
+    else if (isPhase1 && view === 'phase_1') {
+      icon = ICON_DONE; // Green
+      displayStatus = "Done (Phase 1)";
+      doneCount++;
+      countableTotal++;
+    } 
+    else {
+      // Normal site logic
+      const done = isDoneStatus(r.status);
+      if(done) doneCount++; else pendingCount++;
+      countableTotal++;
+      icon = done ? ICON_DONE : ICON_PENDING;
+      displayStatus = r.status;
     }
-
-    if(isDone) doneCount++; else pendingCount++;
 
     const popupHtml = `<div style="min-width:240px">
       <strong>${escapeHtml(r.enodeb_name)}</strong><br/>
@@ -565,15 +591,17 @@ function render(){
     bounds.push([r.lat, r.lon]);
   });
 
-  // Toggle Phase 1 Legend
-  const p1Legend = document.getElementById('phase1Legend');
-  if(p1Legend) p1Legend.style.display = (view === 'phase_1') ? 'none' : 'inline-block';
+  // Toggle Legend: Only show Purple Phase 1 legend if in All View AND Phase 1 exists
+  const p1Leg = document.getElementById('phase1Legend');
+  if (p1Leg) {
+      p1Leg.style.display = (view === 'all' && hasPhase1) ? 'inline-block' : 'none';
+  }
 
   // animate with total shown as "done / total" for doneTotal
-  animateValue('doneTotal', 0, doneCount, rows.length);
+  animateValue('doneTotal', 0, doneCount, countableTotal);
   animateValue('pendingCount', 0, pendingCount);
-  document.getElementById('donePct').textContent = rows.length ? (Math.round(doneCount/rows.length*10000)/100) + '%' : '0%';
-  document.getElementById('totalCount').textContent = `Total: ${rows.length}`;
+  document.getElementById('donePct').textContent = countableTotal ? (Math.round(doneCount/countableTotal*10000)/100) + '%' : '0%';
+  document.getElementById('totalCount').textContent = `Total: ${countableTotal}`;
 
   if(bounds.length){
     const b = L.latLngBounds(bounds);
@@ -591,8 +619,8 @@ const statusColors = {
 
 // click legend dot to pick a color
 document.querySelectorAll('.legend .sw').forEach((el, idx) => {
-  // Simple check for Done/Pending. We skip Phase 1 color picker for simplicity unless requested.
-  if (idx > 1) return; 
+  // If it's the 3rd dot (Phase 1), ignore color picking for simplicity unless requested
+  if(idx > 1) return;
 
   const status = idx === 0 ? 'done' : 'pending';
   el.addEventListener('click', async () => {
@@ -634,10 +662,11 @@ function updateMarkerColors(status, color){
     const row = allRows.find(r => (r.enodeb_id || ('row'+r._rowIndex)).toString() === key);
     if(!row) continue;
 
-    const done = isDoneStatus(row.status);
-    // Don't change Phase 1 colors in All View (keep purple)
-    if (row.normalized_batch === 'phase_1' && document.getElementById('viewSelect').value === 'all') continue;
+    // Do not update Phase 1 purple markers in All View
+    const isPhase1 = (row.normalized_batch === 'phase_1' || row.normalized_batch === 'phase1');
+    if (isPhase1 && document.getElementById('viewSelect').value === 'all') continue;
 
+    const done = isDoneStatus(row.status);
     if ((status === 'done' && done) || (status === 'pending' && !done)){
       const icon = dotIcon(color);
       m.setIcon(icon);
