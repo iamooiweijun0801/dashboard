@@ -6,6 +6,7 @@
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
+
   gtag('config', 'G-XBHVRKLJCD');
 </script>
 <meta charset="utf-8" />
@@ -18,6 +19,8 @@
     --card:#ffffff80;
     --accent:#2F80ED;
     --accent-hover:#1C60B3;
+    --pending:#1F4E79;
+    --done:#66ff00;
     --shadow:0 8px 30px rgba(0,0,0,0.12);
     --radius:12px;
   }
@@ -139,23 +142,6 @@
     margin-top:4px;
   }
 
-  /* Legend Styling fixes */
-  .legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    margin-top: 5px;
-  }
-  .legend-item {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    font-weight: 500;
-    transition: opacity 0.2s;
-  }
-  .legend-item:hover {
-    opacity: 0.7;
-  }
   .legend .sw{
     width:16px;
     height:16px;
@@ -164,7 +150,6 @@
     margin-right:8px;
     border:2px solid #fff;
     box-shadow:0 0 4px rgba(0,0,0,0.25);
-    flex-shrink: 0; /* Prevents dot from squishing */
   }
 
   #details{
@@ -182,11 +167,10 @@
     display:flex;
     gap:8px;
   }
-  .map-sniper-btn{position:absolute;bottom:20px;right:20px;z-index:9999;width:50px;height:50px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #444;box-shadow:0 2px 8px rgba(0,0,0,0.25);}
-  .map-sniper-btn img{width:28px;height:28px;}
-  .map-sniper-btn:hover{transform:translateY(-4px);box-shadow:0 6px 18px rgba(0,0,0,0.28);}
-  hr{border:none;border-top:1px solid #eee;margin:12px 0;}
-  
+.map-sniper-btn{position:absolute;bottom:20px;right:20px;z-index:9999;width:50px;height:50px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #444;box-shadow:0 2px 8px rgba(0,0,0,0.25);}
+.map-sniper-btn img{width:28px;height:28px;}
+.map-sniper-btn:hover{transform:translateY(-4px);box-shadow:0 6px 18px rgba(0,0,0,0.28);}
+hr{border:none;border-top:1px solid #eee;margin:12px 0;}
   @media(max-width:950px){
     .app{
       grid-template-columns:1fr;
@@ -204,7 +188,7 @@
         <label for="viewSelect">View</label>
         <select id="viewSelect">
           <option value="all">All Sites</option>
-        </select>
+          </select>
       </div>
 
       <div class="row">
@@ -220,16 +204,9 @@
         </div>
       </div>
 
-      <div class="legend small">
-        <div class="legend-item" id="legend-done" title="Click to change color">
-           <span class="sw"></span>Done
-        </div>
-        <div class="legend-item" id="legend-pending" title="Click to change color">
-           <span class="sw"></span>Pending
-        </div>
-        <div class="legend-item" id="legend-phase1" title="Click to change color" style="display:none;">
-           <span class="sw"></span>Phase 1
-        </div>
+      <div class="row legend small">
+        <span class="sw" style="background:var(--done)"></span>Done
+        <span class="sw" style="background:var(--pending)"></span>Pending
       </div>
 
       <hr/>
@@ -262,24 +239,24 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 
 const markersLayer = L.layerGroup().addTo(map);
 
 function dotIcon(color){ return L.divIcon({className:'', html:`<div style="width:10px;height:10px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.25);"></div>`, iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-10]}); }
-
-// Configurable Colors
-const mapColors = {
-  done: '#66ff00',
-  pending: '#1F4E79',
-  phase1: '#A020F0'
-};
-
+const ICON_PENDING = dotIcon('#1F4E79'); const ICON_DONE = dotIcon('#66ff00');
 let allRows = [], visibleMarkers = {}, pinnedMarker = null;
 let uniqueBatches = new Set();
 let batchMap = new Map();
-let lastCsvContent = ""; // For Change Detection
 
 function normalizeKey(k){ return (k||'').toString().trim().toLowerCase().replace(/\s+/g,'_'); }
 function isDoneStatus(s){
   if(!s) return false;
   s = s.toString().toLowerCase();
   return /on\s*-?\s*air|onair|done|live|activated|active|\bon\b/.test(s);
+}
+
+function findOnAirKey(normObj){
+  for(const k of Object.keys(normObj)){
+    const compact = k.replace(/[^a-z0-9]/g,'');
+    if(compact === 'onairdate' || compact === 'onair' || compact.includes('onair')) return k;
+  }
+  return null;
 }
 
 function levenshtein(a,b){
@@ -330,7 +307,8 @@ function fuzzyFindInRows(term, rows){
       const dist = levenshtein(tNorm, c);
       const maxAllowed = Math.max(1, Math.floor(Math.min(3, c.length * 0.2)));
       if(dist <= maxAllowed){
-        if(!best || dist < best.score) best = { row: r, score: dist, type: 'fuzzy' };
+        const score = dist;
+        if(!best || score < best.score) best = { row: r, score, type: 'fuzzy' };
       }
     }
   }
@@ -346,7 +324,7 @@ function animateValue(id, start, end, total) {
     if (!startTimestamp) startTimestamp = timestamp;
     const progress = Math.min((timestamp - startTimestamp) / duration, 1);
     const current = Math.floor(progress * (end - start) + start);
-    obj.textContent = total !== undefined ? `${current} / ${total}` : current;
+    obj.textContent = total ? `${current} / ${total}` : current;
     if (progress < 1) window.requestAnimationFrame(step);
   };
   window.requestAnimationFrame(step);
@@ -356,13 +334,16 @@ function updateFilterDropdown() {
   const select = document.getElementById('viewSelect');
   const currentValue = select.value;
   select.innerHTML = '<option value="all">All Sites</option>';
-  Array.from(uniqueBatches).filter(batch => batch && batch.trim() !== '').sort().forEach(batch => {
-    const option = document.createElement('option');
-    option.value = batch.toLowerCase().replace(/\s+/g, '_');
-    option.textContent = batch;
-    select.appendChild(option);
-    batchMap.set(option.value, batch);
-  });
+  Array.from(uniqueBatches)
+    .filter(batch => batch && batch.trim() !== '')
+    .sort()
+    .forEach(batch => {
+      const option = document.createElement('option');
+      option.value = batch.toLowerCase().replace(/\s+/g, '_');
+      option.textContent = batch;
+      select.appendChild(option);
+      batchMap.set(option.value, batch);
+    });
   if (currentValue) {
     const optionExists = Array.from(select.options).some(opt => opt.value === currentValue);
     if (optionExists) select.value = currentValue;
@@ -379,15 +360,27 @@ function loadCsvText(text){
     const norm = {};
     for(const key in r) norm[normalizeKey(key)] = r[key];
     const enodeb_id = (norm['enodeb_id'] ?? norm['enodeb id'] ?? norm['enodeb'] ?? '') + '';
+    const enodeb_name = (norm['enodeb_name'] ?? norm['enodeb name'] ?? '') + '';
     const site_name = (norm['site_name'] ?? norm['site name'] ?? '') + '';
     const swap_batch = (norm['swap_batch'] ?? norm['swap batch'] ?? '') + '';
     const status = (norm['status'] ?? '') + '';
     const lat = parseFloat((norm['latitude'] ?? norm['lat'] ?? '').toString().replace(/,/g,'.'));
     const lon = parseFloat((norm['longitude'] ?? norm['lon'] ?? norm['lng'] ?? '').toString().replace(/,/g,'.'));
-    let on_air_date = norm['on-air_date'] || norm['on_air_date'] || norm['on_air'] || '';
+    let on_air_date = '';
+    if('on-air_date' in norm) on_air_date = norm['on-air_date'];
+    else if('on_air_date' in norm) on_air_date = norm['on_air_date'];
+    else if('on_air' in norm) on_air_date = norm['on_air'];
+    on_air_date = (on_air_date ?? '') + '';
     const row = {
-      _rowIndex: i, enodeb_id, enodeb_name: site_name, site_name, swap_batch, status, on_air_date,
-      lat: Number.isFinite(lat) ? lat : NaN, lon: Number.isFinite(lon) ? lon : NaN,
+      _rowIndex: i,
+      enodeb_id,
+      enodeb_name: enodeb_name || site_name,
+      site_name,
+      swap_batch,
+      status,
+      on_air_date,
+      lat: Number.isFinite(lat) ? lat : NaN,
+      lon: Number.isFinite(lon) ? lon : NaN,
       normalized_batch: (swap_batch || '').toLowerCase().replace(/\s+/g, '_')
     };
     allRows.push(row);
@@ -397,151 +390,202 @@ function loadCsvText(text){
   render();
 }
 
+function fetchFullList() {
+  const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg/export?format=csv&id=10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg&gid=0';
+  fetch(SHEET_CSV_URL)
+    .then(r => r.text())
+    .then(text => loadCsvText(text))
+    .catch(err => console.error(err));
+}
+
 function render(){
   markersLayer.clearLayers();
   visibleMarkers = {};
   const view = document.getElementById('viewSelect').value;
   let rows = allRows.slice();
-   
+  
   if(view === 'all') {
     rows = allRows.filter(r => {
-      const b = r.normalized_batch;
-      return !(b === 'blocked' || b === '24g_only' || b === 'imacro');
+      const batch = r.normalized_batch;
+      return !(batch === 'blocked' || batch === '24g_only'|| batch === 'imacro');
     });
   } else if(view !== '') {
     rows = allRows.filter(r => r.normalized_batch === view);
   }
 
-  let doneCount = 0, pendingCount = 0, countableTotal = 0;
+  let doneCount = 0, pendingCount = 0;
   const bounds = [];
-  let hasPhase1InView = false;
-
-  // Apply colors to Legend Swatches
-  document.querySelector('#legend-done .sw').style.background = mapColors.done;
-  document.querySelector('#legend-pending .sw').style.background = mapColors.pending;
-  document.querySelector('#legend-phase1 .sw').style.background = mapColors.phase1;
 
   rows.forEach(r=>{
     if(!Number.isFinite(r.lat) || !Number.isFinite(r.lon)) return;
-    const done = isDoneStatus(r.status);
-    const isPhase1 = (r.normalized_batch === 'phase_1' || r.normalized_batch === 'phase1');
     
-    if(isPhase1) hasPhase1InView = true;
-    
-    // Stats Logic: Exclude Phase 1 from the numbers
-    if(!isPhase1) {
-      if(done) doneCount++; else pendingCount++;
-      countableTotal++;
+    // PHASE 1 LOGIC: If filtered to phase_1, force 'done' status. Otherwise use real status.
+    let done = isDoneStatus(r.status);
+    if(view === 'phase_1') {
+        done = true; 
     }
 
-    // Icon Logic
-    const iconColor = isPhase1 ? mapColors.phase1 : (done ? mapColors.done : mapColors.pending);
-    const icon = dotIcon(iconColor);
+    if(done) doneCount++; else pendingCount++;
+    const icon = done ? ICON_DONE : ICON_PENDING;
 
     const popupHtml = `<div style="min-width:240px">
       <strong>${escapeHtml(r.enodeb_name)}</strong><br/>
       <em>Site Name:</em> ${escapeHtml(r.site_name)}<br/>
       <em>eNodeB ID:</em> ${escapeHtml(r.enodeb_id)}<br/>
-      <em style="${isPhase1 ? 'color:'+mapColors.phase1+';font-weight:bold;' : ''}">Swap Batch: ${escapeHtml(r.swap_batch)}</em><br/>
-      <em>Status:</em> ${escapeHtml(r.status)}<br/>
+      <em>Swap Batch:</em> ${escapeHtml(r.swap_batch)}<br/>
+      <em>Status:</em> ${view === 'phase_1' ? 'Phase 1' : escapeHtml(r.status)}<br/>
       <em>On-Air Date:</em> ${escapeHtml(r.on_air_date || '—')}
     </div>`;
 
     const m = L.marker([r.lat, r.lon], { icon });
-    m.bindPopup(popupHtml, { autoClose:true }); 
-
-    // Changed: Hover only updates sidebar, does NOT open map popup
-    m.on('mouseover', () => { 
-      document.getElementById('details').innerHTML = popupHtml; 
-    });
-    
-    // Changed: Click opens popup (standard behavior)
-    m.on('click', () => { 
-      pinnedMarker = m; 
+    m.bindPopup(popupHtml, { autoClose:false, closeOnClick:false });
+    m.on('mouseover', () => {
+      if(pinnedMarker && pinnedMarker !== m) pinnedMarker.closePopup();
+      pinnedMarker = null;
+      m.openPopup();
       document.getElementById('details').innerHTML = popupHtml;
-      // map.setView(m.getLatLng(), 16); // Optional: keep zoom logic if desired
     });
-
+    m.on('mouseout', () => { if(pinnedMarker !== m) m.closePopup(); });
+    m.on('click', () => {
+      if(pinnedMarker && pinnedMarker !== m) pinnedMarker.closePopup();
+      pinnedMarker = m;
+      m.openPopup();
+      document.getElementById('details').innerHTML = popupHtml;
+      map.setView(m.getLatLng(), 16);
+    });
     m.addTo(markersLayer);
     const key = (r.enodeb_id || ('row' + r._rowIndex)).toString();
     visibleMarkers[key] = m;
     bounds.push([r.lat, r.lon]);
   });
 
-  // Toggle Phase 1 Legend Visibility
-  document.getElementById('legend-phase1').style.display = hasPhase1InView ? 'flex' : 'none';
-
-  animateValue('doneTotal', 0, doneCount, countableTotal);
+  animateValue('doneTotal', 0, doneCount, rows.length);
   animateValue('pendingCount', 0, pendingCount);
-  document.getElementById('donePct').textContent = countableTotal ? (Math.round(doneCount/countableTotal*10000)/100) + '%' : '0%';
-  document.getElementById('totalCount').textContent = `Total: ${countableTotal}`;
-
+  document.getElementById('donePct').textContent = rows.length ? (Math.round(doneCount/rows.length*10000)/100) + '%' : '0%';
+  document.getElementById('totalCount').textContent = `Total: ${rows.length}`;
   if(bounds.length){
     const b = L.latLngBounds(bounds);
     if(b.isValid()) map.fitBounds(b.pad(0.2));
   }
 }
 
-// Unified Color Picker Logic
-function setupColorPicker(id, type) {
-  const el = document.getElementById(id);
-  if(!el) return;
-  el.addEventListener('click', () => {
+const statusColors = {
+  done: getComputedStyle(document.documentElement).getPropertyValue('--done').trim(),
+  pending: getComputedStyle(document.documentElement).getPropertyValue('--pending').trim()
+};
+
+document.querySelectorAll('.legend .sw').forEach((el, idx) => {
+  const status = idx === 0 ? 'done' : 'pending';
+  el.addEventListener('click', async () => {
+    const newColor = await pickColor(statusColors[status]);
+    if (!newColor) return;
+    statusColors[status] = newColor;
+    el.style.background = newColor;
+    updateMarkerColors(status, newColor);
+  });
+});
+
+function pickColor(current) {
+  return new Promise(resolve => {
     const input = document.createElement('input');
     input.type = 'color';
-    input.value = mapColors[type];
+    input.value = rgbToHex(current);
+    input.style.position = 'fixed';
+    input.style.left = '-9999px';
+    document.body.appendChild(input);
     input.click();
-    input.onchange = () => {
-      mapColors[type] = input.value;
-      // Re-render to apply new colors
-      render(); 
-    };
+    input.addEventListener('input', () => resolve(input.value));
+    input.addEventListener('change', () => { resolve(input.value); document.body.removeChild(input); });
+    input.addEventListener('blur', () => { resolve(null); document.body.removeChild(input); });
   });
 }
 
-setupColorPicker('legend-done', 'done');
-setupColorPicker('legend-pending', 'pending');
-setupColorPicker('legend-phase1', 'phase1');
+function rgbToHex(rgb){
+  if(rgb.startsWith('#')) return rgb;
+  const nums = rgb.match(/\d+/g).map(Number);
+  return "#" + nums.map(n => n.toString(16).padStart(2,'0')).join('');
+}
 
-function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function updateMarkerColors(status, color){
+  const view = document.getElementById('viewSelect').value;
+  for(const key in visibleMarkers){
+    const m = visibleMarkers[key];
+    const row = allRows.find(r => (r.enodeb_id || ('row'+r._rowIndex)).toString() === key);
+    if(!row) continue;
+    
+    // Status check must mirror the render logic
+    let done = (view === 'phase_1') ? true : isDoneStatus(row.status);
+    if ((status === 'done' && done) || (status === 'pending' && !done)){
+      m.setIcon(dotIcon(color));
+    }
+  }
+}
+
+function escapeHtml(s){
+  if(s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 
 function searchAndZoom(term){
-  if(!term) return;
+  if(!term || !term.toString().trim()){ alert('Enter a eNodeB ID, or Site name'); return; }
+  term = term.toString().trim();
+  if(visibleMarkers[term]){
+    const m = visibleMarkers[term];
+    map.setView(m.getLatLng(), 16);
+    document.getElementById('details').innerHTML = m.getPopup() ? m.getPopup().getContent() : '';
+    m.openPopup();
+    pinnedMarker = m;
+    return;
+  }
+  const exact = allRows.find(r => (r.enodeb_id && r.enodeb_id.toString().trim() === term));
+  if(exact && Number.isFinite(exact.lat) && Number.isFinite(exact.lon)){
+    map.setView([exact.lat, exact.lon], 16);
+    const key = (exact.enodeb_id || ('row' + exact._rowIndex)).toString();
+    if(visibleMarkers[key]){
+      const m = visibleMarkers[key];
+      document.getElementById('details').innerHTML = m.getPopup() ? m.getPopup().getContent() : '';
+      m.openPopup();
+      pinnedMarker = m;
+    }
+    return;
+  }
   const result = fuzzyFindInRows(term, allRows);
   if(result && result.row){
     const found = result.row;
-    map.setView([found.lat, found.lon], 16);
     const key = (found.enodeb_id || ('row' + found._rowIndex)).toString();
-    if(visibleMarkers[key]) visibleMarkers[key].openPopup();
+    if(visibleMarkers[key]){
+        const m = visibleMarkers[key];
+        map.setView(m.getLatLng(),16);
+        document.getElementById('details').innerHTML = m.getPopup() ? m.getPopup().getContent() : '';
+        m.openPopup();
+        pinnedMarker = m;
+    }
+    return;
   }
+  alert('Site not found.');
 }
 
 document.getElementById('viewSelect').addEventListener('change', render);
 document.getElementById('searchBtn').addEventListener('click', ()=> searchAndZoom(document.getElementById('searchInput').value));
-document.getElementById('searchInput').addEventListener('keydown', e => { if(e.key==='Enter') searchAndZoom(e.target.value); });
+document.getElementById('searchInput').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); searchAndZoom(e.target.value); }});
 document.getElementById('sniperBtn').addEventListener('click',()=>render());
+window.addEventListener('load', ()=>{ fetchFullList(); setTimeout(()=>map.invalidateSize(),300); });
 
-const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=232255476&single=true&output=csv';
-
+let lastCsvText = null;
+const REFRESH_INTERVAL_MS = 0.5 * 60 * 1000;
 async function smartFetchCsv() {
   try {
+    const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=232255476&single=true&output=csv';
     const response = await fetch(SHEET_CSV_URL);
-    const text = await response.text();
-    // Logic: Only update if the string content is different
-    if (text.trim() === lastCsvContent) {
-        return; // No changes, do nothing
+    const csvText = await response.text();
+    if (csvText !== lastCsvText) {
+      lastCsvText = csvText;
+      loadCsvText(csvText);
     }
-    lastCsvContent = text.trim();
-    loadCsvText(text);
-  } catch (err) { console.error('Error:', err); }
+  } catch (err) { console.error(err); }
 }
-
-window.addEventListener('load', ()=>{ 
-  smartFetchCsv(); 
-  setInterval(smartFetchCsv, 30000); 
-  setTimeout(()=>map.invalidateSize(),300); 
-});
-
+smartFetchCsv();
+setInterval(smartFetchCsv, REFRESH_INTERVAL_MS);
 </script>
 </body>
 </html>
