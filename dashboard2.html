@@ -6,7 +6,6 @@
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-
   gtag('config', 'G-XBHVRKLJCD');
 </script>
 <meta charset="utf-8" />
@@ -21,6 +20,7 @@
     --accent-hover:#1C60B3;
     --pending:#1F4E79;
     --done:#66ff00;
+    --phase1:#A020F0; /* Added Phase 1 Color */
     --shadow:0 8px 30px rgba(0,0,0,0.12);
     --radius:12px;
   }
@@ -92,7 +92,6 @@
     border-radius:var(--radius);
     border:1px solid #ccc;
     transition:0.2s;
-    width: 100%;
   }
   select:focus, input:focus{
     border-color:var(--accent);
@@ -189,7 +188,7 @@ hr{border:none;border-top:1px solid #eee;margin:12px 0;}
         <label for="viewSelect">View</label>
         <select id="viewSelect">
           <option value="all">All Sites</option>
-        </select>
+          </select>
       </div>
 
       <div class="row">
@@ -208,6 +207,7 @@ hr{border:none;border-top:1px solid #eee;margin:12px 0;}
       <div class="row legend small">
         <span class="sw" style="background:var(--done)"></span>Done
         <span class="sw" style="background:var(--pending)"></span>Pending
+        <span id="phase1Legend" style="margin-left:8px;"><span class="sw" style="background:var(--phase1)"></span>Phase 1</span>
       </div>
 
       <hr/>
@@ -240,10 +240,13 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 
 const markersLayer = L.layerGroup().addTo(map);
 
 function dotIcon(color){ return L.divIcon({className:'', html:`<div style="width:10px;height:10px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.25);"></div>`, iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-10]}); }
-const ICON_PENDING = dotIcon('#1F4E79'); const ICON_DONE = dotIcon('#66ff00');
+const ICON_PENDING = dotIcon('#1F4E79'); 
+const ICON_DONE = dotIcon('#66ff00');
+const ICON_PHASE1 = dotIcon('#A020F0'); // Added Purple Icon
+
 let allRows = [], visibleMarkers = {}, pinnedMarker = null;
 let uniqueBatches = new Set();
-let batchMap = new Map();
+let batchMap = new Map(); // Store mapping between normalized value and actual batch name
 
 function normalizeKey(k){ return (k||'').toString().trim().toLowerCase().replace(/\s+/g,'_'); }
 function isDoneStatus(s){
@@ -252,14 +255,21 @@ function isDoneStatus(s){
   return /on\s*-?\s*air|onair|done|live|activated|active|\bon\b/.test(s);
 }
 
+/* find a key in a normalized-row object that roughly matches 'on air date' */
 function findOnAirKey(normObj){
   for(const k of Object.keys(normObj)){
     const compact = k.replace(/[^a-z0-9]/g,'');
     if(compact === 'onairdate' || compact === 'onair' || compact.includes('onair')) return k;
   }
+  // fallback common names
+  if('on-air_date' in normObj) return 'on-air_date';
+  if('on_air_date' in normObj) return 'on_air_date';
+  if('on_air' in normObj) return 'on_air';
+  if('onairdate' in normObj) return 'onairdate';
   return null;
 }
 
+/* basic Levenshtein distance - small and fast enough for our lists */
 function levenshtein(a,b){
   a = a||''; b = b||'';
   const m = a.length, n = b.length;
@@ -279,53 +289,130 @@ function levenshtein(a,b){
   return dp[n];
 }
 
+/* normalize string for searching */
 function normForSearch(s){
   if(!s) return '';
   return s.toString().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
 }
 
+/* find best match (exact -> substring -> fuzzy) among a field: returns object {row,score,type} or null */
 function fuzzyFindInRows(term, rows){
   term = term || '';
   const tNorm = normForSearch(term);
   if(!tNorm) return null;
+
+  // 1) exact match on enodeb_id or enodeb_name or site_name
   let exact = rows.find(r => (r.enodeb_id && r.enodeb_id.toString().trim() === term));
   if(exact) return { row: exact, score: 0, type: 'exact-id' };
+
+  // 2) exact (case-insensitive) match for names
   exact = rows.find(r => (r.site_name && normForSearch(r.site_name) === tNorm) || (r.enodeb_name && normForSearch(r.enodeb_name) === tNorm));
   if(exact) return { row: exact, score: 0, type: 'exact-name' };
+
+  // 3) substring match (contains)
   const substringMatches = rows.filter(r =>(r.enodeb_id && r.enodeb_id.toString().toLowerCase().includes(term.toLowerCase()))
     || (r.site_name && r.site_name.toString().toLowerCase().includes(term.toLowerCase()))
     || (r.enodeb_name && r.enodeb_name.toString().toLowerCase().includes(term.toLowerCase())));
   if(substringMatches.length === 1) return { row: substringMatches[0], score: 1, type: 'substring' };
-  return null;
+  if(substringMatches.length > 1) {
+    // pick the one with shortest name (likely best)
+    substringMatches.sort((a,b) => ( (a.site_name||a.enodeb_name||'').length - (b.site_name||b.enodeb_name||'').length ));
+    return { row: substringMatches[0], score: 2, type: 'substring-multiple' };
+  }
+
+  // 4) fuzzy: use levenshtein on normalized names, pick best with threshold
+  let best = null;
+  for(const r of rows){
+    const candidates = [
+      normForSearch(r.site_name || ''),
+      normForSearch(r.enodeb_name || ''),
+      normForSearch(r.enodeb_id || '')
+    ];
+    for(const c of candidates){
+      if(!c) continue;
+      const dist = levenshtein(tNorm, c);
+      // compute relative threshold: allow up to ~20% of length (min 1-3)
+      const maxAllowed = Math.max(1, Math.floor(Math.min(3, c.length * 0.2)));
+      if(dist <= maxAllowed){
+        const score = dist; // lower is better
+        if(!best || score < best.score){
+          best = { row: r, score, type: 'fuzzy' };
+        }
+      }
+    }
+  }
+  return best;
 }
 
+/* animate numbers */
 function animateValue(id, start, end, total) {
   const obj = document.getElementById(id);
   if(!obj) return;
-  obj.textContent = total ? `${end} / ${total}` : end;
+  let startTimestamp = null;
+  const duration = 500;
+  const step = (timestamp) => {
+    if (!startTimestamp) startTimestamp = timestamp;
+    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+    const current = Math.floor(progress * (end - start) + start);
+    obj.textContent = total ? `${current} / ${total}` : current;
+    if (progress < 1) window.requestAnimationFrame(step);
+  };
+  window.requestAnimationFrame(step);
 }
 
+/* -------------------------
+   Update filter dropdown with unique batches
+   ------------------------- */
 function updateFilterDropdown() {
   const select = document.getElementById('viewSelect');
   const currentValue = select.value;
+  
+  // Clear existing options except "All Sites"
   select.innerHTML = '<option value="all">All Sites</option>';
-  Array.from(uniqueBatches).filter(batch => batch && batch.trim() !== '').sort().forEach(batch => {
+  
+  // Add unique batches as options (including "blocked")
+  Array.from(uniqueBatches)
+    .filter(batch => batch && batch.trim() !== '')
+    .sort()
+    .forEach(batch => {
       const option = document.createElement('option');
       option.value = batch.toLowerCase().replace(/\s+/g, '_');
       option.textContent = batch;
       select.appendChild(option);
       batchMap.set(option.value, batch);
     });
-  if (currentValue) select.value = currentValue;
+  
+  // Restore previous selection if it still exists
+  if (currentValue) {
+    const optionExists = Array.from(select.options).some(opt => opt.value === currentValue);
+    if (optionExists) {
+      select.value = currentValue;
+    }
+  }
 }
 
+/* -------------------------
+   CSV parsing (adds on_air_date)
+   ------------------------- */
 function loadCsvText(text){
   const parsed = Papa.parse(text,{header:true, skipEmptyLines:true});
-  if(!parsed || !parsed.data) return;
-  allRows = []; uniqueBatches = new Set(); batchMap = new Map();
+  if(!parsed || !parsed.data){
+    alert('CSV parse error or no data found.');
+    return;
+  }
+
+  allRows = [];
+  uniqueBatches = new Set();
+  batchMap = new Map();
+
   parsed.data.forEach((r,i)=>{
     const norm = {};
-    for(const key in r) norm[normalizeKey(key)] = r[key];
+    // normalized keys -> original values
+    for(const key in r){
+      norm[normalizeKey(key)] = r[key];
+    }
+
+    // site fields (keep original values too)
     const enodeb_id = (norm['enodeb_id'] ?? norm['enodeb id'] ?? norm['enodeb'] ?? '') + '';
     const enodeb_name = (norm['enodeb_name'] ?? norm['enodeb name'] ?? '') + '';
     const site_name = (norm['site_name'] ?? norm['site name'] ?? '') + '';
@@ -333,30 +420,91 @@ function loadCsvText(text){
     const status = (norm['status'] ?? '') + '';
     const lat = parseFloat((norm['latitude'] ?? norm['lat'] ?? '').toString().replace(/,/g,'.'));
     const lon = parseFloat((norm['longitude'] ?? norm['lon'] ?? norm['lng'] ?? '').toString().replace(/,/g,'.'));
-    let on_air_date = norm['on_air_date'] || norm['on-air_date'] || norm['on_air'] || '';
-    
+
+    // Attempt to find on-air date value robustly:
+    let on_air_date = '';
+    if('on-air_date' in norm) on_air_date = norm['on-air_date'];
+    else if('on_air_date' in norm) on_air_date = norm['on_air_date'];
+    else if('on_air' in norm) on_air_date = norm['on_air'];
+    else {
+      for(const originalKey in r){
+        if(!originalKey) continue;
+        const compact = originalKey.toString().toLowerCase().replace(/[^a-z0-9]/g,'');
+        if(compact === 'onairdate' || compact === 'onair' || compact.indexOf('onair') !== -1){
+          on_air_date = r[originalKey];
+          break;
+        }
+      }
+    }
+    on_air_date = (on_air_date ?? '') + '';
+
     const row = {
-      _rowIndex: i, enodeb_id, enodeb_name: enodeb_name || site_name, site_name,
-      swap_batch, status, on_air_date, lat, lon,
+      _rowIndex: i,
+      enodeb_id,
+      enodeb_name: enodeb_name || site_name,
+      site_name,
+      swap_batch,
+      status,
+      on_air_date,
+      lat: Number.isFinite(lat) ? lat : NaN,
+      lon: Number.isFinite(lon) ? lon : NaN,
+      // Add normalized batch for easier filtering
       normalized_batch: (swap_batch || '').toLowerCase().replace(/\s+/g, '_')
     };
+
     allRows.push(row);
-    if (swap_batch && swap_batch.trim() !== '') uniqueBatches.add(swap_batch.trim());
+    
+    // Add batch to unique batches set (including "blocked")
+    if (swap_batch && swap_batch.trim() !== '') {
+      uniqueBatches.add(swap_batch.trim());
+    }
   });
+
+  // Update filter dropdown with new batches
   updateFilterDropdown();
+  
   render();
 }
 
+/* -------------------------
+   fetch CSV from Google Sheets (CSV export URL)
+   - make sure sheet is 'Anyone with link can view' and use the CSV export link
+   ------------------------- */
+function fetchFullList() {
+  const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg/export?format=csv&id=10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg&gid=0';
+
+  fetch(SHEET_CSV_URL)
+    .then(r => {
+      if(!r.ok) throw new Error('Network response not ok');
+      return r.text();
+    })
+    .then(text => loadCsvText(text))
+    .catch(err => alert('Could not fetch data from Google Sheets: ' + err));
+}
+
+/* -------------------------
+   Render markers (popup includes On-Air Date)
+   ------------------------- */
 function render(){
   markersLayer.clearLayers();
   visibleMarkers = {};
   const view = document.getElementById('viewSelect').value;
   
-  // Logic: include all except blocked/junk categories in "all" view
-  let rows = allRows.filter(r => {
-    if(view === 'all') return !['blocked', '24g_only', 'imacro'].includes(r.normalized_batch);
-    return r.normalized_batch === view;
-  });
+  let rows = allRows.slice();
+  
+  // MODIFIED: When "All Sites" is selected, exclude "blocked" batch
+  if(view === 'all') {
+    rows = allRows.filter(r => {
+      const batch = r.normalized_batch;
+      const isExcluded = batch === 'blocked' || batch === '24g_only'|| batch === 'imacro' ;
+      return !isExcluded;
+    });
+  }
+
+  // If not "all", filter by normalized_batch (including "blocked" if selected)
+  else if(view !== '') {
+    rows = allRows.filter(r => r.normalized_batch === view);
+  }
 
   let doneCount = 0, pendingCount = 0;
   const bounds = [];
@@ -364,58 +512,261 @@ function render(){
   rows.forEach(r=>{
     if(!Number.isFinite(r.lat) || !Number.isFinite(r.lon)) return;
     
-    // PHASE 1 OVERRIDE: If view is Phase 1, force Done status. Otherwise use real status.
-    let done = isDoneStatus(r.status);
-    if(view === 'phase_1') done = true;
+    let isDone = isDoneStatus(r.status);
+    let icon = isDone ? ICON_DONE : ICON_PENDING;
+    let displayStatus = r.status;
 
-    if(done) doneCount++; else pendingCount++;
-    const icon = done ? ICON_DONE : ICON_PENDING;
+    // --- PHASE 1 LOGIC INJECTED HERE ---
+    if (r.normalized_batch === 'phase_1' || r.normalized_batch === 'phase1') {
+      if (view === 'all') {
+        icon = ICON_PHASE1; // Purple in All Sites
+        displayStatus = r.status + " (Phase 1)";
+      } else if (view === 'phase_1') {
+        isDone = true; // Force Done stats
+        icon = ICON_DONE; // Force Green marker
+        displayStatus = "Done (Phase 1)";
+      }
+    }
+
+    if(isDone) doneCount++; else pendingCount++;
 
     const popupHtml = `<div style="min-width:240px">
       <strong>${escapeHtml(r.enodeb_name)}</strong><br/>
-      <em>Batch:</em> ${escapeHtml(r.swap_batch)}<br/>
-      <em>Status:</em> ${view === 'phase_1' ? 'Done (Phase 1)' : escapeHtml(r.status)}<br/>
+      <em>Site Name:</em> ${escapeHtml(r.site_name)}<br/>
+      <em>eNodeB ID:</em> ${escapeHtml(r.enodeb_id)}<br/>
+      <em>Swap Batch:</em> ${escapeHtml(r.swap_batch)}<br/>
+      <em>Status:</em> ${escapeHtml(displayStatus)}<br/>
       <em>On-Air Date:</em> ${escapeHtml(r.on_air_date || '—')}
     </div>`;
 
-    const m = L.marker([r.lat, r.lon], { icon }).bindPopup(popupHtml);
-    m.on('mouseover', () => { m.openPopup(); document.getElementById('details').innerHTML = popupHtml; });
-    m.on('click', () => { map.setView(m.getLatLng(), 16); m.openPopup(); });
+    const m = L.marker([r.lat, r.lon], { icon });
+    m.bindPopup(popupHtml, { autoClose:false, closeOnClick:false });
+
+    m.on('mouseover', () => {
+      if(pinnedMarker && pinnedMarker !== m) pinnedMarker.closePopup();
+      pinnedMarker = null;
+      m.openPopup();
+      document.getElementById('details').innerHTML = popupHtml;
+    });
+
+    m.on('mouseout', () => { if(pinnedMarker !== m) m.closePopup(); });
+
+    m.on('click', () => {
+      if(pinnedMarker && pinnedMarker !== m) pinnedMarker.closePopup();
+      pinnedMarker = m;
+      m.openPopup();
+      document.getElementById('details').innerHTML = popupHtml;
+      map.setView(m.getLatLng(), 16);
+    });
 
     m.addTo(markersLayer);
-    visibleMarkers[r.enodeb_id || ('row' + r._rowIndex)] = m;
+    const key = (r.enodeb_id || ('row' + r._rowIndex)).toString();
+    visibleMarkers[key] = m;
     bounds.push([r.lat, r.lon]);
   });
 
-  document.getElementById('doneTotal').textContent = `${doneCount} / ${rows.length}`;
-  document.getElementById('pendingCount').textContent = pendingCount;
-  document.getElementById('totalCount').textContent = `Total: ${rows.length}`;
-  document.getElementById('donePct').textContent = rows.length ? Math.round(doneCount/rows.length*100) + '%' : '0%';
+  // Toggle Phase 1 Legend
+  const p1Legend = document.getElementById('phase1Legend');
+  if(p1Legend) p1Legend.style.display = (view === 'phase_1') ? 'none' : 'inline-block';
 
-  if(bounds.length) map.fitBounds(L.latLngBounds(bounds).pad(0.2));
+  // animate with total shown as "done / total" for doneTotal
+  animateValue('doneTotal', 0, doneCount, rows.length);
+  animateValue('pendingCount', 0, pendingCount);
+  document.getElementById('donePct').textContent = rows.length ? (Math.round(doneCount/rows.length*10000)/100) + '%' : '0%';
+  document.getElementById('totalCount').textContent = `Total: ${rows.length}`;
+
+  if(bounds.length){
+    const b = L.latLngBounds(bounds);
+    if(b.isValid()) map.fitBounds(b.pad(0.2));
+  }
 }
 
-function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[m])); }
+/* -------------------------
+   Legend color picker for markers
+   ------------------------- */
+const statusColors = {
+  done: getComputedStyle(document.documentElement).getPropertyValue('--done').trim(),
+  pending: getComputedStyle(document.documentElement).getPropertyValue('--pending').trim()
+};
+
+// click legend dot to pick a color
+document.querySelectorAll('.legend .sw').forEach((el, idx) => {
+  // Simple check for Done/Pending. We skip Phase 1 color picker for simplicity unless requested.
+  if (idx > 1) return; 
+
+  const status = idx === 0 ? 'done' : 'pending';
+  el.addEventListener('click', async () => {
+    const newColor = await pickColor(statusColors[status]);
+    if (!newColor) return;
+    statusColors[status] = newColor;
+    el.style.background = newColor;
+    updateMarkerColors(status, newColor);
+  });
+});
+
+// color picker popup
+function pickColor(current) {
+  return new Promise(resolve => {
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.value = rgbToHex(current);
+    input.style.position = 'fixed';
+    input.style.left = '-9999px';
+    document.body.appendChild(input);
+    input.click();
+    input.addEventListener('input', () => resolve(input.value));
+    input.addEventListener('change', () => { resolve(input.value); document.body.removeChild(input); });
+    input.addEventListener('blur', () => { resolve(null); document.body.removeChild(input); });
+  });
+}
+
+// convert rgb() to hex if needed
+function rgbToHex(rgb){
+  if(rgb.startsWith('#')) return rgb;
+  const nums = rgb.match(/\d+/g).map(Number);
+  return "#" + nums.map(n => n.toString(16).padStart(2,'0')).join('');
+}
+
+// regenerate marker icons with new color
+function updateMarkerColors(status, color){
+  for(const key in visibleMarkers){
+    const m = visibleMarkers[key];
+    const row = allRows.find(r => (r.enodeb_id || ('row'+r._rowIndex)).toString() === key);
+    if(!row) continue;
+
+    const done = isDoneStatus(row.status);
+    // Don't change Phase 1 colors in All View (keep purple)
+    if (row.normalized_batch === 'phase_1' && document.getElementById('viewSelect').value === 'all') continue;
+
+    if ((status === 'done' && done) || (status === 'pending' && !done)){
+      const icon = dotIcon(color);
+      m.setIcon(icon);
+    }
+  }
+}
+
+/* -------------------------
+   Escape HTML utility
+   ------------------------- */
+function escapeHtml(s){
+  if(s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/* -------------------------
+   Search: supports id exact and fuzzy name search
+   ------------------------- */
+function searchAndZoom(term){
+  if(!term || !term.toString().trim()){ alert('Enter a eNodeB ID, or Site name'); return; }
+  term = term.toString().trim();
+
+  // 1) exact key in visibleMarkers
+  if(visibleMarkers[term]){
+    const m = visibleMarkers[term];
+    map.setView(m.getLatLng(), 16);
+    document.getElementById('details').innerHTML = m.getPopup() ? m.getPopup().getContent() : '';
+    m.openPopup();
+    pinnedMarker = m;
+    return;
+  }
+
+  // 2) try exact matches in allRows (enodeb_id)
+  const exact = allRows.find(r => (r.enodeb_id && r.enodeb_id.toString().trim() === term));
+  if(exact && Number.isFinite(exact.lat) && Number.isFinite(exact.lon)){
+    map.setView([exact.lat, exact.lon], 16);
+    const key = (exact.enodeb_id || ('row' + exact._rowIndex)).toString();
+    if(visibleMarkers[key]){
+      const m = visibleMarkers[key];
+      document.getElementById('details').innerHTML = m.getPopup() ? m.getPopup().getContent() : '';
+      m.openPopup();
+      pinnedMarker = m;
+    } else {
+      // not visible in current filter — just show details in panel
+      const popupHtml = `<div style="min-width:220px"><strong>${escapeHtml(exact.enodeb_name)}</strong><br/>
+        <em>Site Name:</em> ${escapeHtml(exact.site_name)}<br/>
+        <em>eNodeB ID:</em> ${escapeHtml(exact.enodeb_id)}<br/>
+        <em>Swap Batch:</em> ${escapeHtml(exact.swap_batch)}<br/>
+        <em>Status:</em> ${escapeHtml(exact.status)}<br/>
+        <em>On-Air Date:</em> ${escapeHtml(exact.on_air_date || '—')}</div>`;
+      document.getElementById('details').innerHTML = popupHtml;
+    }
+    return;
+  }
+
+  // 3) fuzzy / partial search across site_name / enodeb_name / enodeb_id
+  const result = fuzzyFindInRows(term, allRows);
+  if(result && result.row){
+    const found = result.row;
+    if(Number.isFinite(found.lat) && Number.isFinite(found.lon)){
+      // if marker is visible, open; otherwise show details
+      const key = (found.enodeb_id || ('row' + found._rowIndex)).toString();
+      if(visibleMarkers[key]){
+        const m = visibleMarkers[key];
+        map.setView(m.getLatLng(),16);
+        document.getElementById('details').innerHTML = m.getPopup() ? m.getPopup().getContent() : '';
+        m.openPopup();
+        pinnedMarker = m;
+      } else {
+        // show details and zoom map
+        map.setView([found.lat, found.lon], 16);
+        const popupHtml = `<div style="min-width:220px"><strong>${escapeHtml(found.enodeb_name)}</strong><br/>
+          <em>Site Name:</em> ${escapeHtml(found.site_name)}<br/>
+          <em>eNodeB ID:</em> ${escapeHtml(found.enodeb_id)}<br/>
+          <em>Swap Batch:</em> ${escapeHtml(found.swap_batch)}<br/>
+          <em>Status:</em> ${escapeHtml(found.status)}<br/>
+          <em>On-Air Date:</em> ${escapeHtml(found.on_air_date || '—')}</div>`;
+        document.getElementById('details').innerHTML = popupHtml;
+        pinnedMarker = null;
+      }
+      return;
+    }
+  }
+
+  alert('Site not found (try exact eNodeB ID, or part of the Site Name).');
+}
+
+/* -------------------------
+   Event listeners
+   ------------------------- */
+document.getElementById('viewSelect').addEventListener('change', render);
+document.getElementById('searchBtn').addEventListener('click', ()=> searchAndZoom(document.getElementById('searchInput').value));
+document.getElementById('searchInput').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); searchAndZoom(e.target.value); }});
+document.getElementById('sniperBtn').addEventListener('click',()=>render());
+  
+window.addEventListener('load', ()=>{ fetchFullList(); setTimeout(()=>map.invalidateSize(),300); });
+
+// -------------------------
+// Auto-refresh CSV every 30 seconds
+// -------------------------
+let lastCsvText = null;
+const REFRESH_INTERVAL_MS = 0.5 * 60 * 1000; // 30 seconds
 
 async function smartFetchCsv() {
-  const url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=232255476&single=true&output=csv';
   try {
-    const r = await fetch(url);
-    const txt = await r.text();
-    loadCsvText(txt);
-  } catch (err) { console.error(err); }
+    const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=232255476&single=true&output=csv';
+    const response = await fetch(SHEET_CSV_URL);
+    if (!response.ok) throw new Error('Network response not ok');
+    const csvText = await response.text();
+
+    if (csvText !== lastCsvText) {
+      console.log('CSV changed, reloading map...');
+      lastCsvText = csvText;
+      loadCsvText(csvText);
+    } else {
+      console.log('CSV unchanged, no update needed.');
+    }
+  } catch (err) {
+    console.error('Error fetching CSV:', err);
+  }
 }
 
-document.getElementById('viewSelect').addEventListener('change', render);
-document.getElementById('searchBtn').addEventListener('click', () => {
-  const val = document.getElementById('searchInput').value.toLowerCase();
-  const row = allRows.find(r => r.enodeb_id.toLowerCase() === val || r.enodeb_name.toLowerCase().includes(val));
-  if(row) map.setView([row.lat, row.lon], 16);
-});
-document.getElementById('sniperBtn').addEventListener('click', render);
-
+// Initial load
 smartFetchCsv();
-setInterval(smartFetchCsv, 30000);
+
+// Auto-refresh every 30 seconds
+setInterval(smartFetchCsv, REFRESH_INTERVAL_MS);
+
 </script>
 </body>
 </html>
