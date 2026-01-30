@@ -1,303 +1,285 @@
 <!doctype html>
 <html lang="en">
 <head>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-XBHVRKLJCD"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-XBHVRKLJCD');
-</script>
 <meta charset="utf-8" />
 <title>Interactive Sites Map — Dynamic Filter</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
 <style>
-  :root{
-    --bg:#e0eaff;
-    --card:#ffffff80;
-    --accent:#2F80ED;
-    --accent-hover:#1C60B3;
-    --pending:#1F4E79;
-    --done:#66ff00;
-    --phase1:#A020F0;
-    --shadow:0 8px 30px rgba(0,0,0,0.12);
-    --radius:12px;
-  }
+:root{
+  --bg:#e0eaff;
+  --card:#ffffff80;
+  --accent:#2F80ED;
+  --pending:#1F4E79;
+  --done:#66ff00;
+  --phase1:#A020F0;
+  --radius:12px;
+  --shadow:0 8px 30px rgba(0,0,0,0.12);
+}
 
-  html, body {
-    margin:0; height:100%; font-family: 'Inter', system-ui, Arial;
-    background: linear-gradient(to bottom right, #e0eaff, #ffffff);
-    color:#222; font-size:14px; line-height:1.5;
-  }
+html,body{
+  margin:0;
+  height:100%;
+  font-family:Inter,system-ui,Arial;
+  background:linear-gradient(to bottom right,#e0eaff,#fff);
+}
 
-  .app{
-    display:grid; grid-template-columns:380px 1fr; gap:16px;
-    height:100vh; padding:16px; box-sizing:border-box;
-  }
+.app{
+  display:grid;
+  grid-template-columns:380px 1fr;
+  gap:16px;
+  height:100vh;
+  padding:16px;
+  box-sizing:border-box;
+}
 
-  .panel{
-    background:var(--card); backdrop-filter: blur(12px); border-radius:var(--radius);
-    padding:16px; box-shadow:var(--shadow); display:flex; flex-direction:column;
-    overflow:auto; border:1px solid rgba(255,255,255,0.3);
-  }
+.panel{
+  background:var(--card);
+  backdrop-filter:blur(12px);
+  border-radius:var(--radius);
+  padding:16px;
+  box-shadow:var(--shadow);
+  overflow:auto;
+}
 
-  #map{ height:100%; border-radius:var(--radius); box-shadow:var(--shadow); border:2px solid rgba(255,255,255,0.3); }
+#map{
+  height:100%;
+  border-radius:var(--radius);
+}
 
-  h2{ margin-bottom:12px; font-weight:700; font-size:1.4em; color:#1a1a1a; }
-  .controls{ display:flex; flex-direction:column; gap:12px; }
-  .row{ display:flex; gap:12px; align-items:center; }
+.row{display:flex;align-items:center;gap:12px;}
+.controls{display:flex;flex-direction:column;gap:12px;}
 
-  select,input[type=text]{ padding:8px 10px; border-radius:var(--radius); border:1px solid #ccc; width: 100%; }
+.stat{
+  flex:1;
+  background:#fff;
+  padding:12px;
+  border-radius:var(--radius);
+  text-align:center;
+}
 
-  .stat{
-    background:rgba(255,255,255,0.85); flex:1; padding:12px; border-radius:var(--radius);
-    box-shadow:0 4px 12px rgba(0,0,0,0.08); text-align:center;
-  }
+.legend{
+  display:flex;
+  gap:16px;
+  flex-wrap:wrap;
+}
 
-  /* Fixed Legend Alignment */
-  .legend{ display: flex; gap: 15px; flex-wrap: wrap; }
-  .legend span { 
-    display: flex; 
-    align-items: center; /* Centers dot and text vertically */
-    line-height: 1; 
-  }
-  .legend .sw{
-    width:16px; height:16px; border-radius:50%; display:inline-block;
-    margin-right:6px; border:2px solid #fff; box-shadow:0 0 4px rgba(0,0,0,0.25);
-    cursor: pointer;
-  }
+.legend-item{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
 
-  .btn{
-    padding:10px 16px; border-radius:var(--radius); border:none; font-weight:600; cursor:pointer;
-    color:#fff; background: linear-gradient(135deg,var(--accent),#1e5fc1);
-  }
+.legend .sw{
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  border:2px solid #fff;
+  box-shadow:0 0 4px rgba(0,0,0,.25);
+  cursor:pointer;
+}
 
-  #details{
-    font-size:14px; color:#222; margin-top:8px; padding:10px; border-radius:var(--radius);
-    background:rgba(255,255,255,0.7); min-height:64px; border: 1px solid rgba(0,0,0,0.05);
-  }
+.sw.done{background:var(--done);}
+.sw.pending{background:var(--pending);}
+.sw.phase1{background:var(--phase1);}
 
-  .map-sniper-btn{
-    position:absolute; bottom:20px; right:20px; z-index:9999; width:50px; height:50px;
-    border-radius:50%; background:white; display:flex; align-items:center; justify-content:center;
-    cursor:pointer; border:2px solid #444; box-shadow:0 2px 8px rgba(0,0,0,0.25);
-  }
-  .map-sniper-btn img{ width:28px; height:28px; }
+#details{
+  background:#fff;
+  padding:8px;
+  border-radius:var(--radius);
+  min-height:70px;
+}
 
-  @media(max-width:950px){ .app{ grid-template-columns:1fr; grid-template-rows:350px 1fr; } }
+.map-sniper-btn{
+  position:absolute;
+  bottom:20px;
+  right:20px;
+  z-index:9999;
+  width:46px;
+  height:46px;
+  border-radius:50%;
+  background:#fff;
+  border:2px solid #444;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+
+.map-sniper-btn img{width:26px}
 </style>
 </head>
+
 <body>
 <div class="app">
-  <div class="panel">
-    <h2>Site Map Dashboard</h2>
-    <div class="controls">
-      <div class="row">
-        <label>View</label>
-        <select id="viewSelect"><option value="all">All Sites</option></select>
-      </div>
 
-      <div class="row">
-        <div class="stat">
-          <div class="small">Done / Total</div>
-          <div id="doneTotal">0 / 0</div>
-          <div class="small" id="donePct">0%</div>
-        </div>
-        <div class="stat">
-          <div class="small">Pending</div>
-          <div id="pendingCount">0</div>
-          <div class="small" id="totalCount">Total: 0</div>
-        </div>
-      </div>
+<div class="panel">
+<h2>Site Map Dashboard</h2>
 
-      <div class="row legend small">
-        <span id="leg-done"><span class="sw" style="background:var(--done)"></span>Done</span>
-        <span id="leg-pending"><span class="sw" style="background:var(--pending)"></span>Pending</span>
-        <span id="leg-phase1" style="display:none;"><span class="sw" style="background:var(--phase1)"></span>Phase 1</span>
-      </div>
+<div class="controls">
 
-      <hr style="border:none; border-top:1px solid #eee; margin:5px 0;"/>
+<div class="row">
+<label>View</label>
+<select id="viewSelect"><option value="all">All Sites</option></select>
+</div>
 
-      <div class="row">
-        <input id="searchInput" type="text" placeholder="Search ID / Site Name..."/>
-        <button id="searchBtn" class="btn">Find</button>
-      </div>
+<div class="row">
+<div class="stat">
+<div>Done / Total</div>
+<div id="doneTotal">0 / 0</div>
+<div id="donePct">0%</div>
+</div>
+<div class="stat">
+<div>Pending</div>
+<div id="pendingCount">0</div>
+<div id="totalCount">Total: 0</div>
+</div>
+</div>
 
-      <div id="details">Hover or click a site to see info.</div>
-    </div>
-  </div>
+<div class="legend" id="legendRow">
+<div class="legend-item" data-type="done">
+<span class="sw done"></span><span>Done</span>
+</div>
+<div class="legend-item" data-type="pending">
+<span class="sw pending"></span><span>Pending</span>
+</div>
+<div class="legend-item phase1" data-type="phase1">
+<span class="sw phase1"></span><span>Phase 1</span>
+</div>
+</div>
 
-  <div class="panel" style="padding:0; position:relative;">
-    <div id="map"></div>
-    <div id="sniperBtn" class="map-sniper-btn" title="Reset view">
-      <img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" alt="sniper">
-    </div>
-  </div>
+<input id="searchInput" placeholder="Search site / eNodeB"/>
+<button id="searchBtn">Find</button>
+
+<div id="details">Hover marker to see details</div>
+
+</div>
+</div>
+
+<div class="panel" style="padding:0">
+<div id="map">
+<div id="sniperBtn" class="map-sniper-btn">
+<img src="https://cdn-icons-png.flaticon.com/512/684/684908.png">
+</div>
+</div>
+</div>
+
 </div>
 
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-const map = L.map('map', { preferCanvas: true }).setView([3.0, 101.5], 6);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-const markersLayer = L.layerGroup().addTo(map);
+const map=L.map('map').setView([3,101.5],6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+const markersLayer=L.layerGroup().addTo(map);
 
-const statusColors = { done: '#66ff00', pending: '#1F4E79', phase1: '#A020F0' };
-let allRows = [], visibleMarkers = {}, pinnedMarker = null;
-let uniqueBatches = new Set();
+let allRows=[],visibleMarkers={},pinnedMarker=null,popupHover=false;
+let lastCsvHash=null;
 
-function dotIcon(color){ 
-  return L.divIcon({
-    className:'', 
-    html:`<div style="width:10px;height:10px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.25);"></div>`, 
-    iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-10]
-  }); 
+const statusColors={
+  done:getCss('--done'),
+  pending:getCss('--pending'),
+  phase1:getCss('--phase1')
+};
+
+function getCss(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function dotIcon(c){
+  return L.divIcon({html:`<div style="width:10px;height:10px;background:${c};border-radius:50%;border:2px solid #fff"></div>`,iconSize:[14,14]});
 }
+function isDone(s){return /on\s*air|done|live|active/i.test(s||'');}
+function hashStr(s){let h=0;for(let i=0;i<s.length;i++)h=(h<<5)-h+s.charCodeAt(i);return h;}
 
-function normalizeKey(k){ return (k||'').toString().trim().toLowerCase().replace(/\s+/g,'_'); }
-function isDoneStatus(s){
-  if(!s) return false;
-  s = s.toString().toLowerCase();
-  return /on\s*-?\s*air|onair|done|live|activated|active|\bon\b/.test(s);
-}
+function loadCsv(text){
+  const h=hashStr(text);
+  if(h===lastCsvHash) return;
+  lastCsvHash=h;
 
-function loadCsvText(text){
-  const parsed = Papa.parse(text,{header:true, skipEmptyLines:true});
-  allRows = []; uniqueBatches.clear();
-  parsed.data.forEach((r,i)=>{
-    const norm = {};
-    for(const key in r) norm[normalizeKey(key)] = r[key];
-    const row = {
-      _rowIndex: i,
-      enodeb_id: (norm['enodeb_id'] ?? norm['enodeb id'] ?? '').toString(),
-      site_name: (norm['site_name'] ?? norm['site name'] ?? '').toString(),
-      swap_batch: (norm['swap_batch'] ?? norm['swap batch'] ?? '').toString(),
-      status: (norm['status'] ?? '').toString(),
-      lat: parseFloat(String(norm['latitude'] || norm['lat']).replace(',','.')),
-      lon: parseFloat(String(norm['longitude'] || norm['lon']).replace(',','.')),
-      normalized_batch: (norm['swap_batch'] || '').toLowerCase().replace(/\s+/g, '_')
-    };
-    allRows.push(row);
-    if(row.swap_batch) uniqueBatches.add(row.swap_batch.trim());
+  allRows=[];
+  Papa.parse(text,{header:true,skipEmptyLines:true}).data.forEach((r,i)=>{
+    allRows.push({
+      id:r.enodeb_id||i,
+      name:r.site_name||'',
+      status:r.status||'',
+      batch:(r.swap_batch||'').toLowerCase().replace(/\s+/g,'_'),
+      lat:+r.latitude,
+      lon:+r.longitude
+    });
   });
-  updateDropdown();
   render();
-}
-
-function updateDropdown() {
-  const select = document.getElementById('viewSelect');
-  const cur = select.value;
-  select.innerHTML = '<option value="all">All Sites</option>';
-  Array.from(uniqueBatches).sort().forEach(b => {
-    const opt = document.createElement('option');
-    opt.value = b.toLowerCase().replace(/\s+/g, '_');
-    opt.textContent = b;
-    select.appendChild(opt);
-  });
-  select.value = cur;
 }
 
 function render(){
   markersLayer.clearLayers();
-  visibleMarkers = {};
-  const view = document.getElementById('viewSelect').value;
-  let rows = allRows.filter(r => isFinite(r.lat) && isFinite(r.lon));
-  
-  if(view === 'all') {
-    rows = rows.filter(r => !['blocked','24g_only','imacro'].includes(r.normalized_batch));
-  } else {
-    rows = rows.filter(r => r.normalized_batch === view);
-  }
+  visibleMarkers={};
 
-  let doneCount = 0, pendingCount = 0, countableTotal = 0, hasPhase1 = false;
-  const bounds = [];
+  const view=document.getElementById('viewSelect').value;
+  let rows=view==='all'?allRows:allRows.filter(r=>r.batch===view);
 
-  rows.forEach(r => {
-    const isP1 = r.normalized_batch.includes('phase1') || r.normalized_batch.includes('phase_1');
-    const done = isDoneStatus(r.status);
-    if(isP1) hasPhase1 = true; else { countableTotal++; if(done) doneCount++; else pendingCount++; }
+  let done=0,pending=0,total=0;
+  let hasPhase1=false;
+  const bounds=[];
 
-    const color = isP1 ? statusColors.phase1 : (done ? statusColors.done : statusColors.pending);
-    const m = L.marker([r.lat, r.lon], { icon: dotIcon(color) });
-    
-    const popupHtml = `<div><strong>${r.site_name}</strong><br>ID: ${r.enodeb_id}<br>Status: ${r.status}</div>`;
-    m.bindPopup(popupHtml, { closeButton: false });
+  rows.forEach(r=>{
+    if(!r.lat||!r.lon) return;
+    const phase1=r.batch.startsWith('phase');
+    if(phase1) hasPhase1=true;
 
-    // FIXED HOVER LOGIC: Close on mouseout, pin on click
-    m.on('mouseover', () => { 
-      if(!pinnedMarker) {
-        m.openPopup(); 
-        document.getElementById('details').innerHTML = popupHtml;
-      }
-    });
-    
-    m.on('mouseout', () => { 
-      if(pinnedMarker !== m) m.closePopup(); 
-    });
-
-    m.on('click', () => { 
-      pinnedMarker = m; 
-      m.openPopup(); 
-      document.getElementById('details').innerHTML = popupHtml;
-      map.setView(m.getLatLng(), 16); 
-    });
-
-    m.addTo(markersLayer);
-    visibleMarkers[r.enodeb_id] = m;
-    bounds.push([r.lat, r.lon]);
-  });
-
-  document.getElementById('leg-phase1').style.display = hasPhase1 ? 'flex' : 'none';
-  document.getElementById('doneTotal').textContent = `${doneCount} / ${countableTotal}`;
-  document.getElementById('pendingCount').textContent = pendingCount;
-  document.getElementById('totalCount').textContent = `Total: ${countableTotal}`;
-  document.getElementById('donePct').textContent = countableTotal ? Math.round(doneCount/countableTotal*100) + '%' : '0%';
-
-  if(bounds.length) map.fitBounds(L.latLngBounds(bounds).pad(0.1));
-}
-
-// Color Picker Setup
-document.querySelectorAll('.legend .sw').forEach((el, idx) => {
-  const keys = ['done', 'pending', 'phase1'];
-  el.addEventListener('click', () => {
-    const input = document.createElement('input');
-    input.type = 'color';
-    input.value = statusColors[keys[idx]];
-    input.onchange = () => {
-      statusColors[keys[idx]] = input.value;
-      el.style.background = input.value;
-      render();
-    };
-    input.click();
-  });
-});
-
-async function smartFetchCsv() {
-  try {
-    const URL = 'https://docs.google.com/spreadsheets/d/10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg/export?format=csv&id=10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg&gid=0';
-    const res = await fetch(URL);
-    const text = await res.text();
-    loadCsvText(text);
-  } catch (e) { console.error(e); }
-}
-
-document.getElementById('viewSelect').addEventListener('change', () => { pinnedMarker = null; render(); });
-document.getElementById('searchBtn').addEventListener('click', () => {
-  const term = document.getElementById('searchInput').value.toLowerCase();
-  const found = allRows.find(r => r.enodeb_id.toLowerCase() === term || r.site_name.toLowerCase().includes(term));
-  if(found) {
-    map.setView([found.lat, found.lon], 16);
-    if(visibleMarkers[found.enodeb_id]) {
-        pinnedMarker = visibleMarkers[found.enodeb_id];
-        pinnedMarker.openPopup();
+    if(!phase1){
+      total++;
+      isDone(r.status)?done++:pending++;
     }
-  }
-});
-document.getElementById('sniperBtn').addEventListener('click', () => { pinnedMarker = null; render(); });
 
-window.onload = () => { smartFetchCsv(); setInterval(smartFetchCsv, 30000); };
+    const color=phase1?statusColors.phase1:isDone(r.status)?statusColors.done:statusColors.pending;
+    const m=L.marker([r.lat,r.lon],{icon:dotIcon(color)}).addTo(markersLayer);
+
+    const html=`<b>${r.name}</b><br>Status: ${r.status}<br>Batch: ${r.batch}`;
+    m.bindPopup(html,{autoClose:false,closeOnClick:false});
+
+    m.on('mouseover',()=>{if(pinnedMarker!==m)m.openPopup();document.getElementById('details').innerHTML=html});
+    m.on('mouseout',()=>setTimeout(()=>{if(!popupHover&&pinnedMarker!==m)m.closePopup()},150));
+    m.on('popupopen',e=>{
+      const el=e.popup.getElement();
+      el.onmouseenter=()=>popupHover=true;
+      el.onmouseleave=()=>{popupHover=false;if(pinnedMarker!==m)m.closePopup();}
+    });
+    m.on('click',()=>{pinnedMarker=m;map.setView(m.getLatLng(),16);});
+
+    visibleMarkers[r.id]=m;
+    bounds.push([r.lat,r.lon]);
+  });
+
+  document.querySelector('.legend-item.phase1').style.display=hasPhase1?'flex':'none';
+  document.getElementById('doneTotal').textContent=`${done} / ${total}`;
+  document.getElementById('pendingCount').textContent=pending;
+  document.getElementById('totalCount').textContent=`Total: ${total}`;
+  document.getElementById('donePct').textContent=total?Math.round(done/total*100)+'%':'0%';
+
+  if(bounds.length) map.fitBounds(bounds,{padding:[40,40]});
+}
+
+document.querySelectorAll('.legend .sw').forEach(el=>{
+  const type=el.closest('.legend-item').dataset.type;
+  el.onclick=()=>{
+    const i=document.createElement('input');
+    i.type='color';
+    i.value=statusColors[type];
+    i.onchange=()=>{statusColors[type]=i.value;render();};
+    i.click();
+  };
+});
+
+document.getElementById('sniperBtn').onclick=render;
+
+async function fetchCsv(){
+  const res=await fetch('YOUR_CSV_URL',{cache:'no-store'});
+  loadCsv(await res.text());
+}
+
+fetchCsv();
+setInterval(fetchCsv,30000);
 </script>
 </body>
 </html>
