@@ -21,7 +21,7 @@
     --accent-hover:#1C60B3;
     --pending:#1F4E79;
     --done:#66ff00;
-    --phase1:#A020F0; /* Added Purple Phase 1 Color */
+    --phase1:#A020F0; /* Purple for Phase 1 */
     --shadow:0 8px 30px rgba(0,0,0,0.12);
     --radius:12px;
   }
@@ -93,6 +93,7 @@
     border-radius:var(--radius);
     border:1px solid #ccc;
     transition:0.2s;
+    width: 100%;
   }
   select:focus, input:focus{
     border-color:var(--accent);
@@ -151,6 +152,7 @@
     margin-right:8px;
     border:2px solid #fff;
     box-shadow:0 0 4px rgba(0,0,0,0.25);
+    vertical-align:middle;
   }
 
   #details{
@@ -245,11 +247,11 @@ const markersLayer = L.layerGroup().addTo(map);
 function dotIcon(color){ return L.divIcon({className:'', html:`<div style="width:10px;height:10px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.25);"></div>`, iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-10]}); }
 const ICON_PENDING = dotIcon('#1F4E79'); 
 const ICON_DONE = dotIcon('#66ff00');
-const ICON_PHASE1 = dotIcon('#A020F0'); // Purple icon for Phase 1
+const ICON_PHASE1 = dotIcon('#A020F0');
 
 let allRows = [], visibleMarkers = {}, pinnedMarker = null;
 let uniqueBatches = new Set();
-let batchMap = new Map(); // Store mapping between normalized value and actual batch name
+let batchMap = new Map();
 
 function normalizeKey(k){ return (k||'').toString().trim().toLowerCase().replace(/\s+/g,'_'); }
 function isDoneStatus(s){
@@ -474,7 +476,7 @@ function loadCsvText(text){
    - make sure sheet is 'Anyone with link can view' and use the CSV export link
    ------------------------- */
 function fetchFullList() {
-  const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg/export?format=csv&id=10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg&gid=0';
+  const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=232255476&single=true&output=csv';
 
   fetch(SHEET_CSV_URL)
     .then(r => {
@@ -525,25 +527,16 @@ function render(){
     if (isPhase1) hasPhase1 = true;
 
     // --- PHASE 1 LOGIC ---
-    // 1. If All Sites view AND it's Phase 1:
-    //    - Show Purple Marker (ICON_PHASE1)
-    //    - Do NOT count it in done/pending/total stats.
-    // 2. If Phase 1 Filter is selected:
-    //    - Show Green Marker (ICON_DONE)
-    //    - Count it as Done.
-    // 3. Else (Normal Site):
-    //    - Normal logic.
-
     let icon, displayStatus;
     
     if (isPhase1 && view === 'all') {
       icon = ICON_PHASE1; // Purple
-      displayStatus = "Phase 1 (Done)";
-      // Note: We intentionally do NOT increment doneCount/pendingCount/countableTotal here.
+      displayStatus = "Done"; // Simply "Done" per request
+      // NOT counted in stats
     } 
     else if (isPhase1 && view === 'phase_1') {
       icon = ICON_DONE; // Green
-      displayStatus = "Done (Phase 1)";
+      displayStatus = "Done"; // Simply "Done" per request
       doneCount++;
       countableTotal++;
     } 
