@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XBHVRKLJCD"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-XBHVRKLJCD');
+</script>
+<meta charset="utf-8" />
+<title>Interactive Sites Map — Dynamic Filter</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  :root{
+    --bg:#e0eaff;
+    --card:#ffffff80;
+    --accent:#2F80ED;
+    --accent-hover:#1C60B3;
+    --pending:#1F4E79;
+    --done:#66ff00;
+    --phase1:#A020F0;
+    --shadow:0 8px 30px rgba(0,0,0,0.12);
+    --radius:12px;
+  }
+
+  html, body {
+    margin:0;
+    height:100%;
+    font-family: 'Inter', system-ui, Arial;
+    background: linear-gradient(to bottom right, #e0eaff, #ffffff);
+    color:#222;
+    font-size:14px;
+    line-height:1.5;
+  }
+
+  .app{
+    display:grid;
+    grid-template-columns:380px 1fr;
+    gap:16px;
+    height:100vh;
+    padding:16px;
+    box-sizing:border-box;
+  }
+
+  .panel{
+    background:var(--card);
+    backdrop-filter: blur(12px);
+    border-radius:var(--radius);
+    padding:16px;
+    box-shadow:var(--shadow);
+    display:flex;
+    flex-direction:column;
+    overflow:auto;
+    border:1px solid rgba(255,255,255,0.3);
+  }
+
+  #map{
+    height:100%;
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    border:2px solid rgba(255,255,255,0.3);
+  }
+
+  h2{
+    margin-bottom:12px;
+    font-weight:700;
+    font-size:1.4em;
+    color:#1a1a1a;
+  }
+
+  label{
+    font-weight:600;
+    color:#333;
+  }
+
+  .controls{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+
+  .row{
+    display:flex;
+    gap:12px;
+    align-items:center;
+  }
+
+  select,input[type=text]{
+    padding:8px 10px;
+    border-radius:var(--radius);
+    border:1px solid #ccc;
+    transition:0.2s;
+  }
+  select:focus, input:focus{
+    border-color:var(--accent);
+    outline:none;
+    box-shadow:0 0 8px rgba(47,128,237,0.3);
+  }
+
+  .btn{
+    padding:10px 16px;
+    border-radius:var(--radius);
+    border:none;
+    font-weight:600;
+    cursor:pointer;
+    color:#fff;
+    background: linear-gradient(135deg,var(--accent),#1e5fc1);
+    transition:0.3s;
+    box-shadow:0 4px 12px rgba(0,0,0,0.2);
+  }
+  .btn:hover{
+    background:var(--accent-hover);
+    transform:translateY(-2px);
+    box-shadow:0 6px 16px rgba(0,0,0,0.25);
+  }
+
+  .stat{
+    background:rgba(255,255,255,0.85);
+    flex:1;
+    padding:12px;
+    border-radius:var(--radius);
+    box-shadow:0 4px 12px rgba(0,0,0,0.08);
+    text-align:center;
+    transition:0.2s;
+  }
+  .stat:hover{
+    box-shadow:0 6px 18px rgba(0,0,0,0.15);
+    transform:translateY(-2px);
+  }
+
+  .stat .small{
+    font-weight:500;
+    color:#555;
+    margin-bottom:4px;
+  }
+
+  .stat div[id]{
+    font-weight:700;
+    font-size:20px;
+    margin-top:4px;
+  }
+
+  .legend .sw{
+    width:16px;
+    height:16px;
+    border-radius:50%;
+    display:inline-block;
+    margin-right:8px;
+    border:2px solid #fff;
+    box-shadow:0 0 4px rgba(0,0,0,0.25);
+  }
+
+  #details{
+    font-size:14px;
+    color:#222;
+    margin-top:8px;
+    padding:8px;
+    border-radius:var(--radius);
+    background:rgba(255,255,255,0.7);
+    box-shadow:0 4px 12px rgba(0,0,0,0.08);
+    min-height:64px;
+  }
+
+  .search-wrap{
+    display:flex;
+    gap:8px;
+  }
+.map-sniper-btn{position:absolute;bottom:20px;right:20px;z-index:9999;width:50px;height:50px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #444;box-shadow:0 2px 8px rgba(0,0,0,0.25);}
+.map-sniper-btn img{width:28px;height:28px;}
+.map-sniper-btn:hover{transform:translateY(-4px);box-shadow:0 6px 18px rgba(0,0,0,0.28);}
+hr{border:none;border-top:1px solid #eee;margin:12px 0;}
+  @media(max-width:950px){
+    .app{
+      grid-template-columns:1fr;
+      grid-template-rows:320px 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="panel">
+    <h2>Site Map Dashboard</h2>
+    <div class="controls">
+      <div class="row">
+        <label for="viewSelect">View</label>
+        <select id="viewSelect">
+          <option value="all">All Sites</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <div class="stat">
+          <div class="small">Done / Total</div>
+          <div id="doneTotal">0 / 0</div>
+          <div class="small" id="donePct">0%</div>
+        </div>
+        <div class="stat">
+          <div class="small">Pending</div>
+          <div id="pendingCount">0</div>
+          <div class="small" id="totalCount">Total: 0</div>
+        </div>
+      </div>
+
+      <div class="row legend small">
+        <span class="sw" style="background:var(--done); cursor:pointer;" title="Click to change color"></span>Done
+        <span class="sw" style="background:var(--pending); cursor:pointer;" title="Click to change color"></span>Pending
+        <span class="sw" style="background:var(--phase1);" title="Phase 1 (Not counted)"></span>Phase 1
+      </div>
+
+      <hr/>
+
+      <div class="row search-wrap">
+        <input id="searchInput" type="text" placeholder="Search eNodeB ID / Site name"/>
+        <button id="searchBtn" class="btn">Find</button>
+      </div>
+
+      <div id="details">Hover a marker or search to see details here.</div>
+
+    </div>
+  </div>
+
+ <div class="panel" style="padding:0;">
+    <div id="map">
+      <div id="sniperBtn" class="map-sniper-btn" title="Reset view to current filter bounds">
+        <img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" alt="sniper">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+const map = L.map('map', { preferCanvas: true }).setView([3.0, 101.5], 6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+const markersLayer = L.layerGroup().addTo(map);
+
+function dotIcon(color){ return L.divIcon({className:'', html:`<div style="width:10px;height:10px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.25);"></div>`, iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-10]}); }
+const ICON_PENDING = dotIcon('#1F4E79'); 
+const ICON_DONE = dotIcon('#66ff00');
+const ICON_PHASE1 = dotIcon('#A020F0');
+
+let allRows = [], visibleMarkers = {}, pinnedMarker = null;
+let uniqueBatches = new Set();
+let batchMap = new Map();
+
+function normalizeKey(k){ return (k||'').toString().trim().toLowerCase().replace(/\s+/g,'_'); }
+function isDoneStatus(s){
+  if(!s) return false;
+  s = s.toString().toLowerCase();
+  return /on\s*-?\s*air|onair|done|live|activated|active|\bon\b/.test(s);
+}
+
+function levenshtein(a,b){
+  a = a||''; b = b||'';
+  const m = a.length, n = b.length;
+  if(m===0) return n;
+  if(n===0) return m;
+  const dp = Array(n+1).fill(0).map((_,i)=>i);
+  for(let i=1;i<=m;i++){
+    let prev = dp[0];
+    dp[0] = i;
+    for(let j=1;j<=n;j++){
+      const temp = dp[j];
+      const cost = a[i-1] === b[j-1] ? 0 : 1;
+      dp[j] = Math.min(dp[j] + 1, dp[j-1] + 1, prev + cost);
+      prev = temp;
+    }
+  }
+  return dp[n];
+}
+
+function normForSearch(s){
+  if(!s) return '';
+  return s.toString().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
+}
+
+function fuzzyFindInRows(term, rows){
+  term = term || '';
+  const tNorm = normForSearch(term);
+  if(!tNorm) return null;
+  let exact = rows.find(r => (r.enodeb_id && r.enodeb_id.toString().trim() === term));
+  if(exact) return { row: exact, score: 0, type: 'exact-id' };
+  exact = rows.find(r => (r.site_name && normForSearch(r.site_name) === tNorm) || (r.enodeb_name && normForSearch(r.enodeb_name) === tNorm));
+  if(exact) return { row: exact, score: 0, type: 'exact-name' };
+  const substringMatches = rows.filter(r =>(r.enodeb_id && r.enodeb_id.toString().toLowerCase().includes(term.toLowerCase()))
+    || (r.site_name && r.site_name.toString().toLowerCase().includes(term.toLowerCase()))
+    || (r.enodeb_name && r.enodeb_name.toString().toLowerCase().includes(term.toLowerCase())));
+  if(substringMatches.length === 1) return { row: substringMatches[0], score: 1, type: 'substring' };
+  if(substringMatches.length > 1) {
+    substringMatches.sort((a,b) => ( (a.site_name||a.enodeb_name||'').length - (b.site_name||b.enodeb_name||'').length ));
+    return { row: substringMatches[0], score: 2, type: 'substring-multiple' };
+  }
+  let best = null;
+  for(const r of rows){
+    const candidates = [normForSearch(r.site_name || ''), normForSearch(r.enodeb_name || ''), normForSearch(r.enodeb_id || '')];
+    for(const c of candidates){
+      if(!c) continue;
+      const dist = levenshtein(tNorm, c);
+      const maxAllowed = Math.max(1, Math.floor(Math.min(3, c.length * 0.2)));
+      if(dist <= maxAllowed){
+        if(!best || dist < best.score) best = { row: r, score: dist, type: 'fuzzy' };
+      }
+    }
+  }
+  return best;
+}
+
+function animateValue(id, start, end, total) {
+  const obj = document.getElementById(id);
+  if(!obj) return;
+  let startTimestamp = null;
+  const duration = 500;
+  const step = (timestamp) => {
+    if (!startTimestamp) startTimestamp = timestamp;
+    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+    const current = Math.floor(progress * (end - start) + start);
+    obj.textContent = total !== undefined ? `${current} / ${total}` : current;
+    if (progress < 1) window.requestAnimationFrame(step);
+  };
+  window.requestAnimationFrame(step);
+}
+
+function updateFilterDropdown() {
+  const select = document.getElementById('viewSelect');
+  const currentValue = select.value;
+  select.innerHTML = '<option value="all">All Sites</option>';
+  Array.from(uniqueBatches).filter(batch => batch && batch.trim() !== '').sort().forEach(batch => {
+    const option = document.createElement('option');
+    option.value = batch.toLowerCase().replace(/\s+/g, '_');
+    option.textContent = batch;
+    select.appendChild(option);
+    batchMap.set(option.value, batch);
+  });
+  if (currentValue) {
+    const optionExists = Array.from(select.options).some(opt => opt.value === currentValue);
+    if (optionExists) select.value = currentValue;
+  }
+}
+
+function loadCsvText(text){
+  const parsed = Papa.parse(text,{header:true, skipEmptyLines:true});
+  if(!parsed || !parsed.data) return;
+  allRows = [];
+  uniqueBatches = new Set();
+  batchMap = new Map();
+  parsed.data.forEach((r,i)=>{
+    const norm = {};
+    for(const key in r) norm[normalizeKey(key)] = r[key];
+    const enodeb_id = (norm['enodeb_id'] ?? norm['enodeb id'] ?? norm['enodeb'] ?? '') + '';
+    const site_name = (norm['site_name'] ?? norm['site name'] ?? '') + '';
+    const swap_batch = (norm['swap_batch'] ?? norm['swap batch'] ?? '') + '';
+    const status = (norm['status'] ?? '') + '';
+    const lat = parseFloat((norm['latitude'] ?? norm['lat'] ?? '').toString().replace(/,/g,'.'));
+    const lon = parseFloat((norm['longitude'] ?? norm['lon'] ?? norm['lng'] ?? '').toString().replace(/,/g,'.'));
+    let on_air_date = norm['on-air_date'] || norm['on_air_date'] || norm['on_air'] || '';
+    const row = {
+      _rowIndex: i, enodeb_id, enodeb_name: site_name, site_name, swap_batch, status, on_air_date,
+      lat: Number.isFinite(lat) ? lat : NaN, lon: Number.isFinite(lon) ? lon : NaN,
+      normalized_batch: (swap_batch || '').toLowerCase().replace(/\s+/g, '_')
+    };
+    allRows.push(row);
+    if (swap_batch && swap_batch.trim() !== '') uniqueBatches.add(swap_batch.trim());
+  });
+  updateFilterDropdown();
+  render();
+}
+
+function render(){
+  markersLayer.clearLayers();
+  visibleMarkers = {};
+  const view = document.getElementById('viewSelect').value;
+  let rows = allRows.slice();
+  
+  if(view === 'all') {
+    rows = allRows.filter(r => {
+      const b = r.normalized_batch;
+      return !(b === 'blocked' || b === '24g_only' || b === 'imacro');
+    });
+  } else if(view !== '') {
+    rows = allRows.filter(r => r.normalized_batch === view);
+  }
+
+  let doneCount = 0, pendingCount = 0, countableTotal = 0;
+  const bounds = [];
+
+  rows.forEach(r=>{
+    if(!Number.isFinite(r.lat) || !Number.isFinite(r.lon)) return;
+    const done = isDoneStatus(r.status);
+    const isPhase1 = (r.normalized_batch === 'phase_1' || r.normalized_batch === 'phase1');
+    
+    // Stats Logic: Exclude Phase 1 from the numbers
+    if(!isPhase1) {
+      if(done) doneCount++; else pendingCount++;
+      countableTotal++;
+    }
+
+    // Icon Logic: Phase 1 is always Purple
+    const icon = isPhase1 ? ICON_PHASE1 : (done ? ICON_DONE : ICON_PENDING);
+
+    const popupHtml = `<div style="min-width:240px">
+      <strong>${escapeHtml(r.enodeb_name)}</strong><br/>
+      <em>Site Name:</em> ${escapeHtml(r.site_name)}<br/>
+      <em>eNodeB ID:</em> ${escapeHtml(r.enodeb_id)}<br/>
+      <em style="${isPhase1 ? 'color:var(--phase1);font-weight:bold;' : ''}">Swap Batch: ${escapeHtml(r.swap_batch)}</em><br/>
+      <em>Status:</em> ${escapeHtml(r.status)}<br/>
+      <em>On-Air Date:</em> ${escapeHtml(r.on_air_date || '—')}
+    </div>`;
+
+    const m = L.marker([r.lat, r.lon], { icon });
+    m.bindPopup(popupHtml, { autoClose:false, closeOnClick:false });
+    m.on('mouseover', () => { 
+      if(pinnedMarker && pinnedMarker !== m) pinnedMarker.closePopup();
+      m.openPopup(); 
+      document.getElementById('details').innerHTML = popupHtml; 
+    });
+    m.on('click', () => { 
+      pinnedMarker = m; m.openPopup(); 
+      document.getElementById('details').innerHTML = popupHtml;
+      map.setView(m.getLatLng(), 16);
+    });
+
+    m.addTo(markersLayer);
+    const key = (r.enodeb_id || ('row' + r._rowIndex)).toString();
+    visibleMarkers[key] = m;
+    bounds.push([r.lat, r.lon]);
+  });
+
+  animateValue('doneTotal', 0, doneCount, countableTotal);
+  animateValue('pendingCount', 0, pendingCount);
+  document.getElementById('donePct').textContent = countableTotal ? (Math.round(doneCount/countableTotal*10000)/100) + '%' : '0%';
+  document.getElementById('totalCount').textContent = `Total: ${countableTotal}`;
+
+  if(bounds.length){
+    const b = L.latLngBounds(bounds);
+    if(b.isValid()) map.fitBounds(b.pad(0.2));
+  }
+}
+
+// Legend Color Picker logic (for Done/Pending only)
+const statusColors = {
+  done: getComputedStyle(document.documentElement).getPropertyValue('--done').trim(),
+  pending: getComputedStyle(document.documentElement).getPropertyValue('--pending').trim()
+};
+
+document.querySelectorAll('.legend .sw').forEach((el, idx) => {
+  if(idx === 2) return; // Skip Phase 1 (fixed color)
+  const status = idx === 0 ? 'done' : 'pending';
+  el.addEventListener('click', async () => {
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.value = statusColors[status].startsWith('#') ? statusColors[status] : '#66ff00';
+    input.click();
+    input.onchange = () => {
+      statusColors[status] = input.value;
+      el.style.background = input.value;
+      for(const key in visibleMarkers){
+        const m = visibleMarkers[key];
+        const row = allRows.find(r => (r.enodeb_id || ('row'+r._rowIndex)).toString() === key);
+        if(!row || (row.normalized_batch === 'phase_1' || row.normalized_batch === 'phase1')) continue;
+        if ((status === 'done' && isDoneStatus(row.status)) || (status === 'pending' && !isDoneStatus(row.status))){
+          m.setIcon(dotIcon(input.value));
+        }
+      }
+    };
+  });
+});
+
+function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function searchAndZoom(term){
+  if(!term) return;
+  const result = fuzzyFindInRows(term, allRows);
+  if(result && result.row){
+    const found = result.row;
+    map.setView([found.lat, found.lon], 16);
+    const key = (found.enodeb_id || ('row' + found._rowIndex)).toString();
+    if(visibleMarkers[key]) visibleMarkers[key].openPopup();
+  }
+}
+
+document.getElementById('viewSelect').addEventListener('change', render);
+document.getElementById('searchBtn').addEventListener('click', ()=> searchAndZoom(document.getElementById('searchInput').value));
+document.getElementById('searchInput').addEventListener('keydown', e => { if(e.key==='Enter') searchAndZoom(e.target.value); });
+document.getElementById('sniperBtn').addEventListener('click',()=>render());
+
+const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=232255476&single=true&output=csv';
+
+async function smartFetchCsv() {
+  try {
+    const response = await fetch(SHEET_CSV_URL);
+    const text = await response.text();
+    loadCsvText(text);
+  } catch (err) { console.error('Error:', err); }
+}
+
+window.addEventListener('load', ()=>{ 
+  smartFetchCsv(); 
+  setInterval(smartFetchCsv, 30000); 
+  setTimeout(()=>map.invalidateSize(),300); 
+});
+
+</script>
+</body>
+</html>
