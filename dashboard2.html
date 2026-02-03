@@ -59,7 +59,9 @@
       <div class="row legend small">
         <span class="sw" style="background:var(--done)"></span>Done
         <span class="sw" style="background:var(--pending)"></span>Pending
-        <span id="phase1Legend" style="display:none; margin-left:10px;"><span class="sw" style="background:var(--phase1)"></span>Phase 1</span>
+        <span id="phase1Legend" style="display:none; margin-left:10px;">
+        <span id="phase1Swatch" class="sw" style="background:var(--phase1); cursor:pointer;"></span>Phase 1
+        </span>
       </div>
       <hr style="border:none;border-top:1px solid #eee;margin:12px 0;"/>
       <div class="row"><input id="searchInput" type="text" placeholder="Search eNodeB ID / Site name"/><button id="searchBtn" class="btn">Find</button></div>
@@ -309,13 +311,19 @@ function render(){
 }
 
 // Updated Color Picker for CircleMarkers
-const statusColors = { done: '#66ff00', pending: '#1F4E79' };
-document.querySelectorAll('.legend .sw').forEach((el, idx) => {
-  if(idx > 1) return;
-  const status = idx === 0 ? 'done' : 'pending';
+const statusColors = { done: '#66ff00', pending: '#1F4E79', phase1: '#A020F0' };
+// Updated Color Picker for all 3 categories
+document.querySelectorAll('.legend .sw').forEach((el) => {
   el.addEventListener('click', async () => {
+    // Determine status based on the ID or order
+    let status;
+    if (el.id === 'phase1Swatch') status = 'phase1';
+    else if (el.style.background.includes('done') || el.style.background.includes('66ff00')) status = 'done';
+    else status = 'pending';
+
     const newColor = await pickColor(statusColors[status]);
     if (!newColor) return;
+
     statusColors[status] = newColor;
     el.style.background = newColor;
     updateMarkerColors(status, newColor);
@@ -344,11 +352,21 @@ function updateMarkerColors(status, color){
     const m = visibleMarkers[key];
     const row = allRows.find(r => (r.enodeb_id || ('row'+r._rowIndex)).toString() === key);
     if(!row) continue;
+
     const isPhase1 = (row.normalized_batch === 'phase_1' || row.normalized_batch === 'phase1');
-    if (isPhase1 && document.getElementById('viewSelect').value === 'all') continue;
-    const done = isDoneStatus(row.status);
-    if ((status === 'done' && done) || (status === 'pending' && !done)){
-      m.setStyle({fillColor: color}); // CircleMarker uses setStyle
+    const view = document.getElementById('viewSelect').value;
+
+    if (status === 'phase1' && isPhase1 && view === 'all') {
+      m.setStyle({fillColor: color});
+    } 
+    else if (status === 'done' || status === 'pending') {
+      // Don't change Phase 1 markers if we are in 'All' view and clicking Done/Pending
+      if (isPhase1 && view === 'all') continue; 
+      
+      const done = isDoneStatus(row.status);
+      if ((status === 'done' && done) || (status === 'pending' && !done)){
+        m.setStyle({fillColor: color});
+      }
     }
   }
 }
