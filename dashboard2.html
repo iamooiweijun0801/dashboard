@@ -137,7 +137,7 @@
   <div class="panel" style="padding:0;">
     <div id="map">
       
-      <div id="measureBtn" class="map-btn" title="Ruler Tool (Distance)">
+      <div id="measureBtn" class="map-btn" title="Ruler Tool">
         <img src="https://cdn-icons-png.flaticon.com/512/5594/5594876.png" alt="Ruler">
       </div>
 
@@ -195,7 +195,7 @@ function setMapStyle(styleKey) {
 const savedStyle = localStorage.getItem('siteMap_style') || 'osm';
 setMapStyle(savedStyle);
 
-// --- 2. RULER TOOL LOGIC (Updated) ---
+// --- 2. RULER TOOL LOGIC (Fix: Event Propagation) ---
 let isMeasuring = false;
 let measurePoints = [];
 let measureMarkers = [];
@@ -204,7 +204,11 @@ let measureTooltip = null;
 
 const measureBtn = document.getElementById('measureBtn');
 
-measureBtn.addEventListener('click', toggleMeasureTool);
+// FIX: Added 'e' and 'e.stopPropagation()' to stop button click hitting map
+measureBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevents click from bubbling to map
+    toggleMeasureTool();
+});
 
 function toggleMeasureTool() {
     isMeasuring = !isMeasuring;
@@ -318,8 +322,7 @@ function finalizeMeasurement(endLatLng) {
     
     document.getElementById('details').innerHTML = "<strong>Measurement Complete.</strong> Right-click or press Ruler icon to clear.";
     
-    // We keep isMeasuring = true (visually) so the button stays blue until they cancel
-    // But we removed the click listener so they can't add a 3rd point.
+    // Keep isMeasuring visual state true, so button stays blue, but logic is done.
 }
 
 
