@@ -512,18 +512,37 @@ document.getElementById('sniperBtn').addEventListener('click',()=>render());
   
 window.addEventListener('load', ()=>{ fetchFullList(); setTimeout(()=>map.invalidateSize(),300); });
 
+// ... existing code above ...
+
 let lastCsvText = null;
-const REFRESH_INTERVAL_MS = 0.5 * 60 * 1000;
+const REFRESH_INTERVAL_MS = 30 * 1000; // Check every 30 seconds
+
 async function smartFetchCsv() {
   try {
-    const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=232255476&single=true&output=csv';
-    const response = await fetch(SHEET_CSV_URL);
+    // We add '&_t=' + Date.now() to FORCE the browser to ignore cache and get a fresh file
+    const BASE_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=232255476&single=true&output=csv';
+    const uniqueUrl = BASE_URL + '&_t=' + Date.now();
+
+    const response = await fetch(uniqueUrl);
     if (!response.ok) throw new Error('Network response not ok');
+    
     const csvText = await response.text();
-    if (csvText !== lastCsvText) { lastCsvText = csvText; loadCsvText(csvText); }
+    
+    // Only reload if data actually changed
+    if (csvText !== lastCsvText) { 
+      console.log("New data detected! Refreshing map...");
+      lastCsvText = csvText; 
+      loadCsvText(csvText); 
+    } else {
+      console.log("Data checked, but no changes found.");
+    }
   } catch (err) { console.error('Error fetching CSV:', err); }
 }
+
+// Initial load
 smartFetchCsv();
+
+// Auto-refresh loop
 setInterval(smartFetchCsv, REFRESH_INTERVAL_MS);
 </script>
 </body>
