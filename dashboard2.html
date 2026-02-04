@@ -9,7 +9,7 @@
   gtag('config', 'G-XBHVRKLJCD');
 </script>
 <meta charset="utf-8" />
-<title>Interactive Sites Map — Dynamic Filter</title>
+<title>Interactive Sites Map — Animated</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
@@ -33,7 +33,7 @@
   .btn{ padding:10px 16px; border-radius:var(--radius); border:none; font-weight:600; cursor:pointer; color:#fff; background: linear-gradient(135deg,var(--accent),#1e5fc1); transition:0.3s; box-shadow:0 4px 12px rgba(0,0,0,0.2); }
   .stat{ background:rgba(255,255,255,0.85); flex:1; padding:12px; border-radius:var(--radius); box-shadow:0 4px 12px rgba(0,0,0,0.08); text-align:center; }
   .stat .small{ font-weight:500; color:#555; margin-bottom:4px; }
-  .stat div[id]{ font-weight:700; font-size:20px; margin-top:4px; }
+  .stat .big-num { font-weight:700; font-size:24px; margin-top:4px; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; color:#111; }
   
   /* Legend Styles */
   .legend .sw { 
@@ -65,8 +65,16 @@
         <select id="viewSelect"><option value="all">All Sites</option></select>
       </div>
       <div class="row">
-        <div class="stat"><div class="small">Done / Total</div><div id="doneTotal">0 / 0</div><div class="small" id="donePct">0%</div></div>
-        <div class="stat"><div class="small">Pending</div><div id="pendingCount">0</div><div class="small" id="totalCount">Total: 0</div></div>
+        <div class="stat">
+          <div class="small">Done</div>
+          <div class="big-num"><span id="animDone">0</span> <span style="font-size:14px; color:#777; font-weight:400;">/ <span id="animTotal">0</span></span></div>
+          <div class="small" id="donePct">0%</div>
+        </div>
+        <div class="stat">
+          <div class="small">Pending</div>
+          <div id="animPending" class="big-num">0</div>
+          <div class="small" id="totalCountLabel">Total: 0</div>
+        </div>
       </div>
       
       <div class="row legend small">
@@ -114,7 +122,44 @@ let batchMap = new Map();
 
 // --- 2. HELPER FUNCTIONS ---
 function normalizeKey(k){ return (k||'').toString().trim().toLowerCase().replace(/\s+/g,'_'); }
-function isDoneStatus(s){ return /on\s*-?\s*air|onair|done|live|activated|active|\bon\b/i.test(s); }
+
+// Tightened Regex for status (avoids "Not On Air")
+function isDoneStatus(s){ 
+  return /^(on\s*-?\s*air|onair|done|live|activated|active)$|(\bon\b)/i.test(s) && !/not\s+on/i.test(s); 
+}
+
+// --- NEW ANIMATION FUNCTION ---
+function runCounterAnimation(elementId, endValue) {
+  const obj = document.getElementById(elementId);
+  if (!obj) return;
+  
+  // Get current value to start from, or default to 0
+  const startValue = parseInt(obj.textContent.replace(/,/g, '')) || 0;
+  
+  // If values are the same, do nothing
+  if (startValue === endValue) return;
+
+  const duration = 1500; // Animation duration in ms
+  const startTime = performance.now();
+
+  function update(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    
+    // Easing function (easeOutExpo) for that "flipping scoreboard" slow-down feel
+    const ease = (progress === 1) ? 1 : 1 - Math.pow(2, -10 * progress);
+    
+    const current = Math.floor(startValue + (endValue - startValue) * ease);
+    obj.textContent = current.toLocaleString(); // Add commas for thousands
+
+    if (progress < 1) {
+      requestAnimationFrame(update);
+    } else {
+      obj.textContent = endValue.toLocaleString(); // Ensure final value is exact
+    }
+  }
+  requestAnimationFrame(update);
+}
 
 function levenshtein(a,b){
   a = a||''; b = b||'';
@@ -167,12 +212,6 @@ function fuzzyFindInRows(term, rows){
     }
   }
   return best;
-}
-
-function animateValue(id, start, end, total) {
-  const obj = document.getElementById(id);
-  if(!obj) return;
-  obj.textContent = total ? `${end} / ${total}` : end;
 }
 
 function updateFilterDropdown() {
@@ -237,7 +276,6 @@ function render(){
   visibleMarkers = {};
   const view = document.getElementById('viewSelect').value;
   
-  // Save preference whenever we render/change view
   localStorage.setItem('siteMap_prefView', view);
 
   let rows = allRows.slice();
@@ -260,13 +298,12 @@ function render(){
     let color, displayStatus;
     
     // Logic: Phase 1 & Colors
-    // IMPORTANT: Use statusColors variable, NOT constants
     if (isPhase1 && view === 'all') {
       color = statusColors.phase1; 
       displayStatus = "Done"; 
     } 
     else if (isPhase1 && view === 'phase_1') {
-      color = statusColors.done; // Logic: In Phase 1 view, they act as 'Done'
+      color = statusColors.done;
       displayStatus = "Done";
       doneCount++; countableTotal++;
     } 
@@ -324,10 +361,13 @@ function render(){
   const p1Leg = document.getElementById('phase1Legend');
   if (p1Leg) p1Leg.style.display = (view === 'all' && hasPhase1) ? 'inline-block' : 'none';
 
-  animateValue('doneTotal', 0, doneCount, countableTotal);
-  animateValue('pendingCount', 0, pendingCount);
+  // --- TRIGGER ANIMATIONS ---
+  runCounterAnimation('animDone', doneCount);
+  runCounterAnimation('animTotal', countableTotal);
+  runCounterAnimation('animPending', pendingCount);
+  
   document.getElementById('donePct').textContent = countableTotal ? (Math.round(doneCount/countableTotal*10000)/100) + '%' : '0%';
-  document.getElementById('totalCount').textContent = `Total: ${countableTotal}`;
+  document.getElementById('totalCountLabel').textContent = `Total: ${countableTotal}`;
 
   if(bounds.length){
     const b = L.latLngBounds(bounds);
@@ -335,16 +375,38 @@ function render(){
   }
 }
 
-// --- 4. COLOR PICKER LOGIC ---
-function pickColor(current) {
-  return new Promise(resolve => {
-    const input = document.createElement('input'); input.type = 'color'; input.value = rgbToHex(current);
-    input.style.position = 'fixed'; input.style.left = '-9999px'; document.body.appendChild(input);
-    input.click();
-    input.addEventListener('input', () => resolve(input.value));
-    input.addEventListener('change', () => { resolve(input.value); document.body.removeChild(input); });
-    input.addEventListener('blur', () => { resolve(null); document.body.removeChild(input); });
-  });
+// --- 4. IMPROVED COLOR PICKER LOGIC ---
+// This uses a direct callback approach instead of Promises to handle continuous "input" events.
+function openColorPicker(initialColor, onInput, onChange) {
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.value = rgbToHex(initialColor);
+    
+    // Hide it but make it part of DOM
+    input.style.position = 'fixed'; 
+    input.style.left = '-9999px'; 
+    document.body.appendChild(input);
+
+    input.click(); // Open system dialog
+
+    // Event 1: Dragging the color (Real-time update)
+    input.addEventListener('input', (e) => {
+        onInput(e.target.value);
+    });
+
+    // Event 2: Closing the picker (Final save)
+    input.addEventListener('change', (e) => {
+        onChange(e.target.value);
+        document.body.removeChild(input);
+    });
+
+    // Cleanup if cancelled (blur often implies cancel/close in some browsers)
+    input.addEventListener('blur', () => {
+        // Short delay to ensure change didn't fire first
+        setTimeout(() => {
+            if(document.body.contains(input)) document.body.removeChild(input);
+        }, 500);
+    });
 }
 
 function rgbToHex(rgb){
@@ -357,28 +419,32 @@ function rgbToHex(rgb){
 }
 
 // Generic handler for color changes
-async function handleColorChange(key) {
-    const el = document.getElementById(key === 'done' ? 'swatchDone' : key === 'pending' ? 'swatchPending' : 'swatchPhase1');
-    const newColor = await pickColor(statusColors[key]);
-    if (!newColor) return;
-
-    // Update State
-    statusColors[key] = newColor;
+function initiateColorChange(key) {
+    const swatchId = key === 'done' ? 'swatchDone' : key === 'pending' ? 'swatchPending' : 'swatchPhase1';
+    const el = document.getElementById(swatchId);
     
-    // Save to LocalStorage
-    localStorage.setItem('siteMap_colors', JSON.stringify(statusColors));
-    
-    // Update UI
-    updateLegendUI();
-    
-    // Update Markers
-    updateMarkerColors(key, newColor);
+    openColorPicker(
+        statusColors[key], 
+        // Callback 1: Real-time update (Input)
+        (newColor) => {
+            el.style.background = newColor;
+            statusColors[key] = newColor; // Temporarily update memory so updateMarkerColors reads it
+            updateMarkerColors(key, newColor);
+        },
+        // Callback 2: Final save (Change)
+        (finalColor) => {
+            el.style.background = finalColor;
+            statusColors[key] = finalColor;
+            localStorage.setItem('siteMap_colors', JSON.stringify(statusColors));
+            updateMarkerColors(key, finalColor);
+        }
+    );
 }
 
 // Attach listeners
-document.getElementById('swatchDone').addEventListener('click', () => handleColorChange('done'));
-document.getElementById('swatchPending').addEventListener('click', () => handleColorChange('pending'));
-document.getElementById('swatchPhase1').addEventListener('click', () => handleColorChange('phase1'));
+document.getElementById('swatchDone').addEventListener('click', () => initiateColorChange('done'));
+document.getElementById('swatchPending').addEventListener('click', () => initiateColorChange('pending'));
+document.getElementById('swatchPhase1').addEventListener('click', () => initiateColorChange('phase1'));
 
 function updateMarkerColors(statusKey, color){
   for(const key in visibleMarkers){
@@ -389,22 +455,21 @@ function updateMarkerColors(statusKey, color){
     const isPhase1 = (row.normalized_batch === 'phase_1' || row.normalized_batch === 'phase1');
     const view = document.getElementById('viewSelect').value;
 
-    // Logic must match render() logic
     let shouldUpdate = false;
     
-    if (statusKey === 'phase1' && isPhase1 && view === 'all') {
-      shouldUpdate = true;
+    // Strict logic to ensure we don't color "Pending" items when changing "Done"
+    if (statusKey === 'phase1') {
+        if (isPhase1 && view === 'all') shouldUpdate = true;
     } 
-    else if (statusKey === 'done' || statusKey === 'pending') {
-      if (isPhase1 && view === 'all') {
-         // In 'all' view, phase 1 items stay phase 1 color, they don't change with done/pending clicks
-         shouldUpdate = false; 
-      } else {
-        const done = isDoneStatus(row.status);
-        if ((statusKey === 'done' && done) || (statusKey === 'pending' && !done)) {
-           shouldUpdate = true;
-        }
-      }
+    else if (statusKey === 'done') {
+        // Only update if it is NOT Phase 1 (in All view) AND it IS actually Done
+        if (isPhase1 && view === 'all') { shouldUpdate = false; }
+        else if (isDoneStatus(row.status)) { shouldUpdate = true; }
+    }
+    else if (statusKey === 'pending') {
+        // Only update if it is NOT Phase 1 (in All view) AND it IS actually Pending
+        if (isPhase1 && view === 'all') { shouldUpdate = false; }
+        else if (!isDoneStatus(row.status)) { shouldUpdate = true; }
     }
     
     if(shouldUpdate) m.setStyle({fillColor: color});
