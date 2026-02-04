@@ -73,8 +73,7 @@
   /* Stacking Order */
   #sniperBtn { bottom:20px; }
   #settingsBtn { bottom:76px; }
-  #measureBtn { bottom:132px; }
-  #gpsBtn { bottom:188px; }
+  #measureBtn { bottom:132px; } 
 
   /* Settings Menu */
   #settingsMenu {
@@ -138,10 +137,6 @@
   <div class="panel" style="padding:0;">
     <div id="map">
       
-      <div id="gpsBtn" class="map-btn" title="Locate Me">
-        <img src="https://cdn-icons-png.flaticon.com/512/1201/1201552.png" alt="GPS">
-      </div>
-
       <div id="measureBtn" class="map-btn" title="Ruler Tool (Distance)">
         <img src="https://cdn-icons-png.flaticon.com/512/5594/5594876.png" alt="Ruler">
       </div>
@@ -172,13 +167,12 @@
 // --- 1. MAP INITIALIZATION & STYLES ---
 const map = L.map('map', { preferCanvas: true }).setView([3.0, 101.5], 11);
 
-// Tile Layer Definitions (Updated Terrain)
+// Tile Layer Definitions
 const tileProviders = {
     osm: { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '&copy; OpenStreetMap' },
     satellite: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr: '&copy; Esri' },
     dark: { url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', attr: '&copy; CartoDB' },
     light: { url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', attr: '&copy; CartoDB' },
-    // CHANGED: Switched to Esri World Topo for reliable terrain/physical view
     topo: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', attr: '&copy; Esri' }
 };
 
@@ -201,19 +195,7 @@ function setMapStyle(styleKey) {
 const savedStyle = localStorage.getItem('siteMap_style') || 'osm';
 setMapStyle(savedStyle);
 
-// --- 2. TOOL LOGIC (MEASURE & GPS) ---
-
-// GPS Tool
-document.getElementById('gpsBtn').addEventListener('click', () => {
-    map.locate({setView: true, maxZoom: 15});
-});
-map.on('locationfound', (e) => {
-    L.circleMarker(e.latlng, { radius: 8, color: '#2F80ED', fillColor: '#2F80ED', fillOpacity: 0.3 }).addTo(map).bindPopup("You are here").openPopup();
-    L.circleMarker(e.latlng, { radius: 4, color: '#fff', fillColor: '#2F80ED', fillOpacity: 1 }).addTo(map);
-});
-map.on('locationerror', () => alert("Could not access location. Please enable GPS permissions."));
-
-// Ruler Tool Logic
+// --- 2. RULER TOOL LOGIC (Updated) ---
 let isMeasuring = false;
 let measurePoints = [];
 let measureMarkers = [];
@@ -226,15 +208,18 @@ measureBtn.addEventListener('click', toggleMeasureTool);
 
 function toggleMeasureTool() {
     isMeasuring = !isMeasuring;
-    const mapDiv = document.getElementById('map');
     
     if (isMeasuring) {
+        // Activate Tool
         measureBtn.classList.add('active');
-        mapDiv.classList.add('crosshair-cursor');
-        document.getElementById('details').innerHTML = "<strong>Ruler Active:</strong> Click on the map to start measuring distance.";
+        document.getElementById('map').classList.add('crosshair-cursor');
+        document.getElementById('details').innerHTML = "<strong>Ruler Active:</strong> Click map to set START point. (Right-click to cancel)";
+        
+        // Add Listeners
         map.on('click', onMeasureClick);
-        map.on('mousemove', onMeasureMove);
+        map.on('contextmenu', clearMeasurement); // Right click to clear
     } else {
+        // Deactivate Tool
         clearMeasurement();
     }
 }
@@ -250,79 +235,91 @@ function clearMeasurement() {
     if (measureLine) map.removeLayer(measureLine);
     if (measureTooltip) map.removeLayer(measureTooltip);
     
+    // Reset Data
     measurePoints = [];
     measureMarkers = [];
     measureLine = null;
     measureTooltip = null;
     
+    // Remove Listeners
     map.off('click', onMeasureClick);
     map.off('mousemove', onMeasureMove);
+    map.off('contextmenu', clearMeasurement);
 }
 
 function onMeasureClick(e) {
     const latlng = e.latlng;
-    measurePoints.push(latlng);
-
-    // Add Dot Marker
-    const dot = L.circleMarker(latlng, {
-        radius: 4, color: '#333', fillColor: '#fff', fillOpacity: 1, weight: 2
-    }).addTo(map);
-    measureMarkers.push(dot);
-
-    if (measurePoints.length === 2) {
-        // Finish Measurement
-        finalizeMeasurement();
+    
+    if (measurePoints.length === 0) {
+        // --- CLICK 1: START POINT ---
+        measurePoints.push(latlng);
+        
+        // Start Marker
+        const dot = L.circleMarker(latlng, {
+            radius: 5, color: '#333', fillColor: '#fff', fillOpacity: 1, weight: 2
+        }).addTo(map);
+        measureMarkers.push(dot);
+        
+        // Listen for mousemove to draw dashed line
+        map.on('mousemove', onMeasureMove);
+        document.getElementById('details').innerHTML = "<strong>Measuring...</strong> Click again to set END point.";
+        
+    } else if (measurePoints.length === 1) {
+        // --- CLICK 2: END POINT ---
+        measurePoints.push(latlng);
+        
+        // Finalize
+        finalizeMeasurement(latlng);
     }
 }
 
 function onMeasureMove(e) {
-    if (measurePoints.length !== 1) return; // Only draw preview if we have exactly 1 start point
+    if (measurePoints.length !== 1) return; 
     
     const start = measurePoints[0];
     const current = e.latlng;
     
-    // Draw/Update Preview Line
+    // Draw Preview Line
     if (measureLine) map.removeLayer(measureLine);
     measureLine = L.polyline([start, current], { color: 'black', dashArray: '5, 10', weight: 2 }).addTo(map);
     
-    // Calculate Distance
-    const distMeters = start.distanceTo(current);
+    // Update Tooltip
+    updateTooltip(start, current);
+}
+
+function updateTooltip(start, end) {
+    const distMeters = start.distanceTo(end);
     const distText = distMeters > 1000 ? (distMeters/1000).toFixed(2) + ' km' : Math.round(distMeters) + ' m';
     
-    // Draw/Update Tooltip
     if (measureTooltip) map.removeLayer(measureTooltip);
     measureTooltip = L.tooltip({
         permanent: true, direction: 'right', className: 'measure-tooltip', offset: [10, 0]
     })
-    .setLatLng(current)
+    .setLatLng(end)
     .setContent(distText)
     .addTo(map);
 }
 
-function finalizeMeasurement() {
-    // Stop listening to moves
+function finalizeMeasurement(endLatLng) {
+    // End Marker
+    const dot = L.circleMarker(endLatLng, {
+        radius: 5, color: '#333', fillColor: '#fff', fillOpacity: 1, weight: 2
+    }).addTo(map);
+    measureMarkers.push(dot);
+
+    // Stop line movement
     map.off('mousemove', onMeasureMove);
-    map.off('click', onMeasureClick);
+    map.off('click', onMeasureClick); // Stop listening for clicks
     
-    // Solidify line
+    // Solidify Line
     if (measureLine) {
         measureLine.setStyle({ dashArray: null, weight: 3, color: '#2F80ED' });
     }
     
-    // Reset state but keep drawings until user clicks button again
-    isMeasuring = false;
-    measureBtn.classList.remove('active'); // Visually untoggle button
-    document.getElementById('map').classList.remove('crosshair-cursor');
+    document.getElementById('details').innerHTML = "<strong>Measurement Complete.</strong> Right-click or press Ruler icon to clear.";
     
-    // Allow clearing by clicking the button again (logic handled in toggleMeasureTool check)
-    // We set a flag or just let toggleMeasureTool handle the reset on next click
-    // For now, we manually re-add the 'active' class to button to indicate "Result Shown" if desired,
-    // or just leave it off. Let's leave it off but keep data on map.
-    // Next click on Ruler will trigger 'clearMeasurement' because logic starts fresh.
-    isMeasuring = true; // Hack: keep it "true" so next click clears it
-    measureBtn.classList.add('active'); 
-    // But disable map clicks
-    map.off('click', onMeasureClick); 
+    // We keep isMeasuring = true (visually) so the button stays blue until they cancel
+    // But we removed the click listener so they can't add a 3rd point.
 }
 
 
