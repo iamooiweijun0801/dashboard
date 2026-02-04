@@ -9,7 +9,7 @@
   gtag('config', 'G-XBHVRKLJCD');
 </script>
 <meta charset="utf-8" />
-<title>Interactive Sites Map — Pro</title>
+<title>Interactive Sites Map — Ultimate</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
@@ -25,6 +25,10 @@
   .app{ display:grid; grid-template-columns:380px 1fr; gap:16px; height:100vh; padding:16px; box-sizing:border-box; }
   .panel{ background:var(--card); backdrop-filter: blur(12px); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); display:flex; flex-direction:column; overflow:auto; border:1px solid rgba(255,255,255,0.3); }
   #map{ height:100%; border-radius:var(--radius); box-shadow:var(--shadow); border:2px solid rgba(255,255,255,0.3); position:relative; }
+  
+  /* Cursors for tools */
+  .crosshair-cursor { cursor: crosshair !important; }
+
   h2{ margin-bottom:12px; font-weight:700; font-size:1.4em; color:#1a1a1a; }
   label{ font-weight:600; color:#333; }
   .controls{ display:flex; flex-direction:column; gap:12px; }
@@ -58,12 +62,19 @@
     width:44px; height:44px; border-radius:50%;
     background:white; display:flex; align-items:center; justify-content:center;
     cursor:pointer; border:2px solid #444; box-shadow:0 4px 10px rgba(0,0,0,0.3);
-    transition: transform 0.2s;
+    transition: transform 0.2s, background 0.2s;
   }
-  .map-btn:hover { transform: scale(1.05); }
+  .map-btn:hover { transform: scale(1.05); background:#f9f9f9; }
+  .map-btn.active { background: var(--accent); border-color:var(--accent); }
+  .map-btn.active img { filter: brightness(0) invert(1); } /* Make icon white */
+  
   .map-btn img { width:24px; height:24px; }
+  
+  /* Stacking Order */
   #sniperBtn { bottom:20px; }
-  #settingsBtn { bottom:76px; } /* Stacked above sniper button */
+  #settingsBtn { bottom:76px; }
+  #measureBtn { bottom:132px; }
+  #gpsBtn { bottom:188px; }
 
   /* Settings Menu */
   #settingsMenu {
@@ -80,6 +91,11 @@
   }
   .style-option:hover { background: #f0f4ff; color: var(--accent); }
   .style-option.active { background: var(--accent); color: white; }
+
+  /* Measure Tooltip */
+  .measure-tooltip {
+    background: rgba(0,0,0,0.8); color: #fff; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; white-space: nowrap; pointer-events: none;
+  }
 
   @media(max-width:950px){ .app{ grid-template-columns:1fr; grid-template-rows:320px 1fr; } }
 </style>
@@ -121,12 +137,23 @@
   </div>
   <div class="panel" style="padding:0;">
     <div id="map">
+      
+      <div id="gpsBtn" class="map-btn" title="Locate Me">
+        <img src="https://cdn-icons-png.flaticon.com/512/1201/1201552.png" alt="GPS">
+      </div>
+
+      <div id="measureBtn" class="map-btn" title="Ruler Tool (Distance)">
+        <img src="https://cdn-icons-png.flaticon.com/512/5594/5594876.png" alt="Ruler">
+      </div>
+
       <div id="settingsBtn" class="map-btn" title="Map Settings">
         <img src="https://cdn-icons-png.flaticon.com/512/3524/3524659.png" alt="Settings">
       </div>
+      
       <div id="sniperBtn" class="map-btn" title="Reset View">
         <img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" alt="Reset">
       </div>
+
       <div id="settingsMenu">
         <div class="style-option" data-style="osm">Standard</div>
         <div class="style-option" data-style="satellite">Satellite</div>
@@ -145,33 +172,26 @@
 // --- 1. MAP INITIALIZATION & STYLES ---
 const map = L.map('map', { preferCanvas: true }).setView([3.0, 101.5], 11);
 
-// Tile Layer Definitions
+// Tile Layer Definitions (Updated Terrain)
 const tileProviders = {
     osm: { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '&copy; OpenStreetMap' },
     satellite: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr: '&copy; Esri' },
     dark: { url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', attr: '&copy; CartoDB' },
     light: { url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', attr: '&copy; CartoDB' },
-    topo: { url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', attr: '&copy; OpenTopoMap' }
+    // CHANGED: Switched to Esri World Topo for reliable terrain/physical view
+    topo: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', attr: '&copy; Esri' }
 };
 
 let currentTileLayer = null;
 
 function setMapStyle(styleKey) {
     const provider = tileProviders[styleKey] || tileProviders.osm;
-    
-    // Remove old layer
     if (currentTileLayer) map.removeLayer(currentTileLayer);
-    
-    // Add new layer
     currentTileLayer = L.tileLayer(provider.url, { 
         maxZoom: 19, 
         attribution: provider.attr 
     }).addTo(map);
-
-    // Save to local storage
     localStorage.setItem('siteMap_style', styleKey);
-
-    // Update UI active state
     document.querySelectorAll('.style-option').forEach(el => {
         el.classList.toggle('active', el.dataset.style === styleKey);
     });
@@ -181,7 +201,132 @@ function setMapStyle(styleKey) {
 const savedStyle = localStorage.getItem('siteMap_style') || 'osm';
 setMapStyle(savedStyle);
 
-// --- 2. SETTINGS UI LOGIC ---
+// --- 2. TOOL LOGIC (MEASURE & GPS) ---
+
+// GPS Tool
+document.getElementById('gpsBtn').addEventListener('click', () => {
+    map.locate({setView: true, maxZoom: 15});
+});
+map.on('locationfound', (e) => {
+    L.circleMarker(e.latlng, { radius: 8, color: '#2F80ED', fillColor: '#2F80ED', fillOpacity: 0.3 }).addTo(map).bindPopup("You are here").openPopup();
+    L.circleMarker(e.latlng, { radius: 4, color: '#fff', fillColor: '#2F80ED', fillOpacity: 1 }).addTo(map);
+});
+map.on('locationerror', () => alert("Could not access location. Please enable GPS permissions."));
+
+// Ruler Tool Logic
+let isMeasuring = false;
+let measurePoints = [];
+let measureMarkers = [];
+let measureLine = null;
+let measureTooltip = null;
+
+const measureBtn = document.getElementById('measureBtn');
+
+measureBtn.addEventListener('click', toggleMeasureTool);
+
+function toggleMeasureTool() {
+    isMeasuring = !isMeasuring;
+    const mapDiv = document.getElementById('map');
+    
+    if (isMeasuring) {
+        measureBtn.classList.add('active');
+        mapDiv.classList.add('crosshair-cursor');
+        document.getElementById('details').innerHTML = "<strong>Ruler Active:</strong> Click on the map to start measuring distance.";
+        map.on('click', onMeasureClick);
+        map.on('mousemove', onMeasureMove);
+    } else {
+        clearMeasurement();
+    }
+}
+
+function clearMeasurement() {
+    isMeasuring = false;
+    measureBtn.classList.remove('active');
+    document.getElementById('map').classList.remove('crosshair-cursor');
+    document.getElementById('details').innerHTML = "Hover a marker or search to see details here.";
+    
+    // Cleanup Layers
+    measureMarkers.forEach(m => map.removeLayer(m));
+    if (measureLine) map.removeLayer(measureLine);
+    if (measureTooltip) map.removeLayer(measureTooltip);
+    
+    measurePoints = [];
+    measureMarkers = [];
+    measureLine = null;
+    measureTooltip = null;
+    
+    map.off('click', onMeasureClick);
+    map.off('mousemove', onMeasureMove);
+}
+
+function onMeasureClick(e) {
+    const latlng = e.latlng;
+    measurePoints.push(latlng);
+
+    // Add Dot Marker
+    const dot = L.circleMarker(latlng, {
+        radius: 4, color: '#333', fillColor: '#fff', fillOpacity: 1, weight: 2
+    }).addTo(map);
+    measureMarkers.push(dot);
+
+    if (measurePoints.length === 2) {
+        // Finish Measurement
+        finalizeMeasurement();
+    }
+}
+
+function onMeasureMove(e) {
+    if (measurePoints.length !== 1) return; // Only draw preview if we have exactly 1 start point
+    
+    const start = measurePoints[0];
+    const current = e.latlng;
+    
+    // Draw/Update Preview Line
+    if (measureLine) map.removeLayer(measureLine);
+    measureLine = L.polyline([start, current], { color: 'black', dashArray: '5, 10', weight: 2 }).addTo(map);
+    
+    // Calculate Distance
+    const distMeters = start.distanceTo(current);
+    const distText = distMeters > 1000 ? (distMeters/1000).toFixed(2) + ' km' : Math.round(distMeters) + ' m';
+    
+    // Draw/Update Tooltip
+    if (measureTooltip) map.removeLayer(measureTooltip);
+    measureTooltip = L.tooltip({
+        permanent: true, direction: 'right', className: 'measure-tooltip', offset: [10, 0]
+    })
+    .setLatLng(current)
+    .setContent(distText)
+    .addTo(map);
+}
+
+function finalizeMeasurement() {
+    // Stop listening to moves
+    map.off('mousemove', onMeasureMove);
+    map.off('click', onMeasureClick);
+    
+    // Solidify line
+    if (measureLine) {
+        measureLine.setStyle({ dashArray: null, weight: 3, color: '#2F80ED' });
+    }
+    
+    // Reset state but keep drawings until user clicks button again
+    isMeasuring = false;
+    measureBtn.classList.remove('active'); // Visually untoggle button
+    document.getElementById('map').classList.remove('crosshair-cursor');
+    
+    // Allow clearing by clicking the button again (logic handled in toggleMeasureTool check)
+    // We set a flag or just let toggleMeasureTool handle the reset on next click
+    // For now, we manually re-add the 'active' class to button to indicate "Result Shown" if desired,
+    // or just leave it off. Let's leave it off but keep data on map.
+    // Next click on Ruler will trigger 'clearMeasurement' because logic starts fresh.
+    isMeasuring = true; // Hack: keep it "true" so next click clears it
+    measureBtn.classList.add('active'); 
+    // But disable map clicks
+    map.off('click', onMeasureClick); 
+}
+
+
+// --- 3. SETTINGS & REST OF APP ---
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsMenu = document.getElementById('settingsMenu');
 
@@ -190,14 +335,12 @@ settingsBtn.addEventListener('click', (e) => {
     settingsMenu.classList.toggle('show');
 });
 
-// Close menu when clicking outside
 document.addEventListener('click', (e) => {
     if (!settingsMenu.contains(e.target) && e.target !== settingsBtn) {
         settingsMenu.classList.remove('show');
     }
 });
 
-// Style selection click handlers
 document.querySelectorAll('.style-option').forEach(option => {
     option.addEventListener('click', () => {
         setMapStyle(option.dataset.style);
@@ -206,8 +349,6 @@ document.querySelectorAll('.style-option').forEach(option => {
 });
 
 let markersLayer = L.layerGroup().addTo(map);
-
-// Default Colors
 const defaultColors = { done: '#66ff00', pending: '#1F4E79', phase1: '#A020F0' };
 let statusColors = JSON.parse(localStorage.getItem('siteMap_colors')) || { ...defaultColors };
 
@@ -222,7 +363,6 @@ let allRows = [], visibleMarkers = {}, pinnedMarker = null;
 let uniqueBatches = new Set();
 let batchMap = new Map();
 
-// --- 3. HELPER FUNCTIONS ---
 function normalizeKey(k){ return (k||'').toString().trim().toLowerCase().replace(/\s+/g,'_'); }
 
 function isDoneStatus(s){ 
@@ -421,6 +561,8 @@ function render(){
     
     m.bindPopup(popupHtml, { autoClose:false, closeOnClick:false });
     m.on('mouseover', () => {
+      // Don't show popups while measuring to avoid clutter
+      if(isMeasuring) return;
       if(pinnedMarker && pinnedMarker !== m) pinnedMarker.closePopup();
       pinnedMarker = null;
       m.openPopup();
@@ -428,6 +570,8 @@ function render(){
     });
     m.on('mouseout', function() { if(pinnedMarker !== this) this.closePopup(); });
     m.on('click', function() {
+      // Don't pin markers while measuring
+      if(isMeasuring) return;
       if(pinnedMarker && pinnedMarker !== this) pinnedMarker.closePopup();
       pinnedMarker = this;
       this.openPopup();
