@@ -18,9 +18,6 @@
     --card:#ffffff80;
     --accent:#2F80ED;
     --accent-hover:#1C60B3;
-    --pending:#1F4E79;
-    --done:#66ff00;
-    --phase1:#A020F0;
     --shadow:0 8px 30px rgba(0,0,0,0.12);
     --radius:12px;
   }
@@ -37,18 +34,22 @@
   .stat{ background:rgba(255,255,255,0.85); flex:1; padding:12px; border-radius:var(--radius); box-shadow:0 4px 12px rgba(0,0,0,0.08); text-align:center; }
   .stat .small{ font-weight:500; color:#555; margin-bottom:4px; }
   .stat div[id]{ font-weight:700; font-size:20px; margin-top:4px; }
-  /* Find this block in your <style> section */
+  
+  /* Legend Styles */
   .legend .sw { 
-  width:16px; 
-  height:16px; 
-  border-radius:50%; 
-  display:inline-block; 
-  margin-right:8px; 
-  border:2px solid #fff; 
-  box-shadow:0 0 4px rgba(0,0,0,0.25); 
-  vertical-align:middle; 
-  cursor: pointer; /* <--- ADD THIS LINE */
-}
+    width:16px; 
+    height:16px; 
+    border-radius:50%; 
+    display:inline-block; 
+    margin-right:8px; 
+    border:2px solid #fff; 
+    box-shadow:0 0 4px rgba(0,0,0,0.25); 
+    vertical-align:middle; 
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .legend .sw:hover { transform: scale(1.2); }
+
   #details{ font-size:14px; color:#222; margin-top:8px; padding:8px; border-radius:var(--radius); background:rgba(255,255,255,0.7); box-shadow:0 4px 12px rgba(0,0,0,0.08); min-height:64px; }
   .map-sniper-btn{position:absolute;bottom:20px;right:20px;z-index:9999;width:50px;height:50px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #444;}
   @media(max-width:950px){ .app{ grid-template-columns:1fr; grid-template-rows:320px 1fr; } }
@@ -67,13 +68,15 @@
         <div class="stat"><div class="small">Done / Total</div><div id="doneTotal">0 / 0</div><div class="small" id="donePct">0%</div></div>
         <div class="stat"><div class="small">Pending</div><div id="pendingCount">0</div><div class="small" id="totalCount">Total: 0</div></div>
       </div>
+      
       <div class="row legend small">
-        <span class="sw" style="background:var(--done)"></span>Done
-        <span class="sw" style="background:var(--pending)"></span>Pending
+        <span id="swatchDone" class="sw"></span>Done
+        <span id="swatchPending" class="sw"></span>Pending
         <span id="phase1Legend" style="display:none; margin-left:10px;">
-        <span id="phase1Swatch" class="sw" style="background:var(--phase1); cursor:pointer;"></span>Phase 1
+          <span id="swatchPhase1" class="sw"></span>Phase 1
         </span>
       </div>
+      
       <hr style="border:none;border-top:1px solid #eee;margin:12px 0;"/>
       <div class="row"><input id="searchInput" type="text" placeholder="Search eNodeB ID / Site name"/><button id="searchBtn" class="btn">Find</button></div>
       <div id="details">Hover a marker or search to see details here.</div>
@@ -86,22 +89,30 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-// OPTIMIZATION 1: preferCanvas: true is crucial for circleMarkers
+// --- 1. INITIALIZATION & PREFERENCE LOADING ---
 const map = L.map('map', { preferCanvas: true }).setView([3.0, 101.5], 11);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-// OPTIMIZATION 2: Changed from const to let to allow efficient batch swapping
 let markersLayer = L.layerGroup().addTo(map);
 
-// Color Constants
-const COLOR_PENDING = '#1F4E79';
-const COLOR_DONE = '#66ff00';
-const COLOR_PHASE1 = '#A020F0';
+// Default Colors
+const defaultColors = { done: '#66ff00', pending: '#1F4E79', phase1: '#A020F0' };
+// Load Saved Colors
+let statusColors = JSON.parse(localStorage.getItem('siteMap_colors')) || { ...defaultColors };
+
+// Apply initial colors to legend swatches
+function updateLegendUI() {
+    document.getElementById('swatchDone').style.background = statusColors.done;
+    document.getElementById('swatchPending').style.background = statusColors.pending;
+    document.getElementById('swatchPhase1').style.background = statusColors.phase1;
+}
+updateLegendUI();
 
 let allRows = [], visibleMarkers = {}, pinnedMarker = null;
 let uniqueBatches = new Set();
 let batchMap = new Map();
 
+// --- 2. HELPER FUNCTIONS ---
 function normalizeKey(k){ return (k||'').toString().trim().toLowerCase().replace(/\s+/g,'_'); }
 function isDoneStatus(s){ return /on\s*-?\s*air|onair|done|live|activated|active|\bon\b/i.test(s); }
 
@@ -166,7 +177,9 @@ function animateValue(id, start, end, total) {
 
 function updateFilterDropdown() {
   const select = document.getElementById('viewSelect');
-  const currentValue = select.value;
+  const storedValue = localStorage.getItem('siteMap_prefView'); // LOAD PREF
+  
+  // Rebuild options
   select.innerHTML = '<option value="all">All Sites</option>';
   Array.from(uniqueBatches).filter(batch => batch && batch.trim() !== '').sort().forEach(batch => {
       const option = document.createElement('option');
@@ -174,10 +187,12 @@ function updateFilterDropdown() {
       option.textContent = batch;
       select.appendChild(option);
       batchMap.set(option.value, batch);
-    });
-  if (currentValue) {
-    const optionExists = Array.from(select.options).some(opt => opt.value === currentValue);
-    if (optionExists) select.value = currentValue;
+  });
+
+  // Restore previous selection if it still exists
+  if (storedValue) {
+    const optionExists = Array.from(select.options).some(opt => opt.value === storedValue);
+    if (optionExists) select.value = storedValue;
   }
 }
 
@@ -216,12 +231,15 @@ function fetchFullList() {
     .catch(err => alert('Could not fetch data from Google Sheets: ' + err));
 }
 
+// --- 3. CORE RENDER LOGIC ---
 function render(){
-  // OPTIMIZATION 3: Prepare array first instead of adding to map in loop
   const newMarkers = [];
   visibleMarkers = {};
   const view = document.getElementById('viewSelect').value;
   
+  // Save preference whenever we render/change view
+  localStorage.setItem('siteMap_prefView', view);
+
   let rows = allRows.slice();
   if(view === 'all') {
     rows = allRows.filter(r => !['blocked', '24g_only', 'imacro'].includes(r.normalized_batch));
@@ -233,7 +251,6 @@ function render(){
   let hasPhase1 = false;
   const bounds = [];
 
-  // OPTIMIZATION 4: Use a single loop to generate lightweight circle markers
   rows.forEach(r=>{
     if(!Number.isFinite(r.lat) || !Number.isFinite(r.lon)) return;
     
@@ -242,14 +259,14 @@ function render(){
 
     let color, displayStatus;
     
-    // Logic: Phase 1
+    // Logic: Phase 1 & Colors
+    // IMPORTANT: Use statusColors variable, NOT constants
     if (isPhase1 && view === 'all') {
-      color = COLOR_PHASE1; // Purple
+      color = statusColors.phase1; 
       displayStatus = "Done"; 
-      // Not counted
     } 
     else if (isPhase1 && view === 'phase_1') {
-      color = COLOR_DONE; // Green
+      color = statusColors.done; // Logic: In Phase 1 view, they act as 'Done'
       displayStatus = "Done";
       doneCount++; countableTotal++;
     } 
@@ -257,7 +274,7 @@ function render(){
       const done = isDoneStatus(r.status);
       if(done) doneCount++; else pendingCount++;
       countableTotal++;
-      color = done ? COLOR_DONE : COLOR_PENDING;
+      color = done ? statusColors.done : statusColors.pending;
       displayStatus = r.status;
     }
 
@@ -270,8 +287,6 @@ function render(){
       <em>On-Air Date:</em> ${escapeHtml(r.on_air_date || '—')}
     </div>`;
 
-    // OPTIMIZATION 5: Use L.circleMarker (Canvas) instead of L.marker (DOM)
-    // This is 100x faster for thousands of points
     const m = L.circleMarker([r.lat, r.lon], {
         radius: 6,
         fillColor: color,
@@ -297,13 +312,12 @@ function render(){
       map.setView(this.getLatLng(), 16);
     });
 
-    newMarkers.push(m); // Add to batch array
+    newMarkers.push(m);
     const key = (r.enodeb_id || ('row' + r._rowIndex)).toString();
     visibleMarkers[key] = m;
     bounds.push([r.lat, r.lon]);
   });
 
-  // OPTIMIZATION 6: Batch add layers to map
   markersLayer.clearLayers();
   markersLayer = L.layerGroup(newMarkers).addTo(map);
 
@@ -321,26 +335,7 @@ function render(){
   }
 }
 
-// Updated Color Picker for CircleMarkers
-const statusColors = { done: '#66ff00', pending: '#1F4E79', phase1: '#A020F0' };
-// Updated Color Picker for all 3 categories
-document.querySelectorAll('.legend .sw').forEach((el) => {
-  el.addEventListener('click', async () => {
-    // Determine status based on the ID or order
-    let status;
-    if (el.id === 'phase1Swatch') status = 'phase1';
-    else if (el.style.background.includes('done') || el.style.background.includes('66ff00')) status = 'done';
-    else status = 'pending';
-
-    const newColor = await pickColor(statusColors[status]);
-    if (!newColor) return;
-
-    statusColors[status] = newColor;
-    el.style.background = newColor;
-    updateMarkerColors(status, newColor);
-  });
-});
-
+// --- 4. COLOR PICKER LOGIC ---
 function pickColor(current) {
   return new Promise(resolve => {
     const input = document.createElement('input'); input.type = 'color'; input.value = rgbToHex(current);
@@ -353,12 +348,39 @@ function pickColor(current) {
 }
 
 function rgbToHex(rgb){
+  if(!rgb) return '#000000';
   if(rgb.startsWith('#')) return rgb;
-  const nums = rgb.match(/\d+/g).map(Number);
+  const match = rgb.match(/\d+/g);
+  if(!match) return '#000000';
+  const nums = match.map(Number);
   return "#" + nums.map(n => n.toString(16).padStart(2,'0')).join('');
 }
 
-function updateMarkerColors(status, color){
+// Generic handler for color changes
+async function handleColorChange(key) {
+    const el = document.getElementById(key === 'done' ? 'swatchDone' : key === 'pending' ? 'swatchPending' : 'swatchPhase1');
+    const newColor = await pickColor(statusColors[key]);
+    if (!newColor) return;
+
+    // Update State
+    statusColors[key] = newColor;
+    
+    // Save to LocalStorage
+    localStorage.setItem('siteMap_colors', JSON.stringify(statusColors));
+    
+    // Update UI
+    updateLegendUI();
+    
+    // Update Markers
+    updateMarkerColors(key, newColor);
+}
+
+// Attach listeners
+document.getElementById('swatchDone').addEventListener('click', () => handleColorChange('done'));
+document.getElementById('swatchPending').addEventListener('click', () => handleColorChange('pending'));
+document.getElementById('swatchPhase1').addEventListener('click', () => handleColorChange('phase1'));
+
+function updateMarkerColors(statusKey, color){
   for(const key in visibleMarkers){
     const m = visibleMarkers[key];
     const row = allRows.find(r => (r.enodeb_id || ('row'+r._rowIndex)).toString() === key);
@@ -367,18 +389,25 @@ function updateMarkerColors(status, color){
     const isPhase1 = (row.normalized_batch === 'phase_1' || row.normalized_batch === 'phase1');
     const view = document.getElementById('viewSelect').value;
 
-    if (status === 'phase1' && isPhase1 && view === 'all') {
-      m.setStyle({fillColor: color});
+    // Logic must match render() logic
+    let shouldUpdate = false;
+    
+    if (statusKey === 'phase1' && isPhase1 && view === 'all') {
+      shouldUpdate = true;
     } 
-    else if (status === 'done' || status === 'pending') {
-      // Don't change Phase 1 markers if we are in 'All' view and clicking Done/Pending
-      if (isPhase1 && view === 'all') continue; 
-      
-      const done = isDoneStatus(row.status);
-      if ((status === 'done' && done) || (status === 'pending' && !done)){
-        m.setStyle({fillColor: color});
+    else if (statusKey === 'done' || statusKey === 'pending') {
+      if (isPhase1 && view === 'all') {
+         // In 'all' view, phase 1 items stay phase 1 color, they don't change with done/pending clicks
+         shouldUpdate = false; 
+      } else {
+        const done = isDoneStatus(row.status);
+        if ((statusKey === 'done' && done) || (statusKey === 'pending' && !done)) {
+           shouldUpdate = true;
+        }
       }
     }
+    
+    if(shouldUpdate) m.setStyle({fillColor: color});
   }
 }
 
@@ -405,7 +434,6 @@ function searchAndZoom(term){
         m.openPopup(); pinnedMarker = m;
         document.getElementById('details').innerHTML = m.getPopup().getContent();
       } else {
-        // Show detail if hidden
         document.getElementById('details').innerHTML = `<div style="min-width:220px"><strong>${escapeHtml(found.enodeb_name)}</strong><br/><em>Status:</em> ${escapeHtml(found.status)}</div>`;
       }
     }
