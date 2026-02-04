@@ -9,7 +9,7 @@
   gtag('config', 'G-XBHVRKLJCD');
 </script>
 <meta charset="utf-8" />
-<title>Interactive Sites Map — Animated</title>
+<title>Interactive Sites Map — Pro</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
@@ -24,7 +24,7 @@
   html, body { margin:0; height:100%; font-family: 'Inter', system-ui, Arial; background: linear-gradient(to bottom right, #e0eaff, #ffffff); color:#222; font-size:14px; line-height:1.5; }
   .app{ display:grid; grid-template-columns:380px 1fr; gap:16px; height:100vh; padding:16px; box-sizing:border-box; }
   .panel{ background:var(--card); backdrop-filter: blur(12px); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); display:flex; flex-direction:column; overflow:auto; border:1px solid rgba(255,255,255,0.3); }
-  #map{ height:100%; border-radius:var(--radius); box-shadow:var(--shadow); border:2px solid rgba(255,255,255,0.3); }
+  #map{ height:100%; border-radius:var(--radius); box-shadow:var(--shadow); border:2px solid rgba(255,255,255,0.3); position:relative; }
   h2{ margin-bottom:12px; font-weight:700; font-size:1.4em; color:#1a1a1a; }
   label{ font-weight:600; color:#333; }
   .controls{ display:flex; flex-direction:column; gap:12px; }
@@ -51,7 +51,36 @@
   .legend .sw:hover { transform: scale(1.2); }
 
   #details{ font-size:14px; color:#222; margin-top:8px; padding:8px; border-radius:var(--radius); background:rgba(255,255,255,0.7); box-shadow:0 4px 12px rgba(0,0,0,0.08); min-height:64px; }
-  .map-sniper-btn{position:absolute;bottom:20px;right:20px;z-index:9999;width:50px;height:50px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #444;}
+  
+  /* Map Buttons */
+  .map-btn {
+    position:absolute; right:20px; z-index:999;
+    width:44px; height:44px; border-radius:50%;
+    background:white; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; border:2px solid #444; box-shadow:0 4px 10px rgba(0,0,0,0.3);
+    transition: transform 0.2s;
+  }
+  .map-btn:hover { transform: scale(1.05); }
+  .map-btn img { width:24px; height:24px; }
+  #sniperBtn { bottom:20px; }
+  #settingsBtn { bottom:76px; } /* Stacked above sniper button */
+
+  /* Settings Menu */
+  #settingsMenu {
+    position: absolute; bottom: 80px; right: 74px; z-index: 1000;
+    background: white; padding: 10px; border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    display: none; flex-direction: column; gap: 6px;
+    min-width: 140px; border: 1px solid #ddd;
+  }
+  #settingsMenu.show { display: flex; }
+  .style-option {
+    padding: 8px 12px; cursor: pointer; border-radius: 6px; font-weight: 500; color: #333;
+    transition: background 0.2s;
+  }
+  .style-option:hover { background: #f0f4ff; color: var(--accent); }
+  .style-option.active { background: var(--accent); color: white; }
+
   @media(max-width:950px){ .app{ grid-template-columns:1fr; grid-template-rows:320px 1fr; } }
 </style>
 </head>
@@ -90,25 +119,98 @@
       <div id="details">Hover a marker or search to see details here.</div>
     </div>
   </div>
-  <div class="panel" style="padding:0;"><div id="map"><div id="sniperBtn" class="map-sniper-btn"><img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" width="28"></div></div></div>
+  <div class="panel" style="padding:0;">
+    <div id="map">
+      <div id="settingsBtn" class="map-btn" title="Map Settings">
+        <img src="https://cdn-icons-png.flaticon.com/512/3524/3524659.png" alt="Settings">
+      </div>
+      <div id="sniperBtn" class="map-btn" title="Reset View">
+        <img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" alt="Reset">
+      </div>
+      <div id="settingsMenu">
+        <div class="style-option" data-style="osm">Standard</div>
+        <div class="style-option" data-style="satellite">Satellite</div>
+        <div class="style-option" data-style="dark">Dark Mode</div>
+        <div class="style-option" data-style="light">Light Mode</div>
+        <div class="style-option" data-style="topo">Terrain</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-// --- 1. INITIALIZATION & PREFERENCE LOADING ---
+// --- 1. MAP INITIALIZATION & STYLES ---
 const map = L.map('map', { preferCanvas: true }).setView([3.0, 101.5], 11);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+// Tile Layer Definitions
+const tileProviders = {
+    osm: { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '&copy; OpenStreetMap' },
+    satellite: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr: '&copy; Esri' },
+    dark: { url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', attr: '&copy; CartoDB' },
+    light: { url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', attr: '&copy; CartoDB' },
+    topo: { url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', attr: '&copy; OpenTopoMap' }
+};
+
+let currentTileLayer = null;
+
+function setMapStyle(styleKey) {
+    const provider = tileProviders[styleKey] || tileProviders.osm;
+    
+    // Remove old layer
+    if (currentTileLayer) map.removeLayer(currentTileLayer);
+    
+    // Add new layer
+    currentTileLayer = L.tileLayer(provider.url, { 
+        maxZoom: 19, 
+        attribution: provider.attr 
+    }).addTo(map);
+
+    // Save to local storage
+    localStorage.setItem('siteMap_style', styleKey);
+
+    // Update UI active state
+    document.querySelectorAll('.style-option').forEach(el => {
+        el.classList.toggle('active', el.dataset.style === styleKey);
+    });
+}
+
+// Load saved style or default to 'osm'
+const savedStyle = localStorage.getItem('siteMap_style') || 'osm';
+setMapStyle(savedStyle);
+
+// --- 2. SETTINGS UI LOGIC ---
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsMenu = document.getElementById('settingsMenu');
+
+settingsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    settingsMenu.classList.toggle('show');
+});
+
+// Close menu when clicking outside
+document.addEventListener('click', (e) => {
+    if (!settingsMenu.contains(e.target) && e.target !== settingsBtn) {
+        settingsMenu.classList.remove('show');
+    }
+});
+
+// Style selection click handlers
+document.querySelectorAll('.style-option').forEach(option => {
+    option.addEventListener('click', () => {
+        setMapStyle(option.dataset.style);
+        settingsMenu.classList.remove('show');
+    });
+});
 
 let markersLayer = L.layerGroup().addTo(map);
 
 // Default Colors
 const defaultColors = { done: '#66ff00', pending: '#1F4E79', phase1: '#A020F0' };
-// Load Saved Colors
 let statusColors = JSON.parse(localStorage.getItem('siteMap_colors')) || { ...defaultColors };
 
-// Apply initial colors to legend swatches
 function updateLegendUI() {
     document.getElementById('swatchDone').style.background = statusColors.done;
     document.getElementById('swatchPending').style.background = statusColors.pending;
@@ -120,43 +222,30 @@ let allRows = [], visibleMarkers = {}, pinnedMarker = null;
 let uniqueBatches = new Set();
 let batchMap = new Map();
 
-// --- 2. HELPER FUNCTIONS ---
+// --- 3. HELPER FUNCTIONS ---
 function normalizeKey(k){ return (k||'').toString().trim().toLowerCase().replace(/\s+/g,'_'); }
 
-// Tightened Regex for status (avoids "Not On Air")
 function isDoneStatus(s){ 
   return /^(on\s*-?\s*air|onair|done|live|activated|active)$|(\bon\b)/i.test(s) && !/not\s+on/i.test(s); 
 }
 
-// --- NEW ANIMATION FUNCTION ---
 function runCounterAnimation(elementId, endValue) {
   const obj = document.getElementById(elementId);
   if (!obj) return;
-  
-  // Get current value to start from, or default to 0
   const startValue = parseInt(obj.textContent.replace(/,/g, '')) || 0;
-  
-  // If values are the same, do nothing
   if (startValue === endValue) return;
 
-  const duration = 1500; // Animation duration in ms
+  const duration = 1500;
   const startTime = performance.now();
 
   function update(currentTime) {
     const elapsed = currentTime - startTime;
     const progress = Math.min(elapsed / duration, 1);
-    
-    // Easing function (easeOutExpo) for that "flipping scoreboard" slow-down feel
     const ease = (progress === 1) ? 1 : 1 - Math.pow(2, -10 * progress);
-    
     const current = Math.floor(startValue + (endValue - startValue) * ease);
-    obj.textContent = current.toLocaleString(); // Add commas for thousands
-
-    if (progress < 1) {
-      requestAnimationFrame(update);
-    } else {
-      obj.textContent = endValue.toLocaleString(); // Ensure final value is exact
-    }
+    obj.textContent = current.toLocaleString(); 
+    if (progress < 1) requestAnimationFrame(update);
+    else obj.textContent = endValue.toLocaleString(); 
   }
   requestAnimationFrame(update);
 }
@@ -216,9 +305,8 @@ function fuzzyFindInRows(term, rows){
 
 function updateFilterDropdown() {
   const select = document.getElementById('viewSelect');
-  const storedValue = localStorage.getItem('siteMap_prefView'); // LOAD PREF
+  const storedValue = localStorage.getItem('siteMap_prefView');
   
-  // Rebuild options
   select.innerHTML = '<option value="all">All Sites</option>';
   Array.from(uniqueBatches).filter(batch => batch && batch.trim() !== '').sort().forEach(batch => {
       const option = document.createElement('option');
@@ -228,7 +316,6 @@ function updateFilterDropdown() {
       batchMap.set(option.value, batch);
   });
 
-  // Restore previous selection if it still exists
   if (storedValue) {
     const optionExists = Array.from(select.options).some(opt => opt.value === storedValue);
     if (optionExists) select.value = storedValue;
@@ -270,7 +357,7 @@ function fetchFullList() {
     .catch(err => alert('Could not fetch data from Google Sheets: ' + err));
 }
 
-// --- 3. CORE RENDER LOGIC ---
+// --- 4. RENDER LOGIC ---
 function render(){
   const newMarkers = [];
   visibleMarkers = {};
@@ -297,7 +384,6 @@ function render(){
 
     let color, displayStatus;
     
-    // Logic: Phase 1 & Colors
     if (isPhase1 && view === 'all') {
       color = statusColors.phase1; 
       displayStatus = "Done"; 
@@ -361,7 +447,6 @@ function render(){
   const p1Leg = document.getElementById('phase1Legend');
   if (p1Leg) p1Leg.style.display = (view === 'all' && hasPhase1) ? 'inline-block' : 'none';
 
-  // --- TRIGGER ANIMATIONS ---
   runCounterAnimation('animDone', doneCount);
   runCounterAnimation('animTotal', countableTotal);
   runCounterAnimation('animPending', pendingCount);
@@ -375,34 +460,27 @@ function render(){
   }
 }
 
-// --- 4. IMPROVED COLOR PICKER LOGIC ---
-// This uses a direct callback approach instead of Promises to handle continuous "input" events.
+// --- 5. COLOR PICKER ---
 function openColorPicker(initialColor, onInput, onChange) {
     const input = document.createElement('input');
     input.type = 'color';
     input.value = rgbToHex(initialColor);
-    
-    // Hide it but make it part of DOM
     input.style.position = 'fixed'; 
     input.style.left = '-9999px'; 
     document.body.appendChild(input);
 
-    input.click(); // Open system dialog
+    input.click();
 
-    // Event 1: Dragging the color (Real-time update)
     input.addEventListener('input', (e) => {
         onInput(e.target.value);
     });
 
-    // Event 2: Closing the picker (Final save)
     input.addEventListener('change', (e) => {
         onChange(e.target.value);
         document.body.removeChild(input);
     });
 
-    // Cleanup if cancelled (blur often implies cancel/close in some browsers)
     input.addEventListener('blur', () => {
-        // Short delay to ensure change didn't fire first
         setTimeout(() => {
             if(document.body.contains(input)) document.body.removeChild(input);
         }, 500);
@@ -418,20 +496,17 @@ function rgbToHex(rgb){
   return "#" + nums.map(n => n.toString(16).padStart(2,'0')).join('');
 }
 
-// Generic handler for color changes
 function initiateColorChange(key) {
     const swatchId = key === 'done' ? 'swatchDone' : key === 'pending' ? 'swatchPending' : 'swatchPhase1';
     const el = document.getElementById(swatchId);
     
     openColorPicker(
         statusColors[key], 
-        // Callback 1: Real-time update (Input)
         (newColor) => {
             el.style.background = newColor;
-            statusColors[key] = newColor; // Temporarily update memory so updateMarkerColors reads it
+            statusColors[key] = newColor; 
             updateMarkerColors(key, newColor);
         },
-        // Callback 2: Final save (Change)
         (finalColor) => {
             el.style.background = finalColor;
             statusColors[key] = finalColor;
@@ -441,7 +516,6 @@ function initiateColorChange(key) {
     );
 }
 
-// Attach listeners
 document.getElementById('swatchDone').addEventListener('click', () => initiateColorChange('done'));
 document.getElementById('swatchPending').addEventListener('click', () => initiateColorChange('pending'));
 document.getElementById('swatchPhase1').addEventListener('click', () => initiateColorChange('phase1'));
@@ -457,17 +531,14 @@ function updateMarkerColors(statusKey, color){
 
     let shouldUpdate = false;
     
-    // Strict logic to ensure we don't color "Pending" items when changing "Done"
     if (statusKey === 'phase1') {
         if (isPhase1 && view === 'all') shouldUpdate = true;
     } 
     else if (statusKey === 'done') {
-        // Only update if it is NOT Phase 1 (in All view) AND it IS actually Done
         if (isPhase1 && view === 'all') { shouldUpdate = false; }
         else if (isDoneStatus(row.status)) { shouldUpdate = true; }
     }
     else if (statusKey === 'pending') {
-        // Only update if it is NOT Phase 1 (in All view) AND it IS actually Pending
         if (isPhase1 && view === 'all') { shouldUpdate = false; }
         else if (!isDoneStatus(row.status)) { shouldUpdate = true; }
     }
@@ -512,14 +583,11 @@ document.getElementById('sniperBtn').addEventListener('click',()=>render());
   
 window.addEventListener('load', ()=>{ fetchFullList(); setTimeout(()=>map.invalidateSize(),300); });
 
-// ... existing code above ...
-
 let lastCsvText = null;
-const REFRESH_INTERVAL_MS = 30 * 1000; // Check every 30 seconds
+const REFRESH_INTERVAL_MS = 30 * 1000; 
 
 async function smartFetchCsv() {
   try {
-    // We add '&_t=' + Date.now() to FORCE the browser to ignore cache and get a fresh file
     const BASE_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?gid=232255476&single=true&output=csv';
     const uniqueUrl = BASE_URL + '&_t=' + Date.now();
 
@@ -528,7 +596,6 @@ async function smartFetchCsv() {
     
     const csvText = await response.text();
     
-    // Only reload if data actually changed
     if (csvText !== lastCsvText) { 
       console.log("New data detected! Refreshing map...");
       lastCsvText = csvText; 
@@ -539,10 +606,7 @@ async function smartFetchCsv() {
   } catch (err) { console.error('Error fetching CSV:', err); }
 }
 
-// Initial load
 smartFetchCsv();
-
-// Auto-refresh loop
 setInterval(smartFetchCsv, REFRESH_INTERVAL_MS);
 </script>
 </body>
