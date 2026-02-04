@@ -137,7 +137,7 @@
   <div class="panel" style="padding:0;">
     <div id="map">
       
-      <div id="measureBtn" class="map-btn" title="Ruler Tool">
+      <div id="measureBtn" class="map-btn" title="Ruler Tool (Distance)">
         <img src="https://cdn-icons-png.flaticon.com/512/5594/5594876.png" alt="Ruler">
       </div>
 
@@ -191,22 +191,24 @@ function setMapStyle(styleKey) {
     });
 }
 
-// Load saved style or default to 'osm'
 const savedStyle = localStorage.getItem('siteMap_style') || 'osm';
 setMapStyle(savedStyle);
 
-// --- 2. RULER TOOL LOGIC (Fix: Event Propagation) ---
+// --- 2. MULTI-LINE RULER TOOL ---
 let isMeasuring = false;
-let measurePoints = [];
-let measureMarkers = [];
-let measureLine = null;
-let measureTooltip = null;
+
+// Variables for the CURRENT line being drawn
+let currentPoints = [];
+let currentLinePreview = null;
+let currentTooltipPreview = null;
+
+// Storage for ALL completed lines (to clear them later)
+let completedMeasurements = []; 
 
 const measureBtn = document.getElementById('measureBtn');
 
-// FIX: Added 'e' and 'e.stopPropagation()' to stop button click hitting map
 measureBtn.addEventListener('click', (e) => {
-    e.stopPropagation(); // Prevents click from bubbling to map
+    e.stopPropagation(); 
     toggleMeasureTool();
 });
 
@@ -217,112 +219,136 @@ function toggleMeasureTool() {
         // Activate Tool
         measureBtn.classList.add('active');
         document.getElementById('map').classList.add('crosshair-cursor');
-        document.getElementById('details').innerHTML = "<strong>Ruler Active:</strong> Click map to set START point. (Right-click to cancel)";
+        document.getElementById('details').innerHTML = "<strong>Ruler Active:</strong> Click map to START. (Right-click to clear all)";
         
-        // Add Listeners
         map.on('click', onMeasureClick);
-        map.on('contextmenu', clearMeasurement); // Right click to clear
+        map.on('contextmenu', clearAllMeasurements);
     } else {
         // Deactivate Tool
-        clearMeasurement();
+        clearAllMeasurements();
     }
 }
 
-function clearMeasurement() {
+function clearAllMeasurements() {
     isMeasuring = false;
     measureBtn.classList.remove('active');
     document.getElementById('map').classList.remove('crosshair-cursor');
     document.getElementById('details').innerHTML = "Hover a marker or search to see details here.";
     
-    // Cleanup Layers
-    measureMarkers.forEach(m => map.removeLayer(m));
-    if (measureLine) map.removeLayer(measureLine);
-    if (measureTooltip) map.removeLayer(measureTooltip);
+    // Clear Current Preview
+    if (currentLinePreview) map.removeLayer(currentLinePreview);
+    if (currentTooltipPreview) map.removeLayer(currentTooltipPreview);
+    
+    // Clear All Completed Lines
+    completedMeasurements.forEach(group => {
+        group.forEach(layer => map.removeLayer(layer));
+    });
     
     // Reset Data
-    measurePoints = [];
-    measureMarkers = [];
-    measureLine = null;
-    measureTooltip = null;
+    currentPoints = [];
+    completedMeasurements = [];
+    currentLinePreview = null;
+    currentTooltipPreview = null;
     
     // Remove Listeners
     map.off('click', onMeasureClick);
     map.off('mousemove', onMeasureMove);
-    map.off('contextmenu', clearMeasurement);
+    map.off('contextmenu', clearAllMeasurements);
 }
 
+// Logic for clicking map OR site marker
 function onMeasureClick(e) {
-    const latlng = e.latlng;
+    const latlng = e.latlng || e; // Handle Leaflet event or direct latlng
     
-    if (measurePoints.length === 0) {
-        // --- CLICK 1: START POINT ---
-        measurePoints.push(latlng);
+    // --- START NEW LINE ---
+    if (currentPoints.length === 0) {
+        currentPoints.push(latlng);
         
-        // Start Marker
+        // Draw Start Dot
         const dot = L.circleMarker(latlng, {
             radius: 5, color: '#333', fillColor: '#fff', fillOpacity: 1, weight: 2
         }).addTo(map);
-        measureMarkers.push(dot);
         
-        // Listen for mousemove to draw dashed line
+        // Save this dot to a temporary group in case we finish
+        // We will move it to 'completedMeasurements' later
+        currentPoints._tempDot = dot; 
+        
+        // Listen for mousemove
         map.on('mousemove', onMeasureMove);
-        document.getElementById('details').innerHTML = "<strong>Measuring...</strong> Click again to set END point.";
+        document.getElementById('details').innerHTML = "<strong>Measuring...</strong> Click again to END line.";
         
-    } else if (measurePoints.length === 1) {
-        // --- CLICK 2: END POINT ---
-        measurePoints.push(latlng);
+    } 
+    // --- FINISH LINE ---
+    else if (currentPoints.length === 1) {
+        const start = currentPoints[0];
+        const end = latlng;
         
-        // Finalize
-        finalizeMeasurement(latlng);
+        // Finalize this line
+        finishLine(start, end, currentPoints._tempDot);
+        
+        // Reset for NEXT line immediately
+        currentPoints = [];
+        if (currentLinePreview) map.removeLayer(currentLinePreview);
+        if (currentTooltipPreview) map.removeLayer(currentTooltipPreview);
+        map.off('mousemove', onMeasureMove);
+        
+        document.getElementById('details').innerHTML = "<strong>Line Added.</strong> Click anywhere to start a NEW line.";
     }
 }
 
 function onMeasureMove(e) {
-    if (measurePoints.length !== 1) return; 
+    if (currentPoints.length !== 1) return; 
     
-    const start = measurePoints[0];
+    const start = currentPoints[0];
     const current = e.latlng;
     
     // Draw Preview Line
-    if (measureLine) map.removeLayer(measureLine);
-    measureLine = L.polyline([start, current], { color: 'black', dashArray: '5, 10', weight: 2 }).addTo(map);
+    if (currentLinePreview) map.removeLayer(currentLinePreview);
+    currentLinePreview = L.polyline([start, current], { color: 'black', dashArray: '5, 10', weight: 2 }).addTo(map);
     
     // Update Tooltip
-    updateTooltip(start, current);
-}
-
-function updateTooltip(start, end) {
-    const distMeters = start.distanceTo(end);
+    const distMeters = start.distanceTo(current);
     const distText = distMeters > 1000 ? (distMeters/1000).toFixed(2) + ' km' : Math.round(distMeters) + ' m';
     
-    if (measureTooltip) map.removeLayer(measureTooltip);
-    measureTooltip = L.tooltip({
+    if (currentTooltipPreview) map.removeLayer(currentTooltipPreview);
+    currentTooltipPreview = L.tooltip({
         permanent: true, direction: 'right', className: 'measure-tooltip', offset: [10, 0]
     })
-    .setLatLng(end)
+    .setLatLng(current)
     .setContent(distText)
     .addTo(map);
 }
 
-function finalizeMeasurement(endLatLng) {
-    // End Marker
-    const dot = L.circleMarker(endLatLng, {
+function finishLine(start, end, startDot) {
+    const layers = [];
+    
+    // 1. Keep Start Dot
+    layers.push(startDot);
+    
+    // 2. Add End Dot
+    const endDot = L.circleMarker(end, {
         radius: 5, color: '#333', fillColor: '#fff', fillOpacity: 1, weight: 2
     }).addTo(map);
-    measureMarkers.push(dot);
-
-    // Stop line movement
-    map.off('mousemove', onMeasureMove);
-    map.off('click', onMeasureClick); // Stop listening for clicks
+    layers.push(endDot);
     
-    // Solidify Line
-    if (measureLine) {
-        measureLine.setStyle({ dashArray: null, weight: 3, color: '#2F80ED' });
-    }
+    // 3. Add Solid Line
+    const line = L.polyline([start, end], { weight: 3, color: '#2F80ED' }).addTo(map);
+    layers.push(line);
     
-    document.getElementById('details').innerHTML = "<strong>Measurement Complete.</strong> Right-click or press Ruler icon to clear.";
+    // 4. Add Permanent Label (Distance)
+    const distMeters = start.distanceTo(end);
+    const distText = distMeters > 1000 ? (distMeters/1000).toFixed(2) + ' km' : Math.round(distMeters) + ' m';
     
-    // Keep isMeasuring visual state true, so button stays blue, but logic is done.
+    const label = L.tooltip({
+        permanent: true, direction: 'center', className: 'measure-tooltip', interactive: false
+    })
+    .setLatLng(L.latLngBounds([start, end]).getCenter()) // Center of line
+    .setContent(distText)
+    .addTo(map);
+    layers.push(label);
+    
+    // Save to global array
+    completedMeasurements.push(layers);
 }
 
 
@@ -497,7 +523,7 @@ function fetchFullList() {
     .catch(err => alert('Could not fetch data from Google Sheets: ' + err));
 }
 
-// --- 4. RENDER LOGIC ---
+// --- 4. RENDER LOGIC (Updated for Measure Snapping) ---
 function render(){
   const newMarkers = [];
   visibleMarkers = {};
@@ -561,7 +587,7 @@ function render(){
     
     m.bindPopup(popupHtml, { autoClose:false, closeOnClick:false });
     m.on('mouseover', () => {
-      // Don't show popups while measuring to avoid clutter
+      // Don't show popups while measuring
       if(isMeasuring) return;
       if(pinnedMarker && pinnedMarker !== m) pinnedMarker.closePopup();
       pinnedMarker = null;
@@ -569,14 +595,21 @@ function render(){
       document.getElementById('details').innerHTML = popupHtml;
     });
     m.on('mouseout', function() { if(pinnedMarker !== this) this.closePopup(); });
-    m.on('click', function() {
-      // Don't pin markers while measuring
-      if(isMeasuring) return;
-      if(pinnedMarker && pinnedMarker !== this) pinnedMarker.closePopup();
-      pinnedMarker = this;
-      this.openPopup();
-      document.getElementById('details').innerHTML = popupHtml;
-      map.setView(this.getLatLng(), 16);
+    
+    // CLICK LOGIC: Check if measuring or standard
+    m.on('click', function(e) {
+      if(isMeasuring) {
+          // Intercept click for Ruler Tool
+          L.DomEvent.stopPropagation(e); // Stop popup from opening
+          onMeasureClick(this.getLatLng()); // Feed marker location to ruler
+      } else {
+          // Standard Popup behavior
+          if(pinnedMarker && pinnedMarker !== this) pinnedMarker.closePopup();
+          pinnedMarker = this;
+          this.openPopup();
+          document.getElementById('details').innerHTML = popupHtml;
+          map.setView(this.getLatLng(), 16);
+      }
     });
 
     newMarkers.push(m);
