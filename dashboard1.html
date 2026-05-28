@@ -1,832 +1,752 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<title>Site Map Dashboard</title>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XBHVRKLJCD"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-XBHVRKLJCD');
+</script>
+<meta charset="utf-8" />
+<title>Interactive Sites Map — Dynamic Filter</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-  :root {
-    --bg:        #0d1117;
-    --surface:   #161b22;
-    --surface2:  #21262d;
-    --border:    #30363d;
-    --accent:    #58a6ff;
-    --accent2:   #1f6feb;
-    --done:      #3fb950;
-    --pending:   #f0883e;
-    --text:      #e6edf3;
-    --muted:     #8b949e;
-    --radius:    10px;
-    --shadow:    0 4px 24px rgba(0,0,0,0.4);
+  :root{
+    --bg:#e0eaff;
+    --card:#ffffff80;
+    --accent:#2F80ED;
+    --accent-hover:#1C60B3;
+    --pending:#1F4E79;
+    --done:#66ff00;
+    --shadow:0 8px 30px rgba(0,0,0,0.12);
+    --radius:12px;
   }
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body {
-    height: 100%;
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    font-size: 14px;
-    line-height: 1.6;
+    margin:0;
+    height:100%;
+    font-family: 'Inter', system-ui, Arial;
+    background: linear-gradient(to bottom right, #e0eaff, #ffffff);
+    color:#222;
+    font-size:14px;
+    line-height:1.5;
   }
 
-  .app {
-    display: grid;
-    grid-template-columns: 360px 1fr;
-    gap: 12px;
-    height: 100vh;
-    padding: 12px;
+  .app{
+    display:grid;
+    grid-template-columns:380px 1fr;
+    gap:16px;
+    height:100vh;
+    padding:16px;
+    box-sizing:border-box;
   }
 
-  /* ── Panel ── */
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    overflow-y: auto;
-    box-shadow: var(--shadow);
+  .panel{
+    background:var(--card);
+    backdrop-filter: blur(12px);
+    border-radius:var(--radius);
+    padding:16px;
+    box-shadow:var(--shadow);
+    display:flex;
+    flex-direction:column;
+    overflow:auto;
+    border:1px solid rgba(255,255,255,0.3);
   }
 
-  .panel-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    letter-spacing: -0.3px;
-    color: var(--text);
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  #map{
+    height:100%;
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    border:2px solid rgba(255,255,255,0.3);
   }
 
-  .panel-title svg { flex-shrink: 0; }
-
-  /* ── Status badge ── */
-  #statusBadge {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 20px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--muted);
-    align-self: flex-start;
-    transition: color 0.3s, border-color 0.3s;
-  }
-  #statusBadge.ok   { color: var(--done);    border-color: var(--done); }
-  #statusBadge.err  { color: var(--pending); border-color: var(--pending); }
-
-  /* ── Divider ── */
-  hr { border: none; border-top: 1px solid var(--border); }
-
-  /* ── Label ── */
-  label {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    color: var(--muted);
+  h2{
+    margin-bottom:12px;
+    font-weight:700;
+    font-size:1.4em;
+    color:#1a1a1a;
   }
 
-  /* ── Select ── */
-  .field { display: flex; flex-direction: column; gap: 6px; }
-
-  select {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--text);
-    padding: 8px 10px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 13px;
-    cursor: pointer;
-    transition: border-color 0.2s;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    padding-right: 32px;
-  }
-  select:focus { outline: none; border-color: var(--accent); }
-
-  /* ── Stats row ── */
-  .stats-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 8px;
+  label{
+    font-weight:600;
+    color:#333;
   }
 
-  .stat {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px;
-    text-align: center;
-    transition: border-color 0.2s, transform 0.2s;
-  }
-  .stat:hover { border-color: var(--accent); transform: translateY(-1px); }
-
-  .stat-value {
-    font-family: 'DM Mono', monospace;
-    font-size: 20px;
-    font-weight: 500;
-    color: var(--text);
-    line-height: 1.2;
+  .controls{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
   }
 
-  .stat-label {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-top: 2px;
+  .row{
+    display:flex;
+    gap:12px;
+    align-items:center;
   }
 
-  /* ── Legend ── */
-  .legend {
-    display: flex;
-    gap: 16px;
-    align-items: center;
+  select,input[type=text]{
+    padding:8px 10px;
+    border-radius:var(--radius);
+    border:1px solid #ccc;
+    transition:0.2s;
+  }
+  select:focus, input:focus{
+    border-color:var(--accent);
+    outline:none;
+    box-shadow:0 0 8px rgba(47,128,237,0.3);
   }
 
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: var(--muted);
+  .btn{
+    padding:10px 16px;
+    border-radius:var(--radius);
+    border:none;
+    font-weight:600;
+    cursor:pointer;
+    color:#fff;
+    background: linear-gradient(135deg,var(--accent),#1e5fc1);
+    transition:0.3s;
+    box-shadow:0 4px 12px rgba(0,0,0,0.2);
+  }
+  .btn:hover{
+    background:var(--accent-hover);
+    transform:translateY(-2px);
+    box-shadow:0 6px 16px rgba(0,0,0,0.25);
   }
 
-  .dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    cursor: pointer;
-    border: 2px solid rgba(255,255,255,0.15);
-    transition: transform 0.2s;
+  .stat{
+    background:rgba(255,255,255,0.85);
+    flex:1;
+    padding:12px;
+    border-radius:var(--radius);
+    box-shadow:0 4px 12px rgba(0,0,0,0.08);
+    text-align:center;
+    transition:0.2s;
   }
-  .dot:hover { transform: scale(1.4); }
-
-  /* ── Search ── */
-  .search-row {
-    display: flex;
-    gap: 8px;
+  .stat:hover{
+    box-shadow:0 6px 18px rgba(0,0,0,0.15);
+    transform:translateY(-2px);
   }
 
-  input[type=text] {
-    flex: 1;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--text);
-    padding: 8px 12px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 13px;
-    transition: border-color 0.2s;
-  }
-  input[type=text]::placeholder { color: var(--muted); }
-  input[type=text]:focus { outline: none; border-color: var(--accent); }
-
-  .btn {
-    padding: 8px 16px;
-    background: var(--accent2);
-    border: none;
-    border-radius: var(--radius);
-    color: #fff;
-    font-family: 'DM Sans', sans-serif;
-    font-weight: 600;
-    font-size: 13px;
-    cursor: pointer;
-    transition: background 0.2s, transform 0.15s;
-    white-space: nowrap;
-  }
-  .btn:hover { background: var(--accent); transform: translateY(-1px); }
-  .btn:active { transform: translateY(0); }
-
-  /* ── Details panel ── */
-  #details {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px;
-    min-height: 80px;
-    font-size: 13px;
-    color: var(--muted);
-    line-height: 1.8;
-    flex: 1;
+  .stat .small{
+    font-weight:500;
+    color:#555;
+    margin-bottom:4px;
   }
 
-  /* ── Map ── */
-  .map-wrap {
-    position: relative;
-    border-radius: var(--radius);
-    overflow: hidden;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
+  .stat div[id]{
+    font-weight:700;
+    font-size:20px;
+    margin-top:4px;
   }
 
-  #map { height: 100%; width: 100%; }
-
-  /* Reset view button */
-  .map-reset-btn {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    z-index: 999;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--text);
-    padding: 8px 14px;
-    font-family: 'DM Sans', sans-serif;
-    font-weight: 600;
-    font-size: 12px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: background 0.2s, border-color 0.2s, transform 0.2s;
-    box-shadow: var(--shadow);
+  .legend .sw{
+    width:16px;
+    height:16px;
+    border-radius:50%;
+    display:inline-block;
+    margin-right:8px;
+    border:2px solid #fff;
+    box-shadow:0 0 4px rgba(0,0,0,0.25);
   }
-  .map-reset-btn:hover { background: var(--surface2); border-color: var(--accent); transform: translateY(-2px); }
 
-  /* ── Loading overlay ── */
-  #loadingOverlay {
-    position: absolute;
-    inset: 0;
-    background: rgba(13,17,23,0.75);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    border-radius: var(--radius);
-    flex-direction: column;
-    gap: 12px;
-    color: var(--text);
-    font-weight: 500;
+  #details{
+    font-size:14px;
+    color:#222;
+    margin-top:8px;
+    padding:8px;
+    border-radius:var(--radius);
+    background:rgba(255,255,255,0.7);
+    box-shadow:0 4px 12px rgba(0,0,0,0.08);
+    min-height:64px;
   }
-  #loadingOverlay.hidden { display: none; }
 
-  .spinner {
-    width: 32px;
-    height: 32px;
-    border: 3px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+  .search-wrap{
+    display:flex;
+    gap:8px;
   }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── Leaflet popup dark theme ── */
-  .leaflet-popup-content-wrapper {
-    background: var(--surface) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radius) !important;
-    color: var(--text) !important;
-    box-shadow: var(--shadow) !important;
-  }
-  .leaflet-popup-tip { background: var(--surface) !important; }
-  .leaflet-popup-close-button { color: var(--muted) !important; }
-
-  /* ── Responsive ── */
-  @media (max-width: 900px) {
-    .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-    .map-wrap { min-height: 400px; }
+.map-sniper-btn{position:absolute;bottom:20px;right:20px;z-index:9999;width:50px;height:50px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #444;box-shadow:0 2px 8px rgba(0,0,0,0.25);}
+.map-sniper-btn img{width:28px;height:28px;}
+.map-sniper-btn:hover{transform:translateY(-4px);box-shadow:0 6px 18px rgba(0,0,0,0.28);}
+hr{border:none;border-top:1px solid #eee;margin:12px 0;}
+  @media(max-width:950px){
+    .app{
+      grid-template-columns:1fr;
+      grid-template-rows:320px 1fr;
+    }
   }
 </style>
 </head>
 <body>
 <div class="app">
-
-  <!-- ── Left Panel ── -->
   <div class="panel">
-    <div class="panel-title">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
-      Site Map Dashboard
-    </div>
-
-    <span id="statusBadge">● Initialising…</span>
-
-    <hr/>
-
-    <div class="field">
-      <label for="viewSelect">Filter by Batch</label>
-      <select id="viewSelect">
-        <option value="all">All Sites</option>
-      </select>
-    </div>
-
-    <div class="stats-row">
-      <div class="stat">
-        <div class="stat-value" id="statDone">0</div>
-        <div class="stat-label">Done</div>
+    <h2>Site Map Dashboard</h2>
+    <div class="controls">
+      <div class="row">
+        <label for="viewSelect">View</label>
+        <select id="viewSelect">
+          <option value="all">All Sites</option>
+          <!-- Options will be dynamically populated -->
+        </select>
       </div>
-      <div class="stat">
-        <div class="stat-value" id="statPending">0</div>
-        <div class="stat-label">Pending</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value" id="statPct">0%</div>
-        <div class="stat-label">Progress</div>
-      </div>
-    </div>
 
-    <div class="legend">
-      <div class="legend-item">
-        <div class="dot" id="dotDone"   style="background:var(--done)"   title="Click to change colour"></div>
-        <span>Done</span>
+      <div class="row">
+        <div class="stat">
+          <div class="small">Done / Total</div>
+          <div id="doneTotal">0 / 0</div>
+          <div class="small" id="donePct">0%</div>
+        </div>
+        <div class="stat">
+          <div class="small">Pending</div>
+          <div id="pendingCount">0</div>
+          <div class="small" id="totalCount">Total: 0</div>
+        </div>
       </div>
-      <div class="legend-item">
-        <div class="dot" id="dotPending" style="background:var(--pending)" title="Click to change colour"></div>
-        <span>Pending</span>
+
+      <div class="row legend small">
+        <span class="sw" style="background:var(--done)"></span>Done
+        <span class="sw" style="background:var(--pending)"></span>Pending
       </div>
-    </div>
 
-    <hr/>
+      <hr/>
 
-    <div class="field">
-      <label for="searchInput">Search</label>
-      <div class="search-row">
-        <input id="searchInput" type="text" placeholder="eNodeB ID or Site name…"/>
+      <div class="row search-wrap">
+        <input id="searchInput" type="text" placeholder="Search eNodeB ID / Site name"/>
         <button id="searchBtn" class="btn">Find</button>
       </div>
-    </div>
 
-    <div id="details">Hover a marker or search to see site details.</div>
+      <div id="details">Hover a marker or search to see details here.</div>
+
+    </div>
   </div>
 
-  <!-- ── Map ── -->
-  <div class="map-wrap">
-    <div id="map"></div>
-    <div id="loadingOverlay">
-      <div class="spinner"></div>
-      <span>Loading sites…</span>
+ <div class="panel" style="padding:0;">
+    <div id="map">
+      <div id="sniperBtn" class="map-sniper-btn" title="Reset view to current filter bounds">
+        <img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" alt="sniper">
+      </div>
     </div>
-    <button class="map-reset-btn" id="resetBtn" title="Reset map to current filter bounds">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-      Reset View
-    </button>
   </div>
-
 </div>
 
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <script>
-/* ============================================================
-   CONFIG — replace with your published Google Sheet CSV URL
-   File → Share → Publish to web → Sheet1 → CSV
-   ============================================================ */
-const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/pub?output=csv&gid=0';
-
-const REFRESH_MS   = 30_000;   // auto-refresh interval (ms)
-
-/* batches to hide when "All Sites" is selected */
-const EXCLUDED_BATCHES = new Set(['blocked', '24g_only', 'imacro']);
-
-/* ============================================================
-   MAP SETUP
-   ============================================================ */
 const map = L.map('map', { preferCanvas: true }).setView([3.0, 101.5], 6);
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-  attribution: '© OpenStreetMap contributors'
-}).addTo(map);
-
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 const markersLayer = L.layerGroup().addTo(map);
 
-/* ============================================================
-   STATE
-   ============================================================ */
-let allRows        = [];
-let visibleMarkers = {};       // enodeb_id → Leaflet marker
-let pinnedMarker   = null;
-let lastCsvText    = null;
-let refreshTimer   = null;
+function dotIcon(color){ return L.divIcon({className:'', html:`<div style="width:10px;height:10px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.25);"></div>`, iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-10]}); }
+const ICON_PENDING = dotIcon('#1F4E79'); const ICON_DONE = dotIcon('#66ff00');
+let allRows = [], visibleMarkers = {}, pinnedMarker = null;
+let uniqueBatches = new Set();
+let batchMap = new Map(); // Store mapping between normalized value and actual batch name
 
-let markerColors = {
-  done:    getComputedStyle(document.documentElement).getPropertyValue('--done').trim(),
-  pending: getComputedStyle(document.documentElement).getPropertyValue('--pending').trim()
-};
-
-/* ============================================================
-   UTILITIES
-   ============================================================ */
-function normalizeKey(k) {
-  return (k || '').toString().trim().toLowerCase().replace(/\s+/g, '_');
+function normalizeKey(k){ return (k||'').toString().trim().toLowerCase().replace(/\s+/g,'_'); }
+function isDoneStatus(s){
+  if(!s) return false;
+  s = s.toString().toLowerCase();
+  return /on\s*-?\s*air|onair|done|live|activated|active|\bon\b/.test(s);
 }
 
-function isDone(status) {
-  if (!status) return false;
-  return /on\s*-?\s*air|onair|done|live|activated|active|\bon\b/i.test(status.toString());
+/* find a key in a normalized-row object that roughly matches 'on air date' */
+function findOnAirKey(normObj){
+  for(const k of Object.keys(normObj)){
+    const compact = k.replace(/[^a-z0-9]/g,'');
+    if(compact === 'onairdate' || compact === 'onair' || compact.includes('onair')) return k;
+  }
+  // fallback common names
+  if('on-air_date' in normObj) return 'on-air_date';
+  if('on_air_date' in normObj) return 'on_air_date';
+  if('on_air' in normObj) return 'on_air';
+  if('onairdate' in normObj) return 'onairdate';
+  return null;
 }
 
-function escHtml(s) {
-  if (s === null || s === undefined) return '';
-  return String(s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-function normSearch(s) {
-  return (s || '').toString().toLowerCase()
-    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
-}
-
-/* minimal Levenshtein */
-function levenshtein(a, b) {
-  a = a || ''; b = b || '';
-  if (!a.length) return b.length;
-  if (!b.length) return a.length;
-  const dp = Array.from({ length: b.length + 1 }, (_, i) => i);
-  for (let i = 1; i <= a.length; i++) {
-    let prev = dp[0]; dp[0] = i;
-    for (let j = 1; j <= b.length; j++) {
-      const tmp = dp[j];
-      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i-1] === b[j-1] ? 0 : 1));
-      prev = tmp;
+/* basic Levenshtein distance - small and fast enough for our lists */
+function levenshtein(a,b){
+  a = a||''; b = b||'';
+  const m = a.length, n = b.length;
+  if(m===0) return n;
+  if(n===0) return m;
+  const dp = Array(n+1).fill(0).map((_,i)=>i);
+  for(let i=1;i<=m;i++){
+    let prev = dp[0];
+    dp[0] = i;
+    for(let j=1;j<=n;j++){
+      const temp = dp[j];
+      const cost = a[i-1] === b[j-1] ? 0 : 1;
+      dp[j] = Math.min(dp[j] + 1, dp[j-1] + 1, prev + cost);
+      prev = temp;
     }
   }
-  return dp[b.length];
+  return dp[n];
 }
 
-/* ============================================================
-   MARKER ICONS
-   ============================================================ */
-function makeIcon(color) {
-  return L.divIcon({
-    className: '',
-    html: `<div style="width:10px;height:10px;background:${color};border-radius:50%;border:2px solid rgba(255,255,255,0.6);box-shadow:0 0 6px rgba(0,0,0,0.5);"></div>`,
-    iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -10]
-  });
+/* normalize string for searching */
+function normForSearch(s){
+  if(!s) return '';
+  return s.toString().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
 }
 
-function getIcon(row) {
-  return isDone(row.status)
-    ? makeIcon(markerColors.done)
-    : makeIcon(markerColors.pending);
-}
+/* find best match (exact -> substring -> fuzzy) among a field: returns object {row,score,type} or null */
+function fuzzyFindInRows(term, rows){
+  term = term || '';
+  const tNorm = normForSearch(term);
+  if(!tNorm) return null;
 
-/* ============================================================
-   POPUP CONTENT
-   ============================================================ */
-function popupFor(r) {
-  const badge = isDone(r.status)
-    ? `<span style="color:var(--done);font-weight:600">${escHtml(r.status)}</span>`
-    : `<span style="color:var(--pending);font-weight:600">${escHtml(r.status)}</span>`;
+  // 1) exact match on enodeb_id or enodeb_name or site_name
+  let exact = rows.find(r => (r.enodeb_id && r.enodeb_id.toString().trim() === term));
+  if(exact) return { row: exact, score: 0, type: 'exact-id' };
 
-  return `<div style="font-family:'DM Sans',sans-serif;font-size:13px;line-height:1.8;min-width:220px;">
-    <div style="font-weight:700;margin-bottom:4px;font-size:14px;">${escHtml(r.enodeb_name || r.site_name)}</div>
-    <div><span style="color:#8b949e">Site Name:</span>   ${escHtml(r.site_name)}</div>
-    <div><span style="color:#8b949e">eNodeB ID:</span>   ${escHtml(r.enodeb_id)}</div>
-    <div><span style="color:#8b949e">Swap Batch:</span>  ${escHtml(r.swap_batch)}</div>
-    <div><span style="color:#8b949e">Status:</span>      ${badge}</div>
-    <div><span style="color:#8b949e">On-Air Date:</span> ${escHtml(r.on_air_date || '—')}</div>
-  </div>`;
-}
+  // 2) exact (case-insensitive) match for names
+  exact = rows.find(r => (r.site_name && normForSearch(r.site_name) === tNorm) || (r.enodeb_name && normForSearch(r.enodeb_name) === tNorm));
+  if(exact) return { row: exact, score: 0, type: 'exact-name' };
 
-/* ============================================================
-   CSV PARSING
-   ============================================================ */
-function parseRows(text) {
-  const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-  if (!parsed?.data?.length) return [];
+  // 3) substring match (contains)
+  const substringMatches = rows.filter(r =>(r.enodeb_id && r.enodeb_id.toString().toLowerCase().includes(term.toLowerCase()))
+    || (r.site_name && r.site_name.toString().toLowerCase().includes(term.toLowerCase()))
+    || (r.enodeb_name && r.enodeb_name.toString().toLowerCase().includes(term.toLowerCase())));
+  if(substringMatches.length === 1) return { row: substringMatches[0], score: 1, type: 'substring' };
+  if(substringMatches.length > 1) {
+    // pick the one with shortest name (likely best)
+    substringMatches.sort((a,b) => ( (a.site_name||a.enodeb_name||'').length - (b.site_name||b.enodeb_name||'').length ));
+    return { row: substringMatches[0], score: 2, type: 'substring-multiple' };
+  }
 
-  const rows = [];
-
-  parsed.data.forEach((r, i) => {
-    /* normalise all column keys */
-    const n = {};
-    for (const k in r) n[normalizeKey(k)] = r[k];
-
-    const get = (...keys) => {
-      for (const k of keys) {
-        if (n[k] !== undefined && n[k] !== '') return (n[k] ?? '') + '';
+  // 4) fuzzy: use levenshtein on normalized names, pick best with threshold
+  let best = null;
+  for(const r of rows){
+    const candidates = [
+      normForSearch(r.site_name || ''),
+      normForSearch(r.enodeb_name || ''),
+      normForSearch(r.enodeb_id || '')
+    ];
+    for(const c of candidates){
+      if(!c) continue;
+      const dist = levenshtein(tNorm, c);
+      // compute relative threshold: allow up to ~20% of length (min 1-3)
+      const maxAllowed = Math.max(1, Math.floor(Math.min(3, c.length * 0.2)));
+      if(dist <= maxAllowed){
+        const score = dist; // lower is better
+        if(!best || score < best.score){
+          best = { row: r, score, type: 'fuzzy' };
+        }
       }
-      return '';
-    };
-
-    /* detect on-air date column flexibly */
-    let on_air_date = '';
-    for (const k of Object.keys(n)) {
-      if (k.replace(/[^a-z0-9]/g, '').includes('onair')) {
-        on_air_date = n[k] ?? '';
-        break;
-      }
-    }
-
-    const lat = parseFloat(get('latitude', 'lat').replace(',', '.'));
-    const lon = parseFloat(get('longitude', 'lon', 'lng').replace(',', '.'));
-    const swap_batch = get('swap_batch', 'swap batch');
-
-    rows.push({
-      _idx:         i,
-      enodeb_id:    get('enodeb_id', 'enodeb id', 'enodeb'),
-      enodeb_name:  get('enodeb_name', 'enodeb name'),
-      site_name:    get('site_name', 'site name'),
-      swap_batch,
-      status:       get('status'),
-      on_air_date:  on_air_date + '',
-      lat:          Number.isFinite(lat) ? lat : NaN,
-      lon:          Number.isFinite(lon) ? lon : NaN,
-      batch_key:    normalizeKey(swap_batch)
-    });
-  });
-
-  return rows;
-}
-
-/* ============================================================
-   FILTER DROPDOWN
-   ============================================================ */
-function refreshDropdown() {
-  const select   = document.getElementById('viewSelect');
-  const previous = select.value;
-
-  /* collect unique batch names */
-  const batches = [...new Set(
-    allRows
-      .map(r => r.swap_batch.trim())
-      .filter(b => b !== '')
-  )].sort();
-
-  select.innerHTML = '<option value="all">All Sites</option>';
-
-  batches.forEach(b => {
-    const opt = document.createElement('option');
-    opt.value       = normalizeKey(b);
-    opt.textContent = b;
-    select.appendChild(opt);
-  });
-
-  /* restore previous selection if still valid */
-  if ([...select.options].some(o => o.value === previous)) {
-    select.value = previous;
-  }
-}
-
-/* ============================================================
-   RENDER MARKERS
-   ============================================================ */
-function render() {
-  markersLayer.clearLayers();
-  visibleMarkers = {};
-  pinnedMarker   = null;
-
-  const view = document.getElementById('viewSelect').value;
-
-  const rows = allRows.filter(r => {
-    if (view === 'all') return !EXCLUDED_BATCHES.has(r.batch_key);
-    return r.batch_key === view;
-  });
-
-  let done = 0, pending = 0;
-  const bounds = [];
-
-  rows.forEach(r => {
-    if (!Number.isFinite(r.lat) || !Number.isFinite(r.lon)) return;
-
-    isDone(r.status) ? done++ : pending++;
-
-    const html = popupFor(r);
-    const m    = L.marker([r.lat, r.lon], { icon: getIcon(r) });
-    m.bindPopup(html, { autoClose: false, closeOnClick: false });
-
-    m.on('mouseover', () => {
-      if (pinnedMarker && pinnedMarker !== m) pinnedMarker.closePopup();
-      m.openPopup();
-      document.getElementById('details').innerHTML = html;
-    });
-
-    m.on('mouseout', () => {
-      if (pinnedMarker !== m) m.closePopup();
-    });
-
-    m.on('click', () => {
-      if (pinnedMarker && pinnedMarker !== m) pinnedMarker.closePopup();
-      pinnedMarker = m;
-      m.openPopup();
-      document.getElementById('details').innerHTML = html;
-      map.setView(m.getLatLng(), 16);
-    });
-
-    m.addTo(markersLayer);
-
-    const key = r.enodeb_id || ('row' + r._idx);
-    visibleMarkers[key] = m;
-    bounds.push([r.lat, r.lon]);
-  });
-
-  /* stats */
-  const total = done + pending;
-  animCount('statDone',    done);
-  animCount('statPending', pending);
-  document.getElementById('statPct').textContent =
-    total ? Math.round(done / total * 100) + '%' : '0%';
-
-  /* fit bounds */
-  if (bounds.length) {
-    const b = L.latLngBounds(bounds);
-    if (b.isValid()) map.fitBounds(b.pad(0.15));
-  }
-}
-
-/* ============================================================
-   ANIMATED COUNTER
-   ============================================================ */
-function animCount(id, target) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  let start = null;
-  const from = parseInt(el.textContent) || 0;
-  const step = ts => {
-    if (!start) start = ts;
-    const pct = Math.min((ts - start) / 400, 1);
-    el.textContent = Math.round(from + (target - from) * pct);
-    if (pct < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-}
-
-/* ============================================================
-   FETCH & AUTO-REFRESH
-   ============================================================ */
-function setStatus(msg, type = '') {
-  const el = document.getElementById('statusBadge');
-  el.textContent = '● ' + msg;
-  el.className = type;
-}
-
-async function fetchCsv() {
-  try {
-    const res = await fetch(SHEET_CSV_URL);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
-
-    if (text === lastCsvText) {
-      setStatus('Up to date', 'ok');
-      return;
-    }
-
-    lastCsvText = text;
-    allRows     = parseRows(text);
-    refreshDropdown();
-    render();
-    setStatus('Live · ' + new Date().toLocaleTimeString(), 'ok');
-    document.getElementById('loadingOverlay').classList.add('hidden');
-  } catch (err) {
-    console.error('Fetch error:', err);
-    setStatus('Fetch failed — retrying', 'err');
-  }
-}
-
-/* ============================================================
-   SEARCH (exact → substring → fuzzy)
-   ============================================================ */
-function findRow(term) {
-  const t     = term.trim();
-  const tNorm = normSearch(t);
-  if (!tNorm) return null;
-
-  /* 1. exact eNodeB ID */
-  let found = allRows.find(r => r.enodeb_id.trim() === t);
-  if (found) return found;
-
-  /* 2. exact name (case-insensitive) */
-  found = allRows.find(r =>
-    normSearch(r.site_name) === tNorm || normSearch(r.enodeb_name) === tNorm
-  );
-  if (found) return found;
-
-  /* 3. substring */
-  const subs = allRows.filter(r =>
-    r.enodeb_id.toLowerCase().includes(t.toLowerCase()) ||
-    r.site_name.toLowerCase().includes(t.toLowerCase()) ||
-    r.enodeb_name.toLowerCase().includes(t.toLowerCase())
-  );
-  if (subs.length) {
-    subs.sort((a, b) => (a.site_name || a.enodeb_name || '').length -
-                        (b.site_name || b.enodeb_name || '').length);
-    return subs[0];
-  }
-
-  /* 4. fuzzy */
-  let best = null, bestScore = Infinity;
-  for (const r of allRows) {
-    for (const s of [r.site_name, r.enodeb_name, r.enodeb_id]) {
-      const c = normSearch(s);
-      if (!c) continue;
-      const d = levenshtein(tNorm, c);
-      const threshold = Math.max(1, Math.floor(c.length * 0.2));
-      if (d <= threshold && d < bestScore) { best = r; bestScore = d; }
     }
   }
   return best;
 }
 
-function doSearch() {
-  const term = document.getElementById('searchInput').value.trim();
-  if (!term) return;
+/* animate numbers */
+function animateValue(id, start, end, total) {
+  const obj = document.getElementById(id);
+  if(!obj) return;
+  let startTimestamp = null;
+  const duration = 500;
+  const step = (timestamp) => {
+    if (!startTimestamp) startTimestamp = timestamp;
+    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+    const current = Math.floor(progress * (end - start) + start);
+    obj.textContent = total ? `${current} / ${total}` : current;
+    if (progress < 1) window.requestAnimationFrame(step);
+  };
+  window.requestAnimationFrame(step);
+}
 
-  const r = findRow(term);
-  if (!r) { alert('Site not found — try a different eNodeB ID or site name.'); return; }
-
-  const key = r.enodeb_id || ('row' + r._idx);
-  const html = popupFor(r);
-  document.getElementById('details').innerHTML = html;
-
-  if (Number.isFinite(r.lat) && Number.isFinite(r.lon)) {
-    map.setView([r.lat, r.lon], 16);
-    if (visibleMarkers[key]) {
-      if (pinnedMarker && pinnedMarker !== visibleMarkers[key]) pinnedMarker.closePopup();
-      pinnedMarker = visibleMarkers[key];
-      pinnedMarker.openPopup();
+/* -------------------------
+   Update filter dropdown with unique batches
+   ------------------------- */
+function updateFilterDropdown() {
+  const select = document.getElementById('viewSelect');
+  const currentValue = select.value;
+  
+  // Clear existing options except "All Sites"
+  select.innerHTML = '<option value="all">All Sites</option>';
+  
+  // Add unique batches as options (including "blocked")
+  Array.from(uniqueBatches)
+    .filter(batch => batch && batch.trim() !== '')
+    .sort()
+    .forEach(batch => {
+      const option = document.createElement('option');
+      option.value = batch.toLowerCase().replace(/\s+/g, '_');
+      option.textContent = batch;
+      select.appendChild(option);
+      batchMap.set(option.value, batch);
+    });
+  
+  // Restore previous selection if it still exists
+  if (currentValue) {
+    const optionExists = Array.from(select.options).some(opt => opt.value === currentValue);
+    if (optionExists) {
+      select.value = currentValue;
     }
   }
 }
 
-/* ============================================================
-   LEGEND COLOUR PICKER
-   ============================================================ */
-function pickColor(current) {
-  return new Promise(resolve => {
-    const input = Object.assign(document.createElement('input'), {
-      type: 'color',
-      value: current.startsWith('#') ? current
-        : '#' + current.match(/\d+/g).map(n => (+n).toString(16).padStart(2,'0')).join('')
-    });
-    input.style.cssText = 'position:fixed;left:-9999px';
-    document.body.appendChild(input);
-    input.click();
-    input.addEventListener('change', () => {
-      resolve(input.value);
-      document.body.removeChild(input);
-    });
-    input.addEventListener('blur', () => {
-      resolve(null);
-      if (input.parentNode) document.body.removeChild(input);
-    });
+/* -------------------------
+   CSV parsing (adds on_air_date)
+   ------------------------- */
+function loadCsvText(text){
+  const parsed = Papa.parse(text,{header:true, skipEmptyLines:true});
+  if(!parsed || !parsed.data){
+    alert('CSV parse error or no data found.');
+    return;
+  }
+
+  allRows = [];
+  uniqueBatches = new Set();
+  batchMap = new Map();
+
+  parsed.data.forEach((r,i)=>{
+    const norm = {};
+    // normalized keys -> original values
+    for(const key in r){
+      norm[normalizeKey(key)] = r[key];
+    }
+
+    // site fields (keep original values too)
+    const enodeb_id = (norm['enodeb_id'] ?? norm['enodeb id'] ?? norm['enodeb'] ?? '') + '';
+    const enodeb_name = (norm['enodeb_name'] ?? norm['enodeb name'] ?? '') + '';
+    const site_name = (norm['site_name'] ?? norm['site name'] ?? '') + '';
+    const swap_batch = (norm['swap_batch'] ?? norm['swap batch'] ?? '') + '';
+    const status = (norm['status'] ?? '') + '';
+    const lat = parseFloat((norm['latitude'] ?? norm['lat'] ?? '').toString().replace(/,/g,'.'));
+    const lon = parseFloat((norm['longitude'] ?? norm['lon'] ?? norm['lng'] ?? '').toString().replace(/,/g,'.'));
+
+    // Attempt to find on-air date value robustly:
+    let on_air_date = '';
+    if('on-air_date' in norm) on_air_date = norm['on-air_date'];
+    else if('on_air_date' in norm) on_air_date = norm['on_air_date'];
+    else if('on_air' in norm) on_air_date = norm['on_air'];
+    else {
+      for(const originalKey in r){
+        if(!originalKey) continue;
+        const compact = originalKey.toString().toLowerCase().replace(/[^a-z0-9]/g,'');
+        if(compact === 'onairdate' || compact === 'onair' || compact.indexOf('onair') !== -1){
+          on_air_date = r[originalKey];
+          break;
+        }
+      }
+    }
+    on_air_date = (on_air_date ?? '') + '';
+
+    const row = {
+      _rowIndex: i,
+      enodeb_id,
+      enodeb_name: enodeb_name || site_name,
+      site_name,
+      swap_batch,
+      status,
+      on_air_date,
+      lat: Number.isFinite(lat) ? lat : NaN,
+      lon: Number.isFinite(lon) ? lon : NaN,
+      // Add normalized batch for easier filtering
+      normalized_batch: (swap_batch || '').toLowerCase().replace(/\s+/g, '_')
+    };
+
+    allRows.push(row);
+    
+    // Add batch to unique batches set (including "blocked")
+    if (swap_batch && swap_batch.trim() !== '') {
+      uniqueBatches.add(swap_batch.trim());
+    }
+  });
+
+  // Update filter dropdown with new batches
+  updateFilterDropdown();
+  
+  render();
+}
+
+/* -------------------------
+   fetch CSV from Google Sheets (CSV export URL)
+   - make sure sheet is 'Anyone with link can view' and use the CSV export link
+   ------------------------- */
+function fetchFullList() {
+  const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/export?format=csv&id=10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg&gid=0';
+
+  fetch(SHEET_CSV_URL)
+    .then(r => {
+      if(!r.ok) throw new Error('Network response not ok');
+      return r.text();
+    })
+    .then(text => loadCsvText(text))
+    .catch(err => alert('Could not fetch data from Google Sheets: ' + err));
+}
+
+/* -------------------------
+   Render markers (popup includes On-Air Date)
+   ------------------------- */
+function render(){
+  markersLayer.clearLayers();
+  visibleMarkers = {};
+  const view = document.getElementById('viewSelect').value;
+  
+  let rows = allRows.slice();
+  
+  // MODIFIED: When "All Sites" is selected, exclude "blocked" batch
+  if(view === 'all') {
+  rows = allRows.filter(r => {
+    const batch = r.normalized_batch;
+    const isExcluded =
+      batch === 'blocked' ||
+      batch === '24g_only'||
+      batch === 'imacro' ;
+    return !isExcluded;
   });
 }
 
-function recolorMarkers(type) {
-  const color = markerColors[type];
-  for (const key in visibleMarkers) {
+  // If not "all", filter by normalized_batch (including "blocked" if selected)
+  else if(view !== '') {
+    rows = allRows.filter(r => r.normalized_batch === view);
+  }
+
+  let doneCount = 0, pendingCount = 0;
+  const bounds = [];
+
+  rows.forEach(r=>{
+    if(!Number.isFinite(r.lat) || !Number.isFinite(r.lon)) return;
+    const done = isDoneStatus(r.status);
+    if(done) doneCount++; else pendingCount++;
+    const icon = done ? ICON_DONE : ICON_PENDING;
+
+    const popupHtml = `<div style="min-width:240px">
+      <strong>${escapeHtml(r.enodeb_name)}</strong><br/>
+      <em>Site Name:</em> ${escapeHtml(r.site_name)}<br/>
+      <em>eNodeB ID:</em> ${escapeHtml(r.enodeb_id)}<br/>
+      <em>Swap Batch:</em> ${escapeHtml(r.swap_batch)}<br/>
+      <em>Status:</em> ${escapeHtml(r.status)}<br/>
+      <em>On-Air Date:</em> ${escapeHtml(r.on_air_date || '—')}
+    </div>`;
+
+    const m = L.marker([r.lat, r.lon], { icon });
+    m.bindPopup(popupHtml, { autoClose:false, closeOnClick:false });
+
+    m.on('mouseover', () => {
+      if(pinnedMarker && pinnedMarker !== m) pinnedMarker.closePopup();
+      pinnedMarker = null;
+      m.openPopup();
+      document.getElementById('details').innerHTML = popupHtml;
+    });
+
+    m.on('mouseout', () => { if(pinnedMarker !== m) m.closePopup(); });
+
+    m.on('click', () => {
+      if(pinnedMarker && pinnedMarker !== m) pinnedMarker.closePopup();
+      pinnedMarker = m;
+      m.openPopup();
+      document.getElementById('details').innerHTML = popupHtml;
+      map.setView(m.getLatLng(), 16);
+    });
+
+    m.addTo(markersLayer);
+    const key = (r.enodeb_id || ('row' + r._rowIndex)).toString();
+    visibleMarkers[key] = m;
+    bounds.push([r.lat, r.lon]);
+  });
+
+  // animate with total shown as "done / total" for doneTotal
+  animateValue('doneTotal', 0, doneCount, rows.length);
+  animateValue('pendingCount', 0, pendingCount);
+  document.getElementById('donePct').textContent = rows.length ? (Math.round(doneCount/rows.length*10000)/100) + '%' : '0%';
+  document.getElementById('totalCount').textContent = `Total: ${rows.length}`;
+
+  if(bounds.length){
+    const b = L.latLngBounds(bounds);
+    if(b.isValid()) map.fitBounds(b.pad(0.2));
+  }
+}
+
+/* -------------------------
+   Legend color picker for markers
+   ------------------------- */
+const statusColors = {
+  done: getComputedStyle(document.documentElement).getPropertyValue('--done').trim(),
+  pending: getComputedStyle(document.documentElement).getPropertyValue('--pending').trim()
+};
+
+// click legend dot to pick a color
+document.querySelectorAll('.legend .sw').forEach((el, idx) => {
+  const status = idx === 0 ? 'done' : 'pending';
+  el.addEventListener('click', async () => {
+    const newColor = await pickColor(statusColors[status]);
+    if (!newColor) return;
+    statusColors[status] = newColor;
+    el.style.background = newColor;
+    updateMarkerColors(status, newColor);
+  });
+});
+
+// color picker popup
+function pickColor(current) {
+  return new Promise(resolve => {
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.value = rgbToHex(current);
+    input.style.position = 'fixed';
+    input.style.left = '-9999px';
+    document.body.appendChild(input);
+    input.click();
+    input.addEventListener('input', () => resolve(input.value));
+    input.addEventListener('change', () => { resolve(input.value); document.body.removeChild(input); });
+    input.addEventListener('blur', () => { resolve(null); document.body.removeChild(input); });
+  });
+}
+
+// convert rgb() to hex if needed
+function rgbToHex(rgb){
+  if(rgb.startsWith('#')) return rgb;
+  const nums = rgb.match(/\d+/g).map(Number);
+  return "#" + nums.map(n => n.toString(16).padStart(2,'0')).join('');
+}
+
+// regenerate marker icons with new color
+function updateMarkerColors(status, color){
+  for(const key in visibleMarkers){
     const m = visibleMarkers[key];
-    const r = allRows.find(row => (row.enodeb_id || ('row' + row._idx)) === key);
-    if (!r) continue;
-    const rowDone = isDone(r.status);
-    if ((type === 'done' && rowDone) || (type === 'pending' && !rowDone)) {
-      m.setIcon(makeIcon(color));
+    const row = allRows.find(r => (r.enodeb_id || ('row'+r._rowIndex)).toString() === key);
+    if(!row) continue;
+
+    const done = isDoneStatus(row.status);
+    if ((status === 'done' && done) || (status === 'pending' && !done)){
+      const icon = dotIcon(color);
+      m.setIcon(icon);
     }
   }
 }
 
-document.getElementById('dotDone').addEventListener('click', async () => {
-  const c = await pickColor(markerColors.done);
-  if (!c) return;
-  markerColors.done = c;
-  document.getElementById('dotDone').style.background = c;
-  recolorMarkers('done');
-});
+/* -------------------------
+   Escape HTML utility
+   ------------------------- */
+function escapeHtml(s){
+  if(s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 
-document.getElementById('dotPending').addEventListener('click', async () => {
-  const c = await pickColor(markerColors.pending);
-  if (!c) return;
-  markerColors.pending = c;
-  document.getElementById('dotPending').style.background = c;
-  recolorMarkers('pending');
-});
+/* -------------------------
+   Search: supports id exact and fuzzy name search
+   ------------------------- */
+function searchAndZoom(term){
+  if(!term || !term.toString().trim()){ alert('Enter a eNodeB ID, or Site name'); return; }
+  term = term.toString().trim();
 
-/* ============================================================
-   EVENT LISTENERS
-   ============================================================ */
+  // 1) exact key in visibleMarkers
+  if(visibleMarkers[term]){
+    const m = visibleMarkers[term];
+    map.setView(m.getLatLng(), 16);
+    document.getElementById('details').innerHTML = m.getPopup() ? m.getPopup().getContent() : '';
+    m.openPopup();
+    pinnedMarker = m;
+    return;
+  }
+
+  // 2) try exact matches in allRows (enodeb_id)
+  const exact = allRows.find(r => (r.enodeb_id && r.enodeb_id.toString().trim() === term));
+  if(exact && Number.isFinite(exact.lat) && Number.isFinite(exact.lon)){
+    map.setView([exact.lat, exact.lon], 16);
+    const key = (exact.enodeb_id || ('row' + exact._rowIndex)).toString();
+    if(visibleMarkers[key]){
+      const m = visibleMarkers[key];
+      document.getElementById('details').innerHTML = m.getPopup() ? m.getPopup().getContent() : '';
+      m.openPopup();
+      pinnedMarker = m;
+    } else {
+      // not visible in current filter — just show details in panel
+      const popupHtml = `<div style="min-width:220px"><strong>${escapeHtml(exact.enodeb_name)}</strong><br/>
+        <em>Site Name:</em> ${escapeHtml(exact.site_name)}<br/>
+        <em>eNodeB ID:</em> ${escapeHtml(exact.enodeb_id)}<br/>
+        <em>Swap Batch:</em> ${escapeHtml(exact.swap_batch)}<br/>
+        <em>Status:</em> ${escapeHtml(exact.status)}<br/>
+        <em>On-Air Date:</em> ${escapeHtml(exact.on_air_date || '—')}</div>`;
+      document.getElementById('details').innerHTML = popupHtml;
+    }
+    return;
+  }
+
+  // 3) fuzzy / partial search across site_name / enodeb_name / enodeb_id
+  const result = fuzzyFindInRows(term, allRows);
+  if(result && result.row){
+    const found = result.row;
+    if(Number.isFinite(found.lat) && Number.isFinite(found.lon)){
+      // if marker is visible, open; otherwise show details
+      const key = (found.enodeb_id || ('row' + found._rowIndex)).toString();
+      if(visibleMarkers[key]){
+        const m = visibleMarkers[key];
+        map.setView(m.getLatLng(),16);
+        document.getElementById('details').innerHTML = m.getPopup() ? m.getPopup().getContent() : '';
+        m.openPopup();
+        pinnedMarker = m;
+      } else {
+        // show details and zoom map
+        map.setView([found.lat, found.lon], 16);
+        const popupHtml = `<div style="min-width:220px"><strong>${escapeHtml(found.enodeb_name)}</strong><br/>
+          <em>Site Name:</em> ${escapeHtml(found.site_name)}<br/>
+          <em>eNodeB ID:</em> ${escapeHtml(found.enodeb_id)}<br/>
+          <em>Swap Batch:</em> ${escapeHtml(found.swap_batch)}<br/>
+          <em>Status:</em> ${escapeHtml(found.status)}<br/>
+          <em>On-Air Date:</em> ${escapeHtml(found.on_air_date || '—')}</div>`;
+        document.getElementById('details').innerHTML = popupHtml;
+        pinnedMarker = null;
+      }
+      return;
+    }
+  }
+
+  alert('Site not found (try exact eNodeB ID, or part of the Site Name).');
+}
+
+/* -------------------------
+   Event listeners
+   ------------------------- */
 document.getElementById('viewSelect').addEventListener('change', render);
-document.getElementById('searchBtn').addEventListener('click', doSearch);
-document.getElementById('searchInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
-});
-document.getElementById('resetBtn').addEventListener('click', render);
+document.getElementById('searchBtn').addEventListener('click', ()=> searchAndZoom(document.getElementById('searchInput').value));
+document.getElementById('searchInput').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); searchAndZoom(e.target.value); }});
+document.getElementById('sniperBtn').addEventListener('click',()=>render());
+  
+window.addEventListener('load', ()=>{ fetchFullList(); setTimeout(()=>map.invalidateSize(),300); });
 
-/* ============================================================
-   BOOT
-   ============================================================ */
-window.addEventListener('load', () => {
-  fetchCsv();
-  setTimeout(() => map.invalidateSize(), 300);
-  setInterval(fetchCsv, REFRESH_MS);
-});
+// -------------------------
+// Auto-refresh CSV every 30 seconds
+// -------------------------
+let lastCsvText = null;
+const REFRESH_INTERVAL_MS = 0.5 * 60 * 1000; // 30 seconds
+
+async function smartFetchCsv() {
+  try {
+    const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSfL5XPVZGIaX_PNiDYtjftJOyep4x5IzOJNPvUMZQjt5TRdV-TZyRgzo5jM5vP-jxQljGtseIIQikm/export?format=csv&id=10UMN4MqTENsbHqdp2XdH7wDuNcbKtHdQhB3rKrd7fhg&gid=0';
+    const response = await fetch(SHEET_CSV_URL);
+    if (!response.ok) throw new Error('Network response not ok');
+    const csvText = await response.text();
+
+    if (csvText !== lastCsvText) {
+      console.log('CSV changed, reloading map...');
+      lastCsvText = csvText;
+      loadCsvText(csvText);
+    } else {
+      console.log('CSV unchanged, no update needed.');
+    }
+  } catch (err) {
+    console.error('Error fetching CSV:', err);
+  }
+}
+
+// Initial load
+smartFetchCsv();
+
+// Auto-refresh every 30 seconds
+setInterval(smartFetchCsv, REFRESH_INTERVAL_MS);
+
 </script>
 </body>
 </html>
+
+
+
+
