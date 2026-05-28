@@ -250,7 +250,7 @@ function normalizeKey(k){ return (k||'').toString().trim().toLowerCase().replace
 function isDoneStatus(s){
   if(!s) return false;
   s = s.toString().toLowerCase();
-  return /on\s*-?\s*air|onair|done|live|activated|active|\bon\b/.test(s);
+  return /on\s*-?\s*air|onair|done|live|activated|active||Done|On-Air|On Air|OnAir\bon\b/.test(s);
 }
 
 /* find a key in a normalized-row object that roughly matches 'on air date' */
